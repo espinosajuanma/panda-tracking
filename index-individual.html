@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Time Tracking</title>
+    <link id="runtimeAppFavicon" rel="shortcut icon" type="image/png" href="https://storage.googleapis.com/static.slingrs.io/platform/apps/favicon.ico"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="./vanilla-calendar.css">
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="                      crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.5.0/knockout-min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+    <script src="./vanilla-calendar.js"></script>
+
+
+    <script src="./app.js"></script>
+    <style>
+        main {
+            height: 100vh;
+        }
+        #login {
+            width: 50vw;
+            margin: auto;
+            margin-top: 50px;
+        }
+        #calendar {
+            height: 300px;
+            width: 250px;
+        }
+        #stats {
+            width: 100%;
+            padding: 20px;
+        }
+        .readOnly {
+            opacity: .8;
+        }
+        .loading {
+            opacity: .5;
+            pointer-events: none;
+        }
+        .switch-label {
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 1.2rem;
+        }
+    </style>
+</head>
+<body>
+    <main class="pt-2 container">
+        <h2 class="fw-bold text-center">Time Tracking</h2>
+
+        <!-- LOGIN -->
+        <div data-bind="hidden: logged" class="card" id="login">
+            <div class="card-header">
+                <h5 class="card-title">HQ</h5>
+            </div>
+            <div class="card-body">
+                <label for="email">Email</label>
+                <input data-bind="value: email, attr: { disabled: logginIn }" type="email" name="email" class="form-control" id="email">
+                <label for="password">Password</label>
+                <input data-bind="value: pass, attr: { disabled: logginIn }" type="password" name="password" class="form-control" id="password">
+                <button data-bind="attr: { disabled: logginIn }, click: login" class="mt-2 btn btn-primary">Login</button>
+            </div>
+        </div>
+
+        <!-- DASHBOARD -->
+        <div data-bind="visible: logged, css: { loading: loading }" class="container" id="time-tracking-body">
+            <div class="mb-2 border border-1 rounded d-flex justify-content-start align-items-start">
+                <!-- CALENDAR SELECTOR -->
+                <div id="calendar"></div>
+                <!-- STATS -->
+                <div id="stats">
+                    <h5>Stats</h5>
+                    <div>
+                        <div id="month-progress">
+                            <h6>Month Progress</h6>
+                            <div class="progress">
+                                <div data-bind="text: monthProgress.billable, style: { width: monthProgress.billablePercentage }" class="progress-bar bg-success" role="progressbar"></div>
+                                <div data-bind="text: monthProgress.nonBillable, style: { width: monthProgress.nonBillablePercentage }" class="progress-bar bg-warning" role="progressbar"></div>
+                            </div>
+                        </div>
+                        <div id="projects">
+                            <h6 class="mt-2">Projects</h6>
+                            <div class="group-list" data-bind="foreach: projects">
+                                <li data-bind="visible: isVisible" class="list-group-item">
+                                    <span data-bind="text: name"></span>
+                                    <div class="progress">
+                                        <div data-bind="text: billable, style: { width: billablePercentage }" class="progress-bar bg-success" role="progressbar"></div>
+                                        <div data-bind="text: nonBillable, style: { width: nonBillablePercentage }" class="progress-bar bg-warning" role="progressbar"></div>
+                                    </div>
+                                </li>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-5 d-flex justify-content-between align-items-end">
+                        <div>
+                            <button data-bind="click: updateDashboard, attr: { disabled: loading }" class="btn btn-outline-primary"><i class="bi bi-arrow-clockwise"></i></button>
+                        </div>
+                        <div>
+                            <button data-bind="click: goToToday, attr: { disabled: loading }" class="btn btn-outline-primary m-1"><i class="bi bi-calendar-event"></i> Today</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- DAYS -->
+            <div id="entries">
+                <h5>Month entries</h5>
+                <!-- ko foreach: weeks -->
+                <!-- ko foreach: days -->
+                 <div data-bind="visible: isVisible, attr: { id: dateStr() }, css: { 'border-primary': isToday, 'border-warning': isHoliday, 'border-danger': isWeekend }" class="card mt-2">
+                    <div class="card-header">
+                        <h6 class="card-title d-flex justify-content-between align-items-center">
+                            <div>
+                                <span data-bind="visible: isHoliday, attr: { title: holidayDetail }" data-bs-toggle="tooltip"><i class="bi bi-calendar-x-fill text-warning"></i> </span>
+                                <span data-bind="visible: isWeekend" title="Weekend" data-bs-toggle="tooltip"><i class="bi bi-calendar-x-fill text-danger"></i> </span>
+                                <span data-bind="visible: isBussinessDay"><i class="bi bi-calendar-check-fill text-primary"></i> </span>
+                                <span data-bind="text: title"></span>
+                            </div>
+                            <div>
+                                <span data-bind="visible: duration !== '0h', text: duration" class="badge bg-primary ms-1"></span>
+                                <span data-bind="visible: durationBillable !== '0h', text: durationBillable" class="badge bg-success ms-1"></span>
+                                <span data-bind="visible: durationBillable !== '0h', text: durationNonBillable" class="badge bg-warning ms-1"></span>
+                            </div>
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <div data-bind="visible: isBussinessDay">
+                            <div class="d-flex justify-content-end">
+                                <button data-bind="click: showNotes" class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" aria-expanded="false">
+                                    <i data-bind="css: { 'bi-eye': visibleNotes, 'bi-eye-slash': !visibleNotes() }" class="bi bi-eye"></i>
+                                </button>
+                                <button data-bind="attr: { 'data-bs-target': '#new-entry-' + dateStr(), 'aria-controls': 'new-entry-' + dateStr() }" class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" aria-expanded="false">
+                                    <i class="bi bi-plus"></i> New Entry
+                                </button>
+                            </div>
+                            <div data-bind="attr: { id: 'new-entry-' + dateStr() }" class="collapse">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <input type="checkbox" data-bind="checked: billable, attr: { id: 'billable-'+ dateStr(), name: 'billable-' + dateStr() }" hidden>
+                                        <label data-bind="attr: { for: 'billable-' + dateStr() }, css: { 'btn-outline-success': billable, 'btn-outline-warning': !billable() }" class="switch-label btn">
+                                            <i data-bind="css: { 'bi-cash': billable , 'bi-piggy-bank': !billable() }" class="bi"></i>
+                                        </label>
+                                    </div>
+                                    <div class="m-3 flex">
+                                        <select data-bind="options: $root.projects, optionsText: 'name', value: project" class="form-select">
+                                            <option data-bind="text: name, value: id, visible: isVisible"></option>
+                                        </select>
+                                    </div>
+                                    <div class="m-3 flex-fill">
+                                        <input data-bind="value: timeSpent, attr: { disabled: $root.loading, id: 'time-'+dateStr(), name: 'time' }" type="range" name="time" class="form-range" min="1800000" max="28800000" step="1800000">
+                                        <label class="d-flex justify-content-between align-items-center" for="time">
+                                            <span><i class="bi bi-stopwatch"></i></span>
+                                            <span class="fw-bold" data-bind="text: time"></span>
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="mb-3 d-flex justify-content-between">
+                                    <textarea placeholder="Notes" data-bind="value: notes" name="notes" class="form-control" rows="1" style="width: 95%;"></textarea>
+                                    <div data-bind="click: logEntry, attr: { disabled: $root.loading }" class="btn btn-outline-primary"><i class="bi bi-plus-lg"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                        <h6>Entries</h6>
+                        <!-- ENTRIES -->
+                        <ul data-bind="foreach: entries" class="list-group list-group-flush">
+                            <li data-bind="css: { readOnly: readOnly }" class="list-group-item d-flex justify-content-between align-items-start" data-bs-toggle="collapse" data-bs-target="#multiCollapseExample2">
+                                <div class="ms-2 me-auto">
+                                    <div data-bind="text: project" class="fw-bold"></div>
+                                    <span data-bind="text: notes, visible: $parent.visibleNotes"></span>
+                                </div>
+                                <div class="d-flex flex-column align-items-end">
+                                    <span data-bind="text: duration, css: { 'bg-success': billable, 'bg-warning': nonBillable }" class="badge"></span>
+                                    <div class="d-flex">
+                                        <button data-bind="click: edit, hidden: readOnly" class="btn btn-sm text-info"><i class="bi bi-pencil-square"></i></button>
+                                        <button data-bind="click: remove, hidden: readOnly" class="btn btn-sm text-danger"><i class="bi bi-trash"></i></button>
+                                    </div>
+                                </div>
+                            </li>
+                        </ul>
+                        <div data-bind="visible: entries().length === 0" class="readOnly">No entries yet</div>
+                        <div data-bind="visible: entries().length > 0" class="readOnly">
+                            <div data-bind="visible: missingDuration" class="alert alert-warning">
+                                <i class="bi bi-exclamation-circle"></i> Missing <span data-bind="text: missingDuration" class="fw-bold"></span>
+                            </div>
+                        </div>
+                        
+                    </div>
+                 </div>
+                <!-- /ko -->
+                <!-- /ko -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Toasts -->
+    <div class="toast-container">
+        <!-- ko foreach: toasts -->
+        <div data-bind="id: id, style: { error: error, success: success, info: info }" class="toast align-items-center text-white border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div data-bind="text: msg" class="toast-body"></div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+        <!-- /ko -->
+    </div>
+</body>
+</html>
