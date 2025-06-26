@@ -47,6 +47,21 @@
             gap: 5px;
             font-size: 1.2rem;
         }
+
+        #entries {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .week {
+            display: flex;
+            gap: 10px;
+        }
+        .day-card {
+            flex: 1;
+            border: 1px solid #ccc;
+            background: #f9f9f9;
+        }
     </style>
 </head>
 <body>
@@ -56,7 +71,7 @@
         <!-- LOGIN -->
         <div data-bind="hidden: logged" class="card" id="login">
             <div class="card-header">
-                <h5 class="card-title">HQ</h5>
+                <h5 class="card-title">Solutions</h5>
             </div>
             <div class="card-body">
                 <label for="email">Email</label>
@@ -80,7 +95,6 @@
                             <h6>Month Progress</h6>
                             <div class="progress">
                                 <div data-bind="text: monthProgress.billable, style: { width: monthProgress.billablePercentage }" class="progress-bar bg-success" role="progressbar"></div>
-                                <div data-bind="text: monthProgress.nonBillable, style: { width: monthProgress.nonBillablePercentage }" class="progress-bar bg-warning" role="progressbar"></div>
                             </div>
                         </div>
                         <div id="projects">
@@ -90,7 +104,6 @@
                                     <span data-bind="text: name"></span>
                                     <div class="progress">
                                         <div data-bind="text: billable, style: { width: billablePercentage }" class="progress-bar bg-success" role="progressbar"></div>
-                                        <div data-bind="text: nonBillable, style: { width: nonBillablePercentage }" class="progress-bar bg-warning" role="progressbar"></div>
                                     </div>
                                 </li>
                             </div>
@@ -108,24 +121,18 @@
             </div>
 
             <!-- DAYS -->
+            <h5>Month entries</h5>
             <div id="entries">
-                <h5>Month entries</h5>
                 <!-- ko foreach: weeks -->
+                <div class="week">
                 <!-- ko foreach: days -->
-                 <div data-bind="visible: isVisible, attr: { id: dateStr() }, css: { 'border-primary': isToday, 'border-warning': isHoliday, 'border-danger': isWeekend }" class="card mt-2">
+                 <div data-bind="visible: isVisible, attr: { id: dateStr() }, css: { 'border-primary': isToday, 'border-warning': isHoliday, 'border-danger': isWeekend }" class="card mt-2 day-card">
                     <div class="card-header">
-                        <h6 class="card-title d-flex justify-content-between align-items-center">
-                            <div>
-                                <span data-bind="visible: isHoliday, attr: { title: holidayDetail }" data-bs-toggle="tooltip"><i class="bi bi-calendar-x-fill text-warning"></i> </span>
-                                <span data-bind="visible: isWeekend" title="Weekend" data-bs-toggle="tooltip"><i class="bi bi-calendar-x-fill text-danger"></i> </span>
-                                <span data-bind="visible: isBussinessDay"><i class="bi bi-calendar-check-fill text-primary"></i> </span>
-                                <span data-bind="text: title"></span>
-                            </div>
-                            <div>
-                                <span data-bind="visible: duration !== '0h', text: duration" class="badge bg-primary ms-1"></span>
-                                <span data-bind="visible: durationBillable !== '0h', text: durationBillable" class="badge bg-success ms-1"></span>
-                                <span data-bind="visible: durationBillable !== '0h', text: durationNonBillable" class="badge bg-warning ms-1"></span>
-                            </div>
+                        <h6 class="card-title">
+                            <span data-bind="visible: isHoliday, attr: { title: holidayDetail }" data-bs-toggle="tooltip"><i class="bi bi-calendar-x-fill text-warning"></i> </span>
+                            <span data-bind="visible: isWeekend" title="Weekend" data-bs-toggle="tooltip"><i class="bi bi-calendar-x-fill text-danger"></i> </span>
+                            <span data-bind="visible: isBussinessDay"><i class="bi bi-calendar-check-fill text-primary"></i> </span>
+                            <span data-bind="text: title"></span>
                         </h6>
                     </div>
                     <div class="card-body">
@@ -138,26 +145,20 @@
                                     <i class="bi bi-plus"></i> New Entry
                                 </button>
                             </div>
-                            <div data-bind="attr: { id: 'new-entry-' + dateStr() }" class="collapse">
+                            <div data-bind="attr: { id: 'new-entry-' + dateStr() }" class="collapse ">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <input type="checkbox" data-bind="checked: billable, attr: { id: 'billable-'+ dateStr(), name: 'billable-' + dateStr() }" hidden>
-                                        <label data-bind="attr: { for: 'billable-' + dateStr() }, css: { 'btn-outline-success': billable, 'btn-outline-warning': !billable() }" class="switch-label btn">
-                                            <i data-bind="css: { 'bi-cash': billable , 'bi-piggy-bank': !billable() }" class="bi"></i>
-                                        </label>
-                                    </div>
                                     <div class="m-3 flex">
                                         <select data-bind="options: $root.projects, optionsText: 'name', value: project" class="form-select">
                                             <option data-bind="text: name, value: id, visible: isVisible"></option>
                                         </select>
                                     </div>
-                                    <div class="m-3 flex-fill">
-                                        <input data-bind="value: timeSpent, attr: { disabled: $root.loading, id: 'time-'+dateStr(), name: 'time' }" type="range" name="time" class="form-range" min="1800000" max="28800000" step="1800000">
-                                        <label class="d-flex justify-content-between align-items-center" for="time">
-                                            <span><i class="bi bi-stopwatch"></i></span>
-                                            <span class="fw-bold" data-bind="text: time"></span>
-                                        </label>
-                                    </div>
+                                </div>
+                                <div class="m-3 flex-fill">
+                                    <input data-bind="value: timeSpent, attr: { disabled: $root.loading, id: 'time-'+dateStr(), name: 'time' }" type="range" name="time" class="form-range" min="1800000" max="28800000" step="1800000">
+                                    <label class="d-flex justify-content-between align-items-center" for="time">
+                                        <span><i class="bi bi-stopwatch"></i></span>
+                                        <span class="fw-bold" data-bind="text: time"></span>
+                                    </label>
                                 </div>
                                 <div class="mb-3 d-flex justify-content-between">
                                     <textarea placeholder="Notes" data-bind="value: notes" name="notes" class="form-control" rows="1" style="width: 95%;"></textarea>
@@ -174,7 +175,7 @@
                                     <span data-bind="text: notes, visible: $parent.visibleNotes"></span>
                                 </div>
                                 <div class="d-flex flex-column align-items-end">
-                                    <span data-bind="text: duration, css: { 'bg-success': billable, 'bg-warning': nonBillable }" class="badge"></span>
+                                    <span data-bind="text: duration" class="badge bg-success"></span>
                                     <div class="d-flex">
                                         <button data-bind="click: edit, hidden: readOnly" class="btn btn-sm text-info"><i class="bi bi-pencil-square"></i></button>
                                         <button data-bind="click: remove, hidden: readOnly" class="btn btn-sm text-danger"><i class="bi bi-trash"></i></button>
@@ -188,10 +189,10 @@
                                 <i class="bi bi-exclamation-circle"></i> Missing <span data-bind="text: missingDuration" class="fw-bold"></span>
                             </div>
                         </div>
-                        
                     </div>
                  </div>
                 <!-- /ko -->
+                </div>
                 <!-- /ko -->
             </div>
         </div>

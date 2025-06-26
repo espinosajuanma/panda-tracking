@@ -1,3 +1,5 @@
+const TIME_TRACKING_ENTITY = 'timeTracking';
+
 class Slingr {
     constructor(app, env, token) {
         this.url = `https://${app}.slingrs.io/${env}/runtime/api`;
@@ -72,7 +74,7 @@ class Slingr {
 
 class ViewModel {
     constructor() {
-        this.slingr = new Slingr('hq', 'prod');
+        this.slingr = new Slingr('solutions', 'prod');
 
         // Login
         this.email = ko.observable(null);
@@ -86,7 +88,7 @@ class ViewModel {
             }
         });
 
-        let token = localStorage.getItem('hq:timetracking:token');
+        let token = localStorage.getItem('solutions:timetracking:token');
         if (token) {
             console.log('Using token', token);
             this.slingr.token = token;
@@ -95,13 +97,13 @@ class ViewModel {
             .then(user => {
                 console.log('Logged in as', user?.id);
                 this.logged(true);
-                localStorage.setItem('hq:timetracking:token', this.slingr.token);
+                localStorage.setItem('solutions:timetracking:token', this.slingr.token);
                 this.addToast('Logged in');
             })
             .catch(e => {
                 console.warn('Invalid token', e);
                 this.slingr.token = null;
-                localStorage.removeItem('hq:timetracking:token');
+                localStorage.removeItem('solutions:timetracking:token');
                 this.logged(false);
                 this.addToast('Invalid token or expired', 'error');
             })
@@ -143,12 +145,9 @@ class ViewModel {
         });
         this.monthProgress = {
             billablePercentage: ko.observable(0),
-            nonBillablePercentage: ko.observable(0),
             billable: ko.observable('0h'),
-            nonBillable: ko.observable('0h'),
         }
         this.billable = ko.observable(true);
-        this.nonBillable = ko.observable(false);
         this.notes = ko.observable('');
     }
 
@@ -162,7 +161,7 @@ class ViewModel {
         }
         if (this.slingr.token) {
             let user = await this.slingr.getCurrentUser();
-            localStorage.setItem('hq:timetracking:token', this.slingr.token);
+            localStorage.setItem('solutions:timetracking:token', this.slingr.token);
             console.log('Logged', user);
             this.logged(true);
         }
@@ -230,8 +229,10 @@ class ViewModel {
             _sortField: 'day',
             _sortType: 'asc',
         }
-        let { items: holidays } = await this.slingr.get('/data/management.holidays', query);
-        //this.calendar.set({ selectedHolidays: holidays.map(h => h.day) });
+        //let { items: holidays } = await this.slingr.get('/data/management.holidays', query);
+        let { items: holidays } = JSON.parse(`{"total":2,"offset":"6716b9119ecada7d9349a037","items":[{"id":"68482c459450ec084b4e4f39","version":0,"label":"June , 16 - Passing to Immortality of General Martín Güemes","entity":{"id":"5e84a6cb07081b50bd6c1bc6","name":"management.holidays"},"country":{"id":"5c617a71bbaa2e000c9a4740","label":"Argentina"},"day":"2025-06-16","title":"Passing to Immortality of General Martín Güemes","ignore":false},{"id":"6716b9119ecada7d9349a037","version":0,"label":"June , 20 - Anniversary of the Death of General Manuel Belgrano","entity":{"id":"5e84a6cb07081b50bd6c1bc6","name":"management.holidays"},"country":{"id":"5c617a71bbaa2e000c9a4740","label":"Argentina"},"day":"2025-06-20","title":"Anniversary of the Death of General Manuel Belgrano","ignore":false}]}`)
+        holidays.push({ day: '2025-06-02', label: 'Leave' });
+        this.calendar.set({ selectedHolidays: holidays.map(h => h.day) });
         this.holidays(holidays)
     }
 
@@ -239,12 +240,12 @@ class ViewModel {
         let [start, end] = [this.getStartMonth(), this.getEndMonth()];
         let query = {
             _size: 1000,
-            _sortField: 'day',
+            _sortField: 'date',
             _sortType: 'asc',
-            day: `between(${start.getTime()},${end.getTime()})`,
+            date: `between(${start.getTime()},${end.getTime()})`,
             person: this.slingr.user.id,
         }
-        let { items: entries } = await this.slingr.get('/data/frontendBilling.timeTracking', query);
+        let { items: entries } = await this.slingr.get(`/data/${TIME_TRACKING_ENTITY}`, query);
 
         let weeks = this.listWeeksBetweenMonth()
             .map(week => new Week(week, entries));
@@ -256,19 +257,16 @@ class ViewModel {
     updateStats = async () => {
         let total = this.weeks().map(w => w.days()).flat().filter(e => ! e.isWeekend()).length * 8 * 60 * 60 * 1000;
         let entries = this.weeks().map(w => w.days()).flat().map(d => d.entries()).flat();
-        let totalBillable = entries.filter(e => e.raw.billable).reduce((acc, e) => acc + e.raw.timeSpent, 0);
-        let totalNonBillable = entries.filter(e => !e.raw.billable).reduce((acc, e) => acc + e.raw.timeSpent, 0);
-
+        let totalBillable = entries.reduce((acc, e) => acc + e.raw.timeSpent, 0);
         let billablePercentage = ((totalBillable / total) * 100).toFixed(2) + '%';
-        let nonBillablePercentage = ((totalNonBillable / total) * 100).toFixed(2) + '%';
-
-        this.monthProgress.billable(formatMsToHours(totalBillable));
-        this.monthProgress.nonBillable(formatMsToHours(totalNonBillable));
+        this.monthProgress.billable(formatMsToDuration(totalBillable));
         this.monthProgress.billablePercentage(billablePercentage);
-        this.monthProgress.nonBillablePercentage(nonBillablePercentage);
 
-        let { items: projects } = await model.slingr.get('/data/frontend.projects', {
-            'people.user': model.slingr.user.id,
+        let { items: projects } = await model.slingr.get('/data/projects', {
+            'members.user': model.slingr.user.id,
+            _sortField: 'name',
+            _sortType: 'asc',
+            _size: 1000,
         });
 
         this.projects([]);
@@ -277,22 +275,16 @@ class ViewModel {
                 .map(w => w.days()).flat()
                 .map(d => d.entries()).flat()
                 .filter(e => e.raw.project.id === project.id);
-            let total = entries.reduce((acc, e) => acc + e.raw.timeSpent, 0);
-            let billable = entries.filter(e => e.raw.billable).reduce((acc, e) => acc + e.raw.timeSpent, 0);
-            let nonBillable = entries.filter(e => !e.raw.billable).reduce((acc, e) => acc + e.raw.timeSpent, 0);
-
+            let billable = entries.reduce((acc, e) => acc + e.raw.timeSpent, 0);
             let billablePercentage = ((billable / total) * 100).toFixed(2) + '%';
-            let nonBillablePercentage = ((nonBillable / total) * 100).toFixed(2) + '%';
 
             this.projects.push({
                 id: ko.observable(project.id),
                 name: ko.observable(project.label),
                 isVisible: ko.observable(Boolean(total)),
-                total: ko.observable(formatMsToHours(total)),
-                billable: ko.observable(formatMsToHours(billable)),
-                nonBillable: ko.observable(formatMsToHours(nonBillable)),
+                total: ko.observable(formatMsToDuration(total)),
+                billable: ko.observable(formatMsToDuration(billable)),
                 billablePercentage: ko.observable(billablePercentage),
-                nonBillablePercentage: ko.observable(nonBillablePercentage),
             });
         }
     }
@@ -324,7 +316,8 @@ class ViewModel {
     }
 
 }
-const model = new ViewModel();
+
+/* Classes */
 
 function Week(week, entries) {
     let days = week.days.map(d => new Day(d, entries));
@@ -364,22 +357,29 @@ function Day (date, entries) {
         durationMs: 0,
         durationBillable: 0,
         durationNonBillable: 0,
-        visibleNotes: ko.observable(false),
+        visibleNotes: ko.observable(true),
         // Form
-        billable: ko.observable(true),
+        scope: ko.observable('global'),
         notes: ko.observable(''),
-        timeSpent: ko.observable(4 * 60 * 60 * 1000),
-        time: ko.observable('4h'),
+        timeSpent: ko.observable(1 * 60 * 60 * 1000),
+        time: ko.observable('1h'),
         project: ko.observable(null),
+        task: ko.observable(null),
+        ticket: ko.observable(null),
         logEntry: async (day) => {
+            window.day = day
+            return console.log(day);
             model.loading(true);
             try {
-                let res = await model.slingr.post('/data/frontendBilling.timeTracking', {
+                await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/logTime`, {
                     project: day.project().id(),
+                    scope: day.scope(),
+                    task: day.scope() === 'task' ? day.task() : null,
+                    ticket: day.scope() === 'ticket' ? day.ticket() : null,
+                    forMe: true,
+                    date: day.dateStr(),
                     timeSpent: parseInt(day.timeSpent()),
                     notes: day.notes(),
-                    billable: day.billable(),
-                    day: day.dateStr(),
                 });
                 await model.updateTimeTracking();
             } catch(e) {
@@ -391,33 +391,28 @@ function Day (date, entries) {
             day.visibleNotes(! day.visibleNotes());
         }
     }
-    day.billableText = ko.computed(() => day.billable() ? 'Billable' : 'Non-billable');
     day.timeSpent.subscribe(val => {
-        day.time(formatMsToHours(val));
+        day.time(formatMsToDuration(val));
     });
     for (let entry of entries) {
-        if (entry.day !== dateStr) continue;
+        if (entry.date !== dateStr) continue;
         let entryDate = new Entry(entry, day);
 
         day.durationMs += entryDate.raw.timeSpent;
-        if (entry.billable) {
-            day.durationBillable += entry.timeSpent;
-        } else {
-            day.durationNonBillable += entry.timeSpent;
-        }
+        day.durationBillable += entry.timeSpent;
         day.entries.push(entryDate);
     }
-    day.duration = ko.observable(formatMsToHours(day.durationMs));
-    day.durationBillable = ko.observable(formatMsToHours(day.durationBillable));
-    day.durationNonBillable = ko.observable(formatMsToHours(day.durationNonBillable));
-    day.missingDuration = ko.observable(day.durationMs < MAX_TIME_SPENT ? formatMsToHours(MAX_TIME_SPENT - day.durationMs) : null);
+    day.duration = ko.observable(formatMsToDuration(day.durationMs));
+    day.durationBillable = ko.observable(formatMsToDuration(day.durationBillable));
+    day.durationNonBillable = ko.observable(formatMsToDuration(day.durationNonBillable));
+    day.missingDuration = ko.observable(day.durationMs < MAX_TIME_SPENT ? formatMsToDuration(MAX_TIME_SPENT - day.durationMs) : null);
 
     return day;
 }
 
 function Entry (entry, day) {
-    let readOnly = entry.createDay !== getDateString(new Date());
-    let duration = formatMsToHours(entry.timeSpent);
+    let readOnly = false; // entry.createDay !== getDateString(new Date());
+    let duration = formatMsToDuration(entry.timeSpent);
     let shortName = entry.project.label.substring(0, 11);
     if (entry.project.label.length > 11) {
         shortName += '...';
@@ -425,24 +420,54 @@ function Entry (entry, day) {
     return {
         id: ko.observable(entry.id),
         readOnly: ko.observable(readOnly),
-        project: ko.observable(shortName),
+        project: ko.observable(entry.project.label),
+        scope: ko.observable(entry.task ? 'task' : entry.ticket ? 'ticket' : 'global'),
+        task: ko.observable(entry.task?.label ?? entry.ticket?.label ?? 'Global to the project'),
         timeSpent: ko.observable(entry.timeSpent),
         createDay: ko.observable(entry.createDay),
         duration: ko.observable(duration),
         notes: ko.observable(entry.notes),
-        billable: ko.observable(entry.billable),
-        nonBillable: ko.observable(!entry.billable),
+        editMode: ko.observable(false),
+        removeMode: ko.observable(false),
         day: day,
+        raw: entry,
         edit: (entry) => {
-            day.billable(entry.billable());
-            day.notes(entry.notes());
-            day.timeSpent(entry.timeSpent());
-            day.project(entry.project());
+            console.log(entry);
+            entry.editMode(true);
         },
-        remove: async (entry) => {
+        submitEdit: async (entry) => {
             model.loading(true);
             try {
-                let res = await model.slingr.delete(`/data/frontendBilling.timeTracking/${entry.id()}`);
+                entry.raw = {
+                    ...entry.raw,
+                    timeSpent: parseInt(entry.timeSpent()),
+                    notes: entry.notes(),
+                    project: { id: entry.project().id() },
+                    task: entry.scope() === 'task' ? null : { id: entry.task().id() },
+                    ticket: entry.scope() === 'ticket' ? null : { id: entry.ticket().id() },
+                }
+                let res = await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/${entry.id()}`, entry.raw);
+                console.log(res);
+                await model.updateTimeTracking();
+            } catch (e) {
+                console.error(e);
+            }
+            model.loading(false);
+            entry.editMode(false);
+        },
+        cancelEdit: async (entry) => {
+            entry.editMode(false);
+            model.loading(true);
+            await model.updateTimeTracking();
+            model.loading(false);
+        },
+        remove: (entry) => {
+            entry.removeMode(true);
+        },
+        submitRemove: async (entry) => {
+            model.loading(true);
+            try {
+                let res = await model.slingr.delete(`/data/${TIME_TRACKING_ENTITY}/${entry.id()}`);
                 console.log(res);
                 await model.updateTimeTracking();
             } catch (e) {
@@ -450,9 +475,13 @@ function Entry (entry, day) {
             }
             model.loading(false);
         },
-        raw: entry,
+        cancelRemove: (entry) => {
+            entry.removeMode(false);
+        },
     }
 }
+
+/* Date Utils */
 
 function getDateString(date) {
     return date.toISOString().split('T')[0];
@@ -462,10 +491,33 @@ function formatMsToHours(ms) {
     n = n % 1 === 0 ? n.toString() : n.toFixed(1);
     return n + 'h';
 }
+
+/**
+ * Transform a duration in milliseconds to human readable format stepped by 30 minutes
+ * @param {Number} ms Milliseconds  
+ * @return {String} Output string like 1h or 2h30m
+ */
+function formatMsToDuration(ms) {
+    let hours = Math.floor(ms / 1000 / 60 / 60);
+    let minutes = Math.floor((ms / 1000 / 60) % 60);
+    let output = '';
+    if (hours > 0) {
+        output += hours + 'h';
+    }
+    if (minutes > 0) {
+        output += minutes + 'm';
+    }
+    if (! output) {
+        output = '0m';
+    }
+    return output;
+}
+
 function getMsFromHours(hours) {
     return hours * 1000 * 60 * 60;
 }
 
+const model = new ViewModel();
 document.addEventListener('DOMContentLoaded', () => {
     ko.applyBindings(model);
 });
