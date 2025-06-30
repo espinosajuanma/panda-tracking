@@ -535,6 +535,7 @@ function Day (date, entries) {
     day.durationBillable = ko.observable(formatMsToDuration(day.durationBillable));
     day.durationNonBillable = ko.observable(formatMsToDuration(day.durationNonBillable));
     day.missingDuration = ko.observable(day.durationMs < MAX_TIME_SPENT ? formatMsToDuration(MAX_TIME_SPENT - day.durationMs) : null);
+    day.isMissingTime = ko.observable(day.durationMs > 0 && day.durationMs < MAX_TIME_SPENT);
 
     return day;
 }

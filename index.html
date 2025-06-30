@@ -119,8 +119,9 @@
                                 <span data-bind="visible: isBussinessDay"><i class="bi bi-calendar-check-fill text-primary"></i> </span>
                                 <span data-bind="text: title"></span>
                             </div>
-                            <div>
-                                <span data-bind="visible: duration !== '0m', text: duration" class="badge bg-primary ms-1"></span>
+                            <div class="d-flex align-items-center">
+                                <span data-bind="visible: isMissingTime, attr: { title: 'Missing ' + missingDuration() }" data-bs-toggle="tooltip"><i class="bi bi-info-circle-fill text-warning me-1"></i></span>
+                                <span data-bind="visible: duration() !== '0m', text: duration" class="badge bg-primary"></span>
                             </div>
                         </h6>
                     </div>
@@ -220,12 +221,6 @@
                              </li>
                         </ul>
                         <div data-bind="visible: entries().length === 0" class="readOnly">No entries yet</div>
-                        <div data-bind="visible: entries().length > 0" class="readOnly">
-                            <div data-bind="visible: missingDuration" class="alert alert-warning">
-                                <i class="bi bi-exclamation-circle"></i> Missing <span data-bind="text: missingDuration" class="fw-bold"></span>
-                            </div>
-                        </div>
-                        
                     </div>
                  </div>
                 <!-- /ko -->
