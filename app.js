@@ -366,24 +366,51 @@ function Day (date, entries) {
         project: ko.observable(null),
         task: ko.observable(null),
         ticket: ko.observable(null),
+        tasks: ko.observableArray([]),
+        tickets: ko.observableArray([]),
         logEntry: async (day) => {
-            window.day = day
-            return console.log(day);
             model.loading(true);
             try {
+                // Ensure project is selected before logging
+                if (!day.project()) {
+                    model.addToast('Please select a project.', 'error');
+                    model.loading(false);
+                    return;
+                }
+                // Ensure task/ticket is selected if scope is task/ticket
+                if (day.scope() === 'task' && !day.task()) {
+                    model.addToast('Please select a task.', 'error');
+                    model.loading(false);
+                    return;
+                }
+                if (day.scope() === 'ticket' && !day.ticket()) {
+                    model.addToast('Please select a ticket.', 'error');
+                    model.loading(false);
+                    return;
+                }
+
                 await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/logTime`, {
                     project: day.project().id(),
                     scope: day.scope(),
-                    task: day.scope() === 'task' ? day.task() : null,
-                    ticket: day.scope() === 'ticket' ? day.ticket() : null,
+                    task: day.scope() === 'task' && day.task() ? day.task().id : null,
+                    ticket: day.scope() === 'ticket' && day.ticket() ? day.ticket().id : null,
                     forMe: true,
                     date: day.dateStr(),
                     timeSpent: parseInt(day.timeSpent()),
                     notes: day.notes(),
                 });
+                // Reset form fields after successful log
+                day.notes('');
+                day.timeSpent(1 * 60 * 60 * 1000); // Reset to 1 hour
+                day.scope('global'); // Reset scope to global
+                day.task(null); // Clear task selection
+                day.ticket(null); // Clear ticket selection
+                // Project is not reset as it might be common for multiple entries
+
                 await model.updateTimeTracking();
             } catch(e) {
                 console.error(e);
+                model.addToast('Error logging entry.', 'error');
             }
             model.loading(false);
         },
@@ -391,9 +418,85 @@ function Day (date, entries) {
             day.visibleNotes(! day.visibleNotes());
         }
     }
+
+    day.isLoggable = ko.computed(function() {
+        if (!day.project()) {
+            return false;
+        }
+        if (day.scope() === 'task' && !day.task()) {
+            return false;
+        }
+        if (day.scope() === 'ticket' && !day.ticket()) {
+            return false;
+        }
+        if (day.notes().trim() === '') {
+            return false;
+        }
+        return true;
+    });
+
+    // Set default project if available
+    ko.computed(() => {
+        if (day.project() === null && model.projects().length > 0) {
+            const defaultProject = model.projects().find(p => p.name() === 'Collaborative Work Solutions');
+            if (defaultProject) {
+                day.project(defaultProject);
+            }
+        }
+    });
+
     day.timeSpent.subscribe(val => {
         day.time(formatMsToDuration(val));
     });
+
+    const loadScopeOptions = async () => {
+        const project = day.project();
+        const scope = day.scope();
+
+        day.tasks([]);
+        day.tickets([]);
+
+        if (!project || !scope || scope === 'global') {
+            return;
+        }
+
+        model.loading(true);
+        try {
+            if (scope === 'global') return;
+
+            let entity = '';
+            let obs = null;
+            if (scope === 'task') {
+                obs = day.tasks;
+                entity = 'dev.tasks';
+            }
+            if (scope === 'ticket') {
+                obs = day.tickets;
+                entity = 'support.tickets';
+            }
+            const { items } = await model.slingr.get(`/data/${entity}`, {
+                project: project.id(),
+                _size: 1000,
+                _sortField: 'n,umber',
+                _sortType: 'desc',
+                _fields: 'id,label,number',
+            });
+            obs(items.map(t => ({ id: t.id, name: t.label })));
+        } catch (e) {
+            console.error('Error loading scope options', e);
+            model.addToast('Error loading tasks/tickets', 'error');
+        } finally {
+            model.loading(false);
+        }
+    };
+
+    day.project.subscribe(async () => await loadScopeOptions());
+    day.scope.subscribe(async () => {
+        day.task(null);
+        day.ticket(null);
+        await loadScopeOptions();
+    });
+
     for (let entry of entries) {
         if (entry.date !== dateStr) continue;
         let entryDate = new Entry(entry, day);
