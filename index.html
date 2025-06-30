@@ -194,8 +194,10 @@
                                 <div class="d-flex flex-column align-items-end">
                                     <span data-bind="text: duration" class="badge bg-success"></span>
                                     <div class="d-flex">
-                                        <button data-bind="click: edit, hidden: readOnly" class="btn btn-sm text-info"><i class="bi bi-pencil-square"></i></button>
-                                        <button data-bind="click: remove, hidden: readOnly" class="btn btn-sm text-danger"><i class="bi bi-trash"></i></button>
+                                        <button data-bind="click: remove, hidden: readOnly" class="btn btn-sm text-danger" title="Remove"><i class="bi bi-trash"></i></button>
+                                        <button data-bind="click: updateTime.bind($data, -1800000), hidden: readOnly" class="btn btn-sm text-primary" title="Subtract 30m"><i class="bi bi-dash-square"></i></button>
+                                        <button data-bind="click: updateTime.bind($data, 1800000), hidden: readOnly" class="btn btn-sm text-primary" title="Add 30m"><i class="bi bi-plus-square"></i></button>
+                                        <button data-bind="click: edit, hidden: readOnly" class="btn btn-sm text-primary" title="Edit"><i class="bi bi-pencil-square"></i></button>
                                     </div>
                                 </div>
                             </li>

@@ -534,6 +534,19 @@ function Entry (entry, day) {
         removeMode: ko.observable(false),
         day: day,
         raw: entry,
+        updateTime: async function(amount) {
+            model.loading(true);
+            const newTime = this.raw.timeSpent + amount;
+            try {
+                const payload = { ...this.raw, timeSpent: newTime };
+                await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/${this.id()}`, payload);
+                await model.updateTimeTracking();
+            } catch (e) {
+                console.error(e);
+                model.addToast('Error updating time entry.', 'error');
+            }
+            model.loading(false);
+        },
         edit: (entry) => {
             console.log(entry);
             entry.editMode(true);
