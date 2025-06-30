@@ -98,7 +98,6 @@ class ViewModel {
                 console.log('Logged in as', user?.id);
                 this.logged(true);
                 localStorage.setItem('solutions:timetracking:token', this.slingr.token);
-                this.addToast('Logged in');
             })
             .catch(e => {
                 console.warn('Invalid token', e);
@@ -117,14 +116,24 @@ class ViewModel {
 
         // Toasts
         this.toasts = ko.observableArray([]);
-        this.toasts.subscribe(arr => {
-            setTimeout(() => {
-                let t = arr.pop();
-                let toast = $('#'+t.id);
-                toast.show();
-                setTimeout(() => toast.remove(), 10000);
-            }, 50);
-        });
+        this.toasts.subscribe(changes => {
+            changes.forEach(change => {
+                if (change.status === 'added') {
+                    const toastData = change.value;
+                    // We need to wait for Knockout to render the element
+                    setTimeout(() => {
+                        const toastEl = document.getElementById(toastData.id);
+                        if (toastEl) {
+                            const toast = new bootstrap.Toast(toastEl);
+                            toast.show();
+                            toastEl.addEventListener('hidden.bs.toast', () => {
+                                this.toasts.remove(toastData);
+                            });
+                        }
+                    }, 50);
+                }
+            });
+        }, null, 'arrayChange');
 
         // Calendar
         this.holidays = ko.observableArray([]);
@@ -170,12 +179,29 @@ class ViewModel {
         this.logginIn(false);
     }
 
-    addToast = (msg, type = 'info') => {
-        let id = new Date().getTime();
+    addToast = (msg, type = 'info', title = null) => {
+        let id = 'toast-' + new Date().getTime();
+        if (title === null) {
+            switch (type) {
+                case 'error':
+                    title = 'Error';
+                    break;
+                case 'warning':
+                    title = 'Warning';
+                    break;
+                case 'success':
+                    title = 'Success';
+                    break;
+                default: // 'info'
+                    title = 'Info';
+            }
+        }
         this.toasts.push({
             id: id,
+            title: title,
             msg: msg,
             error: type === 'error',
+            warning: type === 'warning',
             info: type === 'info',
             success: type === 'success',
         });
@@ -562,11 +588,12 @@ function Entry (entry, day) {
                     task: entry.scope() === 'task' ? null : { id: entry.task().id() },
                     ticket: entry.scope() === 'ticket' ? null : { id: entry.ticket().id() },
                 }
-                let res = await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/${entry.id()}`, entry.raw);
-                console.log(res);
+                await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/${entry.id()}`, entry.raw);
+                model.addToast('Entry updated successfully.', 'success');
                 await model.updateTimeTracking();
             } catch (e) {
                 console.error(e);
+                model.addToast('Error updating entry.', 'error');
             }
             model.loading(false);
             entry.editMode(false);
@@ -583,11 +610,12 @@ function Entry (entry, day) {
         submitRemove: async (entry) => {
             model.loading(true);
             try {
-                let res = await model.slingr.delete(`/data/${TIME_TRACKING_ENTITY}/${entry.id()}`);
-                console.log(res);
+                await model.slingr.delete(`/data/${TIME_TRACKING_ENTITY}/${entry.id()}`);
+                model.addToast('Entry removed successfully.', 'success');
                 await model.updateTimeTracking();
             } catch (e) {
                 console.error(e);
+                model.addToast('Error removing entry.', 'error');
             }
             model.loading(false);
         },

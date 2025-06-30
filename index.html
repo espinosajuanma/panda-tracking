@@ -235,12 +235,15 @@
     </main>
 
     <!-- Toasts -->
-    <div class="toast-container">
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1090;">
         <!-- ko foreach: toasts -->
-        <div data-bind="id: id, style: { error: error, success: success, info: info }" class="toast align-items-center text-white border-0" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="d-flex">
-                <div data-bind="text: msg" class="toast-body"></div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        <div class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bind="attr: { id: id }">
+            <div class="toast-header">
+                <i class="bi me-2" data-bind="css: { 'bi-info-circle-fill text-info': info, 'bi-exclamation-triangle-fill text-warning': warning, 'bi-x-circle-fill text-danger': error, 'bi-check-circle-fill text-success': success }"></i>
+                <strong class="me-auto" data-bind="text: title"></strong>
+                <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+            <div class="toast-body" data-bind="text: msg">
             </div>
         </div>
         <!-- /ko -->
