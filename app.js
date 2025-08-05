@@ -409,7 +409,7 @@ function Day (date, entries) {
                     model.loading(false);
                     return;
                 }
-                if (day.scope() === 'ticket' && !day.ticket()) {
+                if (day.scope() === 'supportTicket' && !day.ticket()) {
                     model.addToast('Please select a ticket.', 'error');
                     model.loading(false);
                     return;
@@ -419,7 +419,7 @@ function Day (date, entries) {
                     project: day.project().id(),
                     scope: day.scope(),
                     task: day.scope() === 'task' && day.task() ? day.task().id : null,
-                    ticket: day.scope() === 'ticket' && day.ticket() ? day.ticket().id : null,
+                    ticket: day.scope() === 'supportTicket' && day.ticket() ? day.ticket().id : null,
                     forMe: true,
                     date: day.dateStr(),
                     timeSpent: parseInt(day.timeSpent()),
@@ -452,7 +452,7 @@ function Day (date, entries) {
         if (day.scope() === 'task' && !day.task()) {
             return false;
         }
-        if (day.scope() === 'ticket' && !day.ticket()) {
+        if (day.scope() === 'supportTicket' && !day.ticket()) {
             return false;
         }
         if (day.notes().trim() === '') {
@@ -496,7 +496,7 @@ function Day (date, entries) {
                 obs = day.tasks;
                 entity = 'dev.tasks';
             }
-            if (scope === 'ticket') {
+            if (scope === 'supportTicket') {
                 obs = day.tickets;
                 entity = 'support.tickets';
             }
@@ -551,7 +551,7 @@ function Entry (entry, day) {
         id: ko.observable(entry.id),
         readOnly: ko.observable(readOnly),
         project: ko.observable(entry.project.label),
-        scope: ko.observable(entry.task ? 'task' : entry.ticket ? 'ticket' : 'global'),
+        scope: ko.observable(entry.task ? 'task' : entry.ticket ? 'supportTicket' : 'global'),
         task: ko.observable(entry.task?.label ?? entry.ticket?.label ?? 'Global to the project'),
         timeSpent: ko.observable(entry.timeSpent),
         createDay: ko.observable(entry.createDay),
@@ -587,7 +587,7 @@ function Entry (entry, day) {
                     notes: entry.notes(),
                     project: { id: entry.project().id() },
                     task: entry.scope() === 'task' ? null : { id: entry.task().id() },
-                    ticket: entry.scope() === 'ticket' ? null : { id: entry.ticket().id() },
+                    ticket: entry.scope() === 'supportTicket' ? null : { id: entry.ticket().id() },
                 }
                 await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/${entry.id()}`, entry.raw);
                 model.addToast('Entry updated successfully.', 'success');

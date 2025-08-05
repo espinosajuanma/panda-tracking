@@ -145,8 +145,8 @@
                                             <input type="radio" class="btn-check" value="task" data-bind="checked: scope, attr: { name: 'scope-type-' + dateStr(), id: 'scope-task-' + dateStr() }" autocomplete="off">
                                             <label class="btn btn-outline-primary" data-bind="attr: { for: 'scope-task-' + dateStr() }" title="Task"><i class="bi bi-journal-check"></i></label>
 
-                                            <input type="radio" class="btn-check" value="ticket" data-bind="checked: scope, attr: { name: 'scope-type-' + dateStr(), id: 'scope-ticket-' + dateStr() }" autocomplete="off">
-                                            <label class="btn btn-outline-primary" data-bind="attr: { for: 'scope-ticket-' + dateStr() }" title="Ticket"><i class="bi bi-receipt"></i></label>
+                                            <input type="radio" class="btn-check" value="supportTicket" data-bind="checked: scope, attr: { name: 'scope-type-' + dateStr(), id: 'scope-support-ticket-' + dateStr() }" autocomplete="off">
+                                            <label class="btn btn-outline-primary" data-bind="attr: { for: 'scope-support-ticket-' + dateStr() }" title="Support Ticket"><i class="bi bi-receipt"></i></label>
                                         </div>
                                     </div>
                                     <div class="d-flex flex-column m-3 flex-fill">
@@ -162,12 +162,12 @@
                                                 <span class="text-muted small">No tasks for this project.</span>
                                                 <!-- /ko -->
                                             </div>
-                                            <div data-bind="if: scope() === 'ticket'" class="ms-2">
+                                            <div data-bind="if: scope() === 'supportTicket'" class="ms-2">
                                                 <!-- ko if: tickets().length > 0 -->
-                                                <select data-bind="options: tickets, optionsText: 'name', value: ticket, optionsCaption: 'Select Ticket...'" class="form-select"></select>
+                                                <select data-bind="options: tickets, optionsText: 'name', value: ticket, optionsCaption: 'Select Support Ticket...'" class="form-select"></select>
                                                 <!-- /ko -->
                                                 <!-- ko if: tickets().length === 0 && project() -->
-                                                <span class="text-muted small">No tickets for this project.</span>
+                                                <span class="text-muted small">No support tickets for this project.</span>
                                                 <!-- /ko -->
                                             </div>
                                         </div>
@@ -189,7 +189,7 @@
                         <ul data-bind="foreach: entries" class="list-group list-group-flush">
                             <li data-bind="if: ! editMode(), css: { readOnly: readOnly }" class="list-group-item d-flex justify-content-between align-items-start" data-bs-toggle="collapse" data-bs-target="#multiCollapseExample2">
                                 <div class="ms-2 me-auto">
-                                    <div class="fw-bold"><span class="bi bi-journal-check" data-bind="attr: { title: task }, css: { 'bi-globe-americas': scope() === 'global', 'bi-receipt': scope() === 'ticket', 'bi-journal-check': scope() === 'task' }"></span> <span data-bind="text: project"></span></div>
+                                    <div class="fw-bold"><span class="bi bi-journal-check" data-bind="attr: { title: task }, css: { 'bi-globe-americas': scope() === 'global', 'bi-receipt': scope() === 'supportTicket', 'bi-journal-check': scope() === 'task' }"></span> <span data-bind="text: project"></span></div>
                                     <span style="white-space: pre-wrap;" data-bind="text: notes, visible: $parent.visibleNotes"></span>
                                 </div>
                                 <div class="d-flex flex-column align-items-end">
