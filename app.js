@@ -158,6 +158,11 @@ class ViewModel {
         }
         this.billable = ko.observable(true);
         this.notes = ko.observable('');
+
+        this.leaveDays = ko.observableArray(JSON.parse(localStorage.getItem('solutions:timetracking:leavedays')) || []);
+        this.leaveDays.subscribe(val => {
+            localStorage.setItem('solutions:timetracking:leavedays', JSON.stringify(val));
+        });
     }
 
     
@@ -358,11 +363,12 @@ function Day (date, entries) {
     const MAX_TIME_SPENT = 8 * 60 * 60 * 1000;
     let dateStr = getDateString(date);
     let holiday = model.holidays().find(h => h.day === dateStr);
+    let isLeave = model.leaveDays().includes(dateStr);
     let isHoliday = Boolean(holiday);
     let isToday = date.toDateString() === new Date().toDateString();
     let isWeekend = [0, 6].includes(date.getDay());
-    let isBussinessDay = ! isWeekend && ! holiday;
-    let isVisible = (isBussinessDay || isHoliday) ?? (isWeekend && model.showWeekends());
+    let isBussinessDay = ! isWeekend && ! holiday && !isLeave;
+    let isVisible = (isBussinessDay || isHoliday || isLeave) || (isWeekend && model.showWeekends());
 
     let day = {
         title: date.toLocaleDateString(undefined, {
@@ -375,6 +381,7 @@ function Day (date, entries) {
         dateStr: ko.observable(dateStr),
         isToday: ko.observable(isToday),
         isHoliday: ko.observable(isHoliday),
+        isLeave: ko.observable(isLeave),
         isWeekend: ko.observable(isWeekend),
         isBussinessDay: ko.observable(isBussinessDay),
         holidayDetail: ko.observable(holiday?.title),
@@ -394,6 +401,15 @@ function Day (date, entries) {
         ticket: ko.observable(null),
         tasks: ko.observableArray([]),
         tickets: ko.observableArray([]),
+        toggleLeave: async (day) => {
+            const dateStr = day.dateStr();
+            if (model.leaveDays.indexOf(dateStr) > -1) {
+                model.leaveDays.remove(dateStr);
+            } else {
+                model.leaveDays.push(dateStr);
+            }
+            await model.updateTimeTracking();
+        },
         logEntry: async (day) => {
             model.loading(true);
             try {
