@@ -134,7 +134,6 @@ class ViewModel {
                 }
             });
         }, null, 'arrayChange');
-
         // Calendar
         this.holidays = ko.observableArray([]);
         this.month = ko.observable(new Date().getMonth());
@@ -153,9 +152,9 @@ class ViewModel {
             });
         });
         this.monthProgress = {
-            billablePercentage: ko.observable(0),
-            billable: ko.observable('0h'),
-        }
+            scopes: ko.observableArray([]),
+            total: ko.observable('0h'),
+        };
         this.billable = ko.observable(true);
         this.notes = ko.observable('');
 
@@ -286,36 +285,97 @@ class ViewModel {
     }
 
     updateStats = async () => {
-        let total = this.weeks().map(w => w.days()).flat().filter(e => ! e.isWeekend()).length * 8 * 60 * 60 * 1000;
+        let totalMonthMs = this.weeks().map(w => w.days()).flat().filter(d => d.isBussinessDay()).length * 8 * 60 * 60 * 1000;
+        if (totalMonthMs === 0) totalMonthMs = 1; // Avoid division by zero
         let entries = this.weeks().map(w => w.days()).flat().map(d => d.entries()).flat();
-        let totalBillable = entries.reduce((acc, e) => acc + e.raw.timeSpent, 0);
-        let billablePercentage = ((totalBillable / total) * 100).toFixed(2) + '%';
-        this.monthProgress.billable(formatMsToDuration(totalBillable));
-        this.monthProgress.billablePercentage(billablePercentage);
 
+        const scopeStats = {
+            global: { timeSpent: 0, colorClass: 'bg-primary', textColor: 'text-primary' },
+            task: { timeSpent: 0, colorClass: 'bg-success', textColor: 'text-success' },
+            supportTicket: { timeSpent: 0, colorClass: 'bg-info', textColor: 'text-info' },
+        };
+
+        let totalBillable = 0;
+        for (const entry of entries) {
+            const scope = entry.scope();
+            if (scopeStats[scope]) {
+                scopeStats[scope].timeSpent += entry.raw.timeSpent;
+            }
+            totalBillable += entry.raw.timeSpent;
+        }
+
+        const scopeProgress = [];
+        for (const scope in scopeStats) {
+            const stat = scopeStats[scope];
+            const percentage = (stat.timeSpent / totalMonthMs) * 100;
+            if (stat.timeSpent > 0) {
+                scopeProgress.push({
+                    scope: scope,
+                    name: scope.charAt(0).toUpperCase() + scope.slice(1).replace('T', ' T'),
+                    colorClass: stat.colorClass,
+                    textColor: stat.textColor,
+                    duration: formatMsToDuration(stat.timeSpent),
+                    percentage: percentage.toFixed(2) + '%',
+                });
+            }
+        }
+
+        this.monthProgress.scopes(scopeProgress);
+        this.monthProgress.total(formatMsToDuration(totalBillable));
+
+        await this.updateProjectStats(totalMonthMs);
+    }
+
+    updateProjectStats = async (totalMonthMs) => {
         let { items: projects } = await model.slingr.get('/data/projects', {
             'members.user': model.slingr.user.id,
             _sortField: 'name',
             _sortType: 'asc',
             _size: 1000,
         });
-
         this.projects([]);
         for (let project of projects) {
-            let entries = this.weeks()
+            let projectEntries = this.weeks()
                 .map(w => w.days()).flat()
                 .map(d => d.entries()).flat()
                 .filter(e => e.raw.project.id === project.id);
-            let billable = entries.reduce((acc, e) => acc + e.raw.timeSpent, 0);
-            let billablePercentage = ((billable / total) * 100).toFixed(2) + '%';
+
+            if (projectEntries.length === 0) continue;
+
+            const projectScopeStats = {
+                global: { timeSpent: 0, colorClass: 'bg-primary' },
+                task: { timeSpent: 0, colorClass: 'bg-success' },
+                supportTicket: { timeSpent: 0, colorClass: 'bg-info' },
+            };
+
+            let totalProjectBillable = 0;
+            for (const entry of projectEntries) {
+                const scope = entry.scope();
+                if (projectScopeStats[scope]) {
+                    projectScopeStats[scope].timeSpent += entry.raw.timeSpent;
+                }
+                totalProjectBillable += entry.raw.timeSpent;
+            }
+
+            const projectScopeProgress = [];
+            for (const scope in projectScopeStats) {
+                const stat = projectScopeStats[scope];
+                const percentage = (stat.timeSpent / totalMonthMs) * 100;
+                if (stat.timeSpent > 0) {
+                    projectScopeProgress.push({
+                        scope: scope,
+                        colorClass: stat.colorClass,
+                        duration: formatMsToDuration(stat.timeSpent),
+                        percentage: percentage.toFixed(2) + '%',
+                    });
+                }
+            }
 
             this.projects.push({
                 id: ko.observable(project.id),
                 name: ko.observable(project.label),
-                isVisible: ko.observable(Boolean(total)),
-                total: ko.observable(formatMsToDuration(total)),
-                billable: ko.observable(formatMsToDuration(billable)),
-                billablePercentage: ko.observable(billablePercentage),
+                total: ko.observable(formatMsToDuration(totalProjectBillable)),
+                scopes: ko.observableArray(projectScopeProgress),
             });
         }
     }
@@ -563,7 +623,7 @@ function Entry (entry, day) {
     if (entry.project.label.length > 11) {
         shortName += '...';
     }
-    return {
+    const self = {
         id: ko.observable(entry.id),
         readOnly: ko.observable(readOnly),
         project: ko.observable(entry.project.label),
@@ -639,7 +699,29 @@ function Entry (entry, day) {
         cancelRemove: (entry) => {
             entry.removeMode(false);
         },
-    }
+    };
+
+    self.scopeClasses = ko.computed(function() {
+        let iconClass = '';
+        let colorClass = '';
+        switch(self.scope()) {
+            case 'global':
+                iconClass = 'bi-globe-americas';
+                colorClass = 'text-primary';
+                break;
+            case 'task':
+                iconClass = 'bi-journal-check';
+                colorClass = 'text-success';
+                break;
+            case 'supportTicket':
+                iconClass = 'bi-receipt';
+                colorClass = 'text-info';
+                break;
+        }
+        return `${iconClass} ${colorClass}`;
+    });
+
+    return self;
 }
 
 /* Date Utils */
