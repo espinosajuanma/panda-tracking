@@ -101,12 +101,15 @@
                             </div>
                         </div>
                     </div>
-                    <div class="mt-5 d-flex justify-content-between align-items-end">
+                    <div class="mt-5 d-flex justify-content-between align-items-center">
                         <div>
                             <button data-bind="click: updateDashboard, attr: { disabled: loading }" class="btn btn-outline-primary"><i class="bi bi-arrow-clockwise"></i></button>
                         </div>
-                        <div>
-                            <button data-bind="click: goToToday, attr: { disabled: loading }" class="btn btn-outline-primary m-1"><i class="bi bi-calendar-event"></i> Today</button>
+                        <div class="d-flex align-items-center">
+                            <div style="width: 300px;" class="me-2">
+                                <select class="form-select" data-bind="options: projects, optionsText: 'name', optionsValue: 'id', value: selectedProjectFilter, optionsCaption: 'All Projects'"></select>
+                            </div>
+                            <button data-bind="click: goToToday, attr: { disabled: loading }" class="btn btn-outline-primary"><i class="bi bi-calendar-event"></i> Today</button>
                         </div>
                     </div>
                 </div>
@@ -198,38 +201,40 @@
                         <h6>Entries</h6>
                         <!-- ENTRIES -->
                         <ul data-bind="foreach: entries" class="list-group list-group-flush">
-                            <li data-bind="if: ! editMode(), css: { readOnly: readOnly }" class="list-group-item d-flex justify-content-between align-items-start" data-bs-toggle="collapse" data-bs-target="#multiCollapseExample2">
-                                <div class="ms-2 me-auto">
-                                    <div class="fw-bold"><span class="bi" data-bind="attr: { title: task }, css: scopeClasses"></span> <span data-bind="text: project"></span></div>
-                                    <span style="white-space: pre-wrap;" data-bind="text: notes, visible: $parent.visibleNotes"></span>
-                                </div>
-                                <div class="d-flex flex-column align-items-end">
-                                    <span data-bind="text: duration" class="badge bg-success"></span>
-                                    <div class="d-flex">
-                                        <button data-bind="click: remove, hidden: readOnly" class="btn btn-sm text-danger" title="Remove"><i class="bi bi-trash"></i></button>
-                                        <button data-bind="click: updateTime.bind($data, -1800000), hidden: readOnly" class="btn btn-sm text-primary" title="Subtract 30m"><i class="bi bi-dash-square"></i></button>
-                                        <button data-bind="click: updateTime.bind($data, 1800000), hidden: readOnly" class="btn btn-sm text-primary" title="Add 30m"><i class="bi bi-plus-square"></i></button>
-                                        <button data-bind="click: edit, hidden: readOnly" class="btn btn-sm text-primary" title="Edit"><i class="bi bi-pencil-square"></i></button>
+                            <!-- ko if: isVisible -->
+                                <li data-bind="if: ! editMode(), css: { readOnly: readOnly }" class="list-group-item d-flex justify-content-between align-items-start" data-bs-toggle="collapse" data-bs-target="#multiCollapseExample2">
+                                    <div class="ms-2 me-auto">
+                                        <div class="fw-bold"><span class="bi" data-bind="attr: { title: task }, css: scopeClasses"></span> <span data-bind="text: project"></span></div>
+                                        <span style="white-space: pre-wrap;" data-bind="text: notes, visible: $parent.visibleNotes"></span>
                                     </div>
-                                </div>
-                            </li>
-                            <!-- Edit Mode -->
-                             <li data-bind="if: editMode()" class="list-group-item d-flex justify-content-between align-items-start">
-                                <!--
-                                <div class="ms-2 me-auto">
-                                    <input type="checkbox" data-bind="checked: scope() === 'global', attr: { id: 'global-'+ id(), name: 'global-' + id() }" hidden>
-                                    <label data-bind="attr: { for: 'global-' + id() }, css: { 'btn-outline-success': global, 'btn-outline-warning': !global() }" class="switch-label btn">
-                                        <i data-bind="css: { 'bi-globe-americas': global , 'bi-journal-check': !global() }" class="bi"></i>
-                                    </label>
-                                </div>
-                                -->
-                                <div>
-                                    <div class="d-flex">
-                                        <button data-bind="click: cancelEdit, hidden: readOnly" class="btn btn-sm text-danger"><i class="bi bi-x-square"></i></button>
-                                        <button data-bind="click: submitEdit, hidden: readOnly" class="btn btn-sm text-info"><i class="bi bi-floppy-fill"></i></button>
+                                    <div class="d-flex flex-column align-items-end">
+                                        <span data-bind="text: duration" class="badge bg-success"></span>
+                                        <div class="d-flex">
+                                            <button data-bind="click: remove, hidden: readOnly" class="btn btn-sm text-danger" title="Remove"><i class="bi bi-trash"></i></button>
+                                            <button data-bind="click: updateTime.bind($data, -1800000), hidden: readOnly" class="btn btn-sm text-primary" title="Subtract 30m"><i class="bi bi-dash-square"></i></button>
+                                            <button data-bind="click: updateTime.bind($data, 1800000), hidden: readOnly" class="btn btn-sm text-primary" title="Add 30m"><i class="bi bi-plus-square"></i></button>
+                                            <button data-bind="click: edit, hidden: readOnly" class="btn btn-sm text-primary" title="Edit"><i class="bi bi-pencil-square"></i></button>
+                                        </div>
                                     </div>
-                                </div>
-                             </li>
+                                </li>
+                                <!-- Edit Mode -->
+                                 <li data-bind="if: editMode()" class="list-group-item d-flex justify-content-between align-items-start">
+                                    <!--
+                                    <div class="ms-2 me-auto">
+                                        <input type="checkbox" data-bind="checked: scope() === 'global', attr: { id: 'global-'+ id(), name: 'global-' + id() }" hidden>
+                                        <label data-bind="attr: { for: 'global-' + id() }, css: { 'btn-outline-success': global, 'btn-outline-warning': !global() }" class="switch-label btn">
+                                            <i data-bind="css: { 'bi-globe-americas': global , 'bi-journal-check': !global() }" class="bi"></i>
+                                        </label>
+                                    </div>
+                                    -->
+                                    <div>
+                                        <div class="d-flex">
+                                            <button data-bind="click: cancelEdit, hidden: readOnly" class="btn btn-sm text-danger"><i class="bi bi-x-square"></i></button>
+                                            <button data-bind="click: submitEdit, hidden: readOnly" class="btn btn-sm text-info"><i class="bi bi-floppy-fill"></i></button>
+                                        </div>
+                                    </div>
+                                 </li>
+                            <!-- /ko -->
                         </ul>
                         <div data-bind="visible: entries().length === 0" class="readOnly">No entries yet</div>
                     </div>

@@ -144,6 +144,7 @@ class ViewModel {
         this.days = ko.observableArray([]);
         this.projects = ko.observableArray([]);
         this.showWeekends = ko.observable(false);
+        this.selectedProjectFilter = ko.observable(null);
         this.showWeekends.subscribe(val => {
             this.days().forEach(day => {
                 if (day.isWeekend()) {
@@ -372,8 +373,8 @@ class ViewModel {
             }
 
             this.projects.push({
-                id: ko.observable(project.id),
-                name: ko.observable(project.label),
+                id: project.id,
+                name: project.label,
                 total: ko.observable(formatMsToDuration(totalProjectBillable)),
                 scopes: ko.observableArray(projectScopeProgress),
             });
@@ -492,7 +493,7 @@ function Day (date, entries) {
                 }
 
                 await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/logTime`, {
-                    project: day.project().id(),
+                    project: day.project().id,
                     scope: day.scope(),
                     task: day.scope() === 'task' && day.task() ? day.task().id : null,
                     ticket: day.scope() === 'supportTicket' && day.ticket() ? day.ticket().id : null,
@@ -540,7 +541,7 @@ function Day (date, entries) {
     // Set default project if available
     ko.computed(() => {
         if (day.project() === null && model.projects().length > 0) {
-            const defaultProject = model.projects().find(p => p.name() === 'Collaborative Work Solutions');
+            const defaultProject = model.projects().find(p => p.name === 'Collaborative Work Solutions');
             if (defaultProject) {
                 day.project(defaultProject);
             }
@@ -577,7 +578,7 @@ function Day (date, entries) {
                 entity = 'support.tickets';
             }
             const { items } = await model.slingr.get(`/data/${entity}`, {
-                project: project.id(),
+                project: project.id,
                 _size: 1000,
                 _sortField: 'n,umber',
                 _sortType: 'desc',
@@ -700,6 +701,14 @@ function Entry (entry, day) {
             entry.removeMode(false);
         },
     };
+
+    self.isVisible = ko.computed(function() {
+        const selectedProjectId = model.selectedProjectFilter();
+        if (!selectedProjectId) {
+            return true;
+        }
+        return self.raw.project.id === selectedProjectId;
+    });
 
     self.scopeClasses = ko.computed(function() {
         let iconClass = '';
