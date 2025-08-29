@@ -568,20 +568,22 @@ function Day (date, entries) {
             if (scope === 'global') return;
 
             let entity = '';
+            let sort = {};
             let obs = null;
             if (scope === 'task') {
                 obs = day.tasks;
                 entity = 'dev.tasks';
+                sort = { _sortField: 'createdAt', _sortType: 'desc' }
             }
             if (scope === 'supportTicket') {
                 obs = day.tickets;
                 entity = 'support.tickets';
+                sort = { _sortField: 'draftTimestamp', _sortType: 'desc' }
             }
             const { items } = await model.slingr.get(`/data/${entity}`, {
                 project: project.id,
                 _size: 1000,
-                _sortField: 'n,umber',
-                _sortType: 'desc',
+                ...sort,
                 _fields: 'id,label,number',
             });
             obs(items.map(t => ({ id: t.id, name: t.label })));
