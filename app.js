@@ -616,6 +616,16 @@ function Day (date, entries) {
     day.missingDuration = ko.observable(day.durationMs < MAX_TIME_SPENT ? formatMsToDuration(MAX_TIME_SPENT - day.durationMs) : null);
     day.isMissingTime = ko.observable(day.durationMs > 0 && day.durationMs < MAX_TIME_SPENT);
 
+    day.canToggleLeave = ko.computed(function() {
+        if (day.isWeekend() || day.isHoliday()) {
+            return false;
+        }
+        if (day.isLeave()) {
+            return true;
+        }
+        return day.entries().length === 0;
+    });
+
     return day;
 }
 

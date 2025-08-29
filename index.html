@@ -124,15 +124,15 @@
                     <div class="card-header">
                         <h6 class="card-title d-flex justify-content-between align-items-center">
                             <div>
-                                <span data-bind="visible: isLeave()" title="Leave" data-bs-toggle="tooltip"><i class="bi bi-airplane-fill text-info"></i> </span>
+                                <span data-bind="visible: isLeave()" title="Leave" data-bs-toggle="tooltip"><i class="bi bi-person-slash text-info"></i> </span>
                                 <span data-bind="visible: isHoliday() && !isLeave(), attr: { title: holidayDetail }" data-bs-toggle="tooltip"><i class="bi bi-calendar-x-fill text-warning"></i> </span>
                                 <span data-bind="visible: isWeekend()" title="Weekend" data-bs-toggle="tooltip"><i class="bi bi-calendar-x-fill text-danger"></i> </span>
                                 <span data-bind="visible: isBussinessDay()"><i class="bi bi-calendar-check-fill text-primary"></i> </span>
                                 <span data-bind="text: title"></span>
                             </div>
                             <div class="d-flex align-items-center">
-                                <button class="btn btn-sm" data-bind="click: toggleLeave, visible: !isWeekend() && !isHoliday(), attr: { title: isLeave() ? 'Unmark as Leave' : 'Mark as Leave' }">
-                                    <i class="bi bi-airplane-fill" data-bind="css: { 'text-info': isLeave(), 'text-muted': !isLeave() }"></i>
+                                <button class="btn btn-sm" data-bind="click: toggleLeave, visible: canToggleLeave, attr: { title: isLeave() ? 'Unmark as Leave' : 'Mark as Leave' }">
+                                    <i class="bi bi-person-slash" data-bind="css: { 'text-info': isLeave(), 'text-muted': !isLeave() }"></i>
                                 </button>
                                 <span data-bind="visible: isMissingTime, attr: { title: 'Missing ' + missingDuration() }" data-bs-toggle="tooltip"><i class="bi bi-info-circle-fill text-warning me-1"></i></span>
                                 <span data-bind="visible: duration() !== '0m', text: duration" class="badge bg-primary"></span>
