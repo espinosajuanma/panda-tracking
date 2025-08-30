@@ -791,13 +791,13 @@ function Entry (entry, day) {
             }
             model.loading(false);
         },
-        remove: function() {
-            model.openRemoveConfirmModal(self);
+        remove: (entry) => {
+            model.openRemoveConfirmModal(entry);
         },
         submitRemove: async function() {
             model.loading(true);
             try {
-                await model.slingr.delete(`/data/${TIME_TRACKING_ENTITY}/${self.id()}`);
+                await model.slingr.delete(`/data/${TIME_TRACKING_ENTITY}/${this.entryForRemoval().id()}`);
                 model.addToast('Entry removed successfully.', 'success');
                 model.removeConfirmModal.hide();
                 await model.updateTimeTracking();
