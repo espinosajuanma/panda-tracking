@@ -163,6 +163,9 @@ class ViewModel {
         this.leaveDays.subscribe(val => {
             localStorage.setItem('solutions:timetracking:leavedays', JSON.stringify(val));
         });
+
+        this.selectedDayForNewEntry = ko.observable(null);
+        this.newEntryModal = null;
     }
 
     
@@ -182,6 +185,14 @@ class ViewModel {
         this.email(null);
         this.pass(null);
         this.logginIn(false);
+    }
+
+    openNewEntryModal = (day) => {
+        this.selectedDayForNewEntry(day);
+        if (!this.newEntryModal) {
+            this.newEntryModal = new bootstrap.Modal(document.getElementById('newEntryModal'));
+        }
+        this.newEntryModal.show();
     }
 
     addToast = (msg, type = 'info', title = null) => {
@@ -340,8 +351,6 @@ class ViewModel {
                 .map(w => w.days()).flat()
                 .map(d => d.entries()).flat()
                 .filter(e => e.raw.project.id === project.id);
-
-            if (projectEntries.length === 0) continue;
 
             const projectScopeStats = {
                 global: { timeSpent: 0, colorClass: 'bg-primary' },
@@ -510,6 +519,7 @@ function Day (date, entries) {
                 day.ticket(null); // Clear ticket selection
                 // Project is not reset as it might be common for multiple entries
 
+                model.newEntryModal.hide();
                 await model.updateTimeTracking();
             } catch(e) {
                 console.error(e);

@@ -145,57 +145,9 @@
                                 <button data-bind="click: showNotes" class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" aria-expanded="false">
                                     <i data-bind="css: { 'bi-eye': visibleNotes, 'bi-eye-slash': !visibleNotes() }" class="bi bi-eye"></i>
                                 </button>
-                                <button data-bind="attr: { 'data-bs-target': '#new-entry-' + dateStr(), 'aria-controls': 'new-entry-' + dateStr() }" class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" aria-expanded="false">
+                                <button data-bind="click: $root.openNewEntryModal" class="btn btn-outline-primary btn-sm" type="button">
                                     <i class="bi bi-plus"></i> New Entry
                                 </button>
-                            </div>
-                            <div data-bind="attr: { id: 'new-entry-' + dateStr() }" class="collapse">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <div class="btn-group-vertical btn-group-sm" role="group" data-bind="attr: { 'aria-label': 'Scope for ' + dateStr() }">
-                                            <input type="radio" class="btn-check" value="global" data-bind="checked: scope, attr: { name: 'scope-type-' + dateStr(), id: 'scope-global-' + dateStr() }" autocomplete="off">
-                                            <label class="btn btn-outline-primary" data-bind="attr: { for: 'scope-global-' + dateStr() }" title="Global"><i class="bi bi-globe-americas"></i></label>
-
-                                            <input type="radio" class="btn-check" value="task" data-bind="checked: scope, attr: { name: 'scope-type-' + dateStr(), id: 'scope-task-' + dateStr() }" autocomplete="off">
-                                            <label class="btn btn-outline-primary" data-bind="attr: { for: 'scope-task-' + dateStr() }" title="Task"><i class="bi bi-journal-check"></i></label>
-
-                                            <input type="radio" class="btn-check" value="supportTicket" data-bind="checked: scope, attr: { name: 'scope-type-' + dateStr(), id: 'scope-support-ticket-' + dateStr() }" autocomplete="off">
-                                            <label class="btn btn-outline-primary" data-bind="attr: { for: 'scope-support-ticket-' + dateStr() }" title="Support Ticket"><i class="bi bi-receipt"></i></label>
-                                        </div>
-                                    </div>
-                                    <div class="d-flex flex-column m-3 flex-fill">
-                                        <div class="d-flex align-items-center mb-2">
-                                            <div>
-                                                <select data-bind="options: $root.projects, optionsText: 'name', value: project" class="form-select"></select>
-                                            </div>
-                                            <div data-bind="if: scope() === 'task'" class="ms-2">
-                                                <!-- ko if: tasks().length > 0 -->
-                                                <select data-bind="options: tasks, optionsText: 'name', value: task, optionsCaption: 'Select Task...'" class="form-select"></select>
-                                                <!-- /ko -->
-                                                <!-- ko if: tasks().length === 0 && project() -->
-                                                <span class="text-muted small">No tasks for this project.</span>
-                                                <!-- /ko -->
-                                            </div>
-                                            <div data-bind="if: scope() === 'supportTicket'" class="ms-2">
-                                                <!-- ko if: tickets().length > 0 -->
-                                                <select data-bind="options: tickets, optionsText: 'name', value: ticket, optionsCaption: 'Select Support Ticket...'" class="form-select"></select>
-                                                <!-- /ko -->
-                                                <!-- ko if: tickets().length === 0 && project() -->
-                                                <span class="text-muted small">No support tickets for this project.</span>
-                                                <!-- /ko -->
-                                            </div>
-                                        </div>
-                                        <input data-bind="value: timeSpent, attr: { disabled: $root.loading, id: 'time-'+dateStr(), name: 'time' }" type="range" name="time" class="form-range" min="1800000" max="28800000" step="1800000">
-                                        <label class="d-flex justify-content-between align-items-center" for="time">
-                                            <span><i class="bi bi-stopwatch"></i></span>
-                                            <span class="fw-bold" data-bind="text: time"></span>
-                                        </label>
-                                    </div>
-                                </div>
-                                <div class="mb-3 d-flex justify-content-between align-items-start">
-                                    <textarea placeholder="Notes" data-bind="value: notes" name="notes" class="form-control" rows="1" style="width: 95%;"></textarea>
-                                    <button data-bind="click: logEntry, attr: { disabled: !isLoggable() || $root.loading() }" class="btn btn-outline-primary"><i class="bi bi-plus-lg"></i></button>
-                                </div>
                             </div>
                         </div>
                         <h6>Entries</h6>
@@ -241,6 +193,69 @@
                  </div>
                 <!-- /ko -->
                 <!-- /ko -->
+            </div>
+        </div>
+
+        <!-- New Entry Modal -->
+        <div class="modal fade" id="newEntryModal" tabindex="-1" aria-labelledby="newEntryModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="newEntryModalLabel" data-bind="text: selectedDayForNewEntry() ? 'New Entry for ' + selectedDayForNewEntry().title : ''"></h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <!-- ko with: selectedDayForNewEntry -->
+                    <div class="modal-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="btn-group-vertical btn-group-sm" role="group" data-bind="attr: { 'aria-label': 'Scope for ' + dateStr() }">
+                                    <input type="radio" class="btn-check" value="global" data-bind="checked: scope, attr: { name: 'scope-type-modal-' + dateStr(), id: 'scope-global-modal-' + dateStr() }" autocomplete="off">
+                                    <label class="btn btn-outline-primary" data-bind="attr: { for: 'scope-global-modal-' + dateStr() }" title="Global"><i class="bi bi-globe-americas"></i></label>
+
+                                    <input type="radio" class="btn-check" value="task" data-bind="checked: scope, attr: { name: 'scope-type-modal-' + dateStr(), id: 'scope-task-modal-' + dateStr() }" autocomplete="off">
+                                    <label class="btn btn-outline-primary" data-bind="attr: { for: 'scope-task-modal-' + dateStr() }" title="Task"><i class="bi bi-journal-check"></i></label>
+
+                                    <input type="radio" class="btn-check" value="supportTicket" data-bind="checked: scope, attr: { name: 'scope-type-modal-' + dateStr(), id: 'scope-support-ticket-modal-' + dateStr() }" autocomplete="off">
+                                    <label class="btn btn-outline-primary" data-bind="attr: { for: 'scope-support-ticket-modal-' + dateStr() }" title="Support Ticket"><i class="bi bi-receipt"></i></label>
+                                </div>
+                            </div>
+                            <div class="d-flex flex-column m-3 flex-fill">
+                                <div class="d-flex align-items-center mb-2">
+                                    <div>
+                                        <select data-bind="options: $root.projects, optionsText: 'name', value: project" class="form-select"></select>
+                                    </div>
+                                    <div data-bind="if: scope() === 'task'" class="ms-2">
+                                        <!-- ko if: tasks().length > 0 -->
+                                        <select data-bind="options: tasks, optionsText: 'name', value: task, optionsCaption: 'Select Task...'" class="form-select"></select>
+                                        <!-- /ko -->
+                                        <!-- ko if: tasks().length === 0 && project() -->
+                                        <span class="text-muted small">No tasks for this project.</span>
+                                        <!-- /ko -->
+                                    </div>
+                                    <div data-bind="if: scope() === 'supportTicket'" class="ms-2">
+                                        <!-- ko if: tickets().length > 0 -->
+                                        <select data-bind="options: tickets, optionsText: 'name', value: ticket, optionsCaption: 'Select Support Ticket...'" class="form-select"></select>
+                                        <!-- /ko -->
+                                        <!-- ko if: tickets().length === 0 && project() -->
+                                        <span class="text-muted small">No support tickets for this project.</span>
+                                        <!-- /ko -->
+                                    </div>
+                                </div>
+                                <input data-bind="value: timeSpent, attr: { disabled: $root.loading, id: 'time-modal-'+dateStr(), name: 'time-modal' }" type="range" class="form-range" min="1800000" max="28800000" step="1800000">
+                                <label class="d-flex justify-content-between align-items-center" data-bind="attr: { for: 'time-modal-'+dateStr() }">
+                                    <span><i class="bi bi-stopwatch"></i></span>
+                                    <span class="fw-bold" data-bind="text: time"></span>
+                                </label>
+                            </div>
+                        </div>
+                        <textarea placeholder="Notes" data-bind="value: notes" name="notes" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary" data-bind="click: logEntry, attr: { disabled: !isLoggable() || $root.loading() }">Log Entry</button>
+                    </div>
+                    <!-- /ko -->
+                </div>
             </div>
         </div>
     </main>
