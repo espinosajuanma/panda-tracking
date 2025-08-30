@@ -166,6 +166,12 @@ class ViewModel {
 
         this.selectedDayForNewEntry = ko.observable(null);
         this.newEntryModal = null;
+
+        this.selectedEntryForEdit = ko.observable(null);
+        this.editEntryModal = null;
+
+        this.entryForRemoval = ko.observable(null);
+        this.removeConfirmModal = null;
     }
 
     
@@ -193,6 +199,22 @@ class ViewModel {
             this.newEntryModal = new bootstrap.Modal(document.getElementById('newEntryModal'));
         }
         this.newEntryModal.show();
+    }
+
+    openEditEntryModal = (entry) => {
+        this.selectedEntryForEdit(entry);
+        if (!this.editEntryModal) {
+            this.editEntryModal = new bootstrap.Modal(document.getElementById('editEntryModal'));
+        }
+        this.editEntryModal.show();
+    }
+
+    openRemoveConfirmModal = (entry) => {
+        this.entryForRemoval(entry);
+        if (!this.removeConfirmModal) {
+            this.removeConfirmModal = new bootstrap.Modal(document.getElementById('removeConfirmModal'));
+        }
+        this.removeConfirmModal.show();
     }
 
     addToast = (msg, type = 'info', title = null) => {
@@ -646,6 +668,8 @@ function Entry (entry, day) {
     if (entry.project.label.length > 11) {
         shortName += '...';
     }
+    let isInitializing = false;
+
     const self = {
         id: ko.observable(entry.id),
         readOnly: ko.observable(readOnly),
@@ -655,10 +679,6 @@ function Entry (entry, day) {
         timeSpent: ko.observable(entry.timeSpent),
         createDay: ko.observable(entry.createDay),
         duration: ko.observable(duration),
-        notes: ko.observable(entry.notes),
-        editMode: ko.observable(false),
-        removeMode: ko.observable(false),
-        day: day,
         raw: entry,
         updateTime: async function(amount) {
             model.loading(true);
@@ -673,45 +693,113 @@ function Entry (entry, day) {
             }
             model.loading(false);
         },
-        edit: (entry) => {
-            console.log(entry);
-            entry.editMode(true);
+        notes: ko.observable(entry.notes),
+        day: day,
+
+        // Edit functionality
+        edit_project: ko.observable(),
+        edit_scope: ko.observable(),
+        edit_task: ko.observable(),
+        edit_ticket: ko.observable(),
+        edit_notes: ko.observable(),
+        edit_timeSpent: ko.observable(),
+        edit_time: ko.observable(''),
+        edit_tasks: ko.observableArray([]),
+        edit_tickets: ko.observableArray([]),
+
+        edit: async (entry) => {
+            await entry.initializeEditForm();
+            model.openEditEntryModal(entry);
         },
-        submitEdit: async (entry) => {
+
+        initializeEditForm: async function() {
+            isInitializing = true;
+            try {
+                const projectObj = model.projects().find(p => p.id === self.raw.project.id);
+                self.edit_project(projectObj);
+                self.edit_scope(self.scope());
+                self.edit_notes(self.notes());
+                self.edit_timeSpent(self.timeSpent());
+
+                await self.loadEditScopeOptions();
+
+                if (self.scope() === 'task' && self.raw.task) {
+                    const taskObj = self.edit_tasks().find(t => t.id === self.raw.task.id);
+                    self.edit_task(taskObj);
+                }
+                if (self.scope() === 'supportTicket' && self.raw.ticket) {
+                    const ticketObj = self.edit_tickets().find(t => t.id === self.raw.ticket.id);
+                    self.edit_ticket(ticketObj);
+                }
+            } finally {
+                isInitializing = false;
+            }
+        },
+
+        loadEditScopeOptions: async () => {
+            const project = self.edit_project();
+            const scope = self.edit_scope();
+    
+            self.edit_tasks([]);
+            self.edit_tickets([]);
+    
+            if (!project || !scope || scope === 'global') return;
+    
             model.loading(true);
             try {
-                entry.raw = {
-                    ...entry.raw,
-                    timeSpent: parseInt(entry.timeSpent()),
-                    notes: entry.notes(),
-                    project: { id: entry.project().id() },
-                    task: entry.scope() === 'task' ? null : { id: entry.task().id() },
-                    ticket: entry.scope() === 'supportTicket' ? null : { id: entry.ticket().id() },
+                let entity = '', sort = {}, obs = null;
+                if (scope === 'task') {
+                    obs = self.edit_tasks;
+                    entity = 'dev.tasks';
+                    sort = { _sortField: 'createdAt', _sortType: 'desc' };
+                } else if (scope === 'supportTicket') {
+                    obs = self.edit_tickets;
+                    entity = 'support.tickets';
+                    sort = { _sortField: 'draftTimestamp', _sortType: 'desc' };
                 }
-                await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/${entry.id()}`, entry.raw);
+                if (!entity) return;
+
+                const { items } = await model.slingr.get(`/data/${entity}`, {
+                    project: project.id, _size: 1000, ...sort, _fields: 'id,label,number',
+                });
+                obs(items.map(t => ({ id: t.id, name: t.label })));
+            } catch (e) {
+                console.error('Error loading scope options', e);
+                model.addToast('Error loading tasks/tickets', 'error');
+            } finally {
+                model.loading(false);
+            }
+        },
+
+        submitEdit: async function() {
+            model.loading(true);
+            try {
+                const payload = {
+                    project: self.edit_project().id,
+                    task: self.edit_scope() === 'task' && self.edit_task() ? self.edit_task().id : null,
+                    ticket: self.edit_scope() === 'supportTicket' && self.edit_ticket() ? self.edit_ticket().id : null,
+                    timeSpent: parseInt(self.edit_timeSpent()),
+                    notes: self.edit_notes(),
+                };
+                await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/${self.id()}`, payload);
                 model.addToast('Entry updated successfully.', 'success');
+                model.editEntryModal.hide();
                 await model.updateTimeTracking();
             } catch (e) {
                 console.error(e);
                 model.addToast('Error updating entry.', 'error');
             }
             model.loading(false);
-            entry.editMode(false);
         },
-        cancelEdit: async (entry) => {
-            entry.editMode(false);
-            model.loading(true);
-            await model.updateTimeTracking();
-            model.loading(false);
+        remove: function() {
+            model.openRemoveConfirmModal(self);
         },
-        remove: (entry) => {
-            entry.removeMode(true);
-        },
-        submitRemove: async (entry) => {
+        submitRemove: async function() {
             model.loading(true);
             try {
-                await model.slingr.delete(`/data/${TIME_TRACKING_ENTITY}/${entry.id()}`);
+                await model.slingr.delete(`/data/${TIME_TRACKING_ENTITY}/${self.id()}`);
                 model.addToast('Entry removed successfully.', 'success');
+                model.removeConfirmModal.hide();
                 await model.updateTimeTracking();
             } catch (e) {
                 console.error(e);
@@ -719,10 +807,36 @@ function Entry (entry, day) {
             }
             model.loading(false);
         },
-        cancelRemove: (entry) => {
-            entry.removeMode(false);
-        },
     };
+
+    self.edit_timeSpent.subscribe(val => {
+        self.edit_time(formatMsToDuration(val));
+    });
+
+    self.edit_project.subscribe(async () => {
+        if (isInitializing) return;
+        await self.loadEditScopeOptions();
+    });
+    self.edit_scope.subscribe(async () => {
+        if (isInitializing) return;
+        self.edit_task(null);
+        self.edit_ticket(null);
+        await self.loadEditScopeOptions();
+    });
+
+    self.isEditLoggable = ko.computed(function() {
+        if (!self.edit_project()) return false;
+        if (self.edit_scope() === 'task' && !self.edit_task()) {
+            return false;
+        }
+        if (self.edit_scope() === 'supportTicket' && !self.edit_ticket()) {
+            return false;
+        }
+        if (self.edit_notes() && self.edit_notes().trim() === '') {
+            return false;
+        }
+        return true;
+    });
 
     self.isVisible = ko.computed(function() {
         const selectedProjectId = model.selectedProjectFilter();
