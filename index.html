@@ -295,11 +295,12 @@
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label class="form-label d-flex justify-content-between" data-bind="attr: { for: 'time-modal-'+dateStr() }">
-                                        <span><i class="bi bi-stopwatch"></i> Duration</span>
-                                        <span class="fw-bold" data-bind="text: time"></span>
-                                    </label>
-                                    <input data-bind="value: timeSpent, attr: { disabled: $root.loading, id: 'time-modal-'+dateStr(), name: 'time-modal' }" type="range" class="form-range" min="1800000" max="28800000" step="1800000">
+                                    <label class="form-label"><i class="bi bi-stopwatch"></i> Duration</label>
+                                    <div class="input-group">
+                                        <button class="btn btn-outline-secondary" type="button" data-bind="click: updateTimeSpentInModal.bind($data, -1800000), attr: { disabled: $root.loading() }">-30m</button>
+                                        <input type="text" class="form-control text-center fw-bold" data-bind="value: time, event: { change: updateTimeFromInput }, attr: { disabled: $root.loading() }">
+                                        <button class="btn btn-outline-secondary" type="button" data-bind="click: updateTimeSpentInModal.bind($data, 1800000), attr: { disabled: $root.loading() }">+30m</button>
+                                    </div>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Notes</label>
@@ -367,11 +368,12 @@
                             </div>
                             <div class="col-md-6">
                                 <div class="mb-3">
-                                    <label class="form-label d-flex justify-content-between" data-bind="attr: { for: 'edit-time-modal-'+id() }">
-                                        <span><i class="bi bi-stopwatch"></i> Duration</span>
-                                        <span class="fw-bold" data-bind="text: edit_time"></span>
-                                    </label>
-                                    <input data-bind="value: edit_timeSpent, attr: { disabled: $root.loading, id: 'edit-time-modal-'+id(), name: 'edit-time-modal' }" type="range" class="form-range" min="1800000" max="28800000" step="1800000">
+                                    <label class="form-label"><i class="bi bi-stopwatch"></i> Duration</label>
+                                    <div class="input-group">
+                                        <button class="btn btn-outline-secondary" type="button" data-bind="click: updateEditTimeSpent.bind($data, -1800000), attr: { disabled: $root.loading() }">-30m</button>
+                                        <input type="text" class="form-control text-center fw-bold" data-bind="value: edit_time, event: { change: updateEditTimeFromInput }, attr: { disabled: $root.loading() }">
+                                        <button class="btn btn-outline-secondary" type="button" data-bind="click: updateEditTimeSpent.bind($data, 1800000), attr: { disabled: $root.loading() }">+30m</button>
+                                    </div>
                                 </div>
                                 <div class="mb-3">
                                     <label class="form-label">Notes</label>

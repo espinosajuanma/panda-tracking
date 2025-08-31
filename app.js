@@ -941,6 +941,27 @@ function Day (date, entries) {
         timeSpent: ko.observable(1 * 60 * 60 * 1000),
         time: ko.observable('1h'),
         project: ko.observable(null),
+        updateTimeSpentInModal: function(amount) {
+            let current = this.timeSpent();
+            let newValue = current + amount;
+            if (newValue >= 1800000 && newValue <= 28800000) { // 30m to 8h
+                this.timeSpent(newValue);
+            }
+        },
+        updateTimeFromInput: function() {
+            const ms = parseDurationToMs(this.time());
+            if (ms > 0) {
+                const roundedMs = Math.round(ms / 1800000) * 1800000;
+                const clampedMs = Math.max(1800000, Math.min(roundedMs, 28800000));
+                if (this.timeSpent() !== clampedMs) {
+                    this.timeSpent(clampedMs);
+                } else {
+                    this.time(formatMsToDuration(this.timeSpent()));
+                }
+            } else {
+                this.time(formatMsToDuration(this.timeSpent()));
+            }
+        },
         task: ko.observable(null),
         ticket: ko.observable(null),
         tasks: ko.observableArray([]),
@@ -1262,6 +1283,27 @@ function Entry (entry, day) {
         edit_time: ko.observable(''),
         edit_tasks: ko.observableArray([]),
         edit_tickets: ko.observableArray([]),
+        updateEditTimeSpent: function(amount) {
+            let current = this.edit_timeSpent();
+            let newValue = current + amount;
+            if (newValue >= 1800000 && newValue <= 28800000) { // 30m to 8h
+                this.edit_timeSpent(newValue);
+            }
+        },
+        updateEditTimeFromInput: function() {
+            const ms = parseDurationToMs(this.edit_time());
+            if (ms > 0) {
+                const roundedMs = Math.round(ms / 1800000) * 1800000;
+                const clampedMs = Math.max(1800000, Math.min(roundedMs, 28800000));
+                if (this.edit_timeSpent() !== clampedMs) {
+                    this.edit_timeSpent(clampedMs);
+                } else {
+                    this.edit_time(formatMsToDuration(this.edit_timeSpent()));
+                }
+            } else {
+                this.edit_time(formatMsToDuration(this.edit_timeSpent()));
+            }
+        },
 
         edit: async (entry) => {
             await entry.initializeEditForm();
@@ -1445,6 +1487,34 @@ function formatMsToHours(ms) {
     let n = (ms / 1000 / 60 / 60);
     n = n % 1 === 0 ? n.toString() : n.toFixed(1);
     return n + 'h';
+}
+
+/**
+ * Transform a duration string like "1h 30m" or "1.5h" to milliseconds.
+ * @param {String} durationStr
+ * @returns {Number}
+ */
+function parseDurationToMs(durationStr) {
+    if (!durationStr || typeof durationStr !== 'string') return 0;
+    let totalMs = 0;
+    durationStr = durationStr.trim().toLowerCase();
+
+    const hourMatch = durationStr.match(/(\d*\.?\d+)\s*h/);
+    const minMatch = durationStr.match(/(\d+)\s*m/);
+
+    if (hourMatch) {
+        totalMs += parseFloat(hourMatch[1]) * 60 * 60 * 1000;
+    }
+    if (minMatch) {
+        totalMs += parseInt(minMatch[1]) * 60 * 1000;
+    }
+
+    // If no units, assume hours for a plain number
+    if (!hourMatch && !minMatch && !isNaN(parseFloat(durationStr)) && isFinite(durationStr)) {
+        totalMs += parseFloat(durationStr) * 60 * 60 * 1000;
+    }
+
+    return totalMs;
 }
 
 /**
