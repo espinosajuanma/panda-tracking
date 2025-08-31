@@ -77,7 +77,7 @@ class ViewModel {
         this.slingr = new Slingr('solutions', 'prod');
 
         // Login
-        this.email = ko.observable(null);
+        this.email = ko.observable(localStorage.getItem('solutions:timetracking:email') || null);
         this.pass = ko.observable(null);
         this.logginIn = ko.observable(false);
         this.logged = ko.observable(false);
@@ -199,12 +199,12 @@ class ViewModel {
             this.addToast('Invalid email or password', 'error');
         }
         if (this.slingr.token) {
+            localStorage.setItem('solutions:timetracking:email', this.email());
             let user = await this.slingr.getCurrentUser();
             localStorage.setItem('solutions:timetracking:token', this.slingr.token);
             console.log('Logged', user);
             this.logged(true);
         }
-        this.email(null);
         this.pass(null);
         this.logginIn(false);
     }
