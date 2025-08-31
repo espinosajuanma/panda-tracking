@@ -339,7 +339,7 @@ class ViewModel {
         const scopeStats = {
             global: { timeSpent: 0, colorClass: 'bg-primary', textColor: 'text-primary' },
             task: { timeSpent: 0, colorClass: 'bg-success', textColor: 'text-success' },
-            supportTicket: { timeSpent: 0, colorClass: 'bg-info', textColor: 'text-info' },
+            supportTicket: { timeSpent: 0, colorClass: 'bg-danger', textColor: 'text-danger' },
         };
 
         let totalBillable = 0;
@@ -390,7 +390,7 @@ class ViewModel {
             const projectScopeStats = {
                 global: { timeSpent: 0, colorClass: 'bg-primary' },
                 task: { timeSpent: 0, colorClass: 'bg-success' },
-                supportTicket: { timeSpent: 0, colorClass: 'bg-info' },
+                supportTicket: { timeSpent: 0, colorClass: 'bg-danger' },
             };
 
             let totalProjectBillable = 0;
@@ -857,6 +857,19 @@ function Entry (entry, day) {
         },
     };
 
+    self.scopeColorClass = ko.computed(function() {
+        switch(self.scope()) {
+            case 'global':
+                return 'bg-primary';
+            case 'task':
+                return 'bg-success';
+            case 'supportTicket':
+                return 'bg-danger';
+            default:
+                return 'bg-secondary';
+        }
+    });
+
     self.edit_timeSpent.subscribe(val => {
         self.edit_time(formatMsToDuration(val));
     });
@@ -900,7 +913,7 @@ function Entry (entry, day) {
                 break;
             case 'supportTicket':
                 iconClass = 'bi-receipt';
-                colorClass = 'text-info';
+                colorClass = 'text-danger';
                 break;
         }
         return `${iconClass} ${colorClass}`;

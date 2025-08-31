@@ -109,17 +109,19 @@
             <div class="card-header">
                 <h5 class="card-title mb-0">Time Tracking Login</h5>
             </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <label for="email" class="form-label">Email</label>
-                    <input data-bind="value: email, attr: { disabled: logginIn }" type="email" name="email" class="form-control" id="email" placeholder="your@email.com">
+            <form data-bind="submit: login">
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input data-bind="value: email, attr: { disabled: logginIn }" type="email" name="email" class="form-control" id="email" placeholder="your@email.com" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input data-bind="value: pass, attr: { disabled: logginIn }" type="password" name="password" class="form-control" id="password" required>
+                    </div>
+                    <button data-bind="attr: { disabled: logginIn }" type="submit" class="mt-2 btn btn-primary w-100">Login</button>
                 </div>
-                <div class="mb-3">
-                    <label for="password" class="form-label">Password</label>
-                    <input data-bind="value: pass, attr: { disabled: logginIn }" type="password" name="password" class="form-control" id="password">
-                </div>
-                <button data-bind="attr: { disabled: logginIn }, click: login" class="mt-2 btn btn-primary w-100">Login</button>
-            </div>
+            </form>
         </div>
 
         <!-- DASHBOARD -->
@@ -236,7 +238,7 @@
                                             <span class="me-2" data-bind="attr: { title: task }, css: scopeClasses"></span> <span data-bind="text: project"></span> <span class="text-muted small" data-bind="text: task, visible: scope() !== 'global'"></span>
                                         </div>
                                     </div>
-                                    <span data-bind="text: duration" class="badge bg-success rounded-pill"></span>
+                                    <span data-bind="text: duration, css: scopeColorClass" class="badge rounded-pill"></span>
                                 </div>
                                 <div class="d-flex justify-content-between align-items-start mt-2">
                                     <p style="white-space: pre-wrap;" data-bind="text: notes, visible: day.visibleNotes" class="text-muted small mb-0 me-3"></p>
