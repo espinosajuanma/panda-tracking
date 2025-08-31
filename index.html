@@ -149,63 +149,76 @@
             <!-- DAYS -->
             <div id="entries">
                 <h5>Month entries</h5>
-                <!-- ko foreach: weeks -->
-                <!-- ko foreach: { data: days, as: 'day' } -->
-                 <div data-bind="visible: isVisible, attr: { id: dateStr() }, css: { 'border-primary': isToday(), 'border-warning': isHoliday() && !isLeave(), 'border-danger': isWeekend(), 'border-info': isLeave() }" class="card shadow-sm mt-3">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h6 class="card-title mb-0">
-                                <span data-bind="visible: isLeave()" title="Leave" data-bs-toggle="tooltip"><i class="bi bi-person-slash text-info"></i> </span>
-                                <span data-bind="visible: isHoliday() && !isLeave(), attr: { title: holidayDetail }" data-bs-toggle="tooltip"><i class="bi bi-calendar-x-fill text-warning"></i> </span>
-                                <span data-bind="visible: isWeekend()" title="Weekend" data-bs-toggle="tooltip"><i class="bi bi-calendar-x-fill text-danger"></i> </span>
-                                <span data-bind="visible: isBussinessDay()"><i class="bi bi-calendar-check-fill text-primary"></i> </span>
-                                <span data-bind="text: title"></span>
-                        </h6>
-                        <div class="d-flex align-items-center">
-                            <div class="progress" role="progressbar" style="width: 100px; height: 20px;" data-bind="visible: durationMs > 0, attr: { 'aria-valuenow': durationMs, title: duration() + ' logged' }" aria-valuemin="0" aria-valuemax="28800000">
-                                <div class="progress-bar overflow-visible text-light" data-bind="style: { width: durationPercentage() + '%' }, css: durationClass, text: duration"></div>
+                <!-- ko foreach: { data: weeks, as: 'week' } -->
+                <div data-bind="visible: week.isVisible">
+                    <h5 class="mt-4 d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bind="attr: { 'data-bs-target': '#' + week.id }, click: week.toggleCollapse" style="cursor: pointer;">
+                        <span>
+                            <span data-bind="text: week.title"></span>
+                            <small class="text-muted ms-2 fw-normal" data-bind="text: week.dateRange"></small>
+                        </span>
+                        <i class="bi" data-bind="css: { 'bi-chevron-down': !week.isCollapsed(), 'bi-chevron-up': week.isCollapsed() }"></i>
+                    </h5>
+                    <div class="collapse show" data-bind="attr: { id: week.id }">
+                        <!-- ko foreach: { data: week.days, as: 'day' } -->
+                        <div data-bind="visible: isVisible, attr: { id: dateStr() }, css: { 'border-primary': isToday(), 'border-warning': isHoliday() && !isLeave(), 'border-danger': isWeekend(), 'border-info': isLeave() }" class="card shadow-sm mt-3">
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <h6 class="card-title mb-0">
+                                        <span data-bind="visible: isLeave()" title="Leave" data-bs-toggle="tooltip"><i class="bi bi-person-slash text-info"></i> </span>
+                                        <span data-bind="visible: isHoliday() && !isLeave(), attr: { title: holidayDetail }" data-bs-toggle="tooltip"><i class="bi bi-calendar-x-fill text-warning"></i> </span>
+                                        <span data-bind="visible: isWeekend()" title="Weekend" data-bs-toggle="tooltip"><i class="bi bi-calendar-x-fill text-danger"></i> </span>
+                                        <span data-bind="visible: isBussinessDay()"><i class="bi bi-calendar-check-fill text-primary"></i> </span>
+                                        <span data-bind="text: title"></span>
+                                </h6>
+                                <div class="d-flex align-items-center">
+                                    <div class="progress" role="progressbar" style="width: 100px; height: 20px;" data-bind="visible: durationMs > 0, attr: { 'aria-valuenow': durationMs, title: duration() + ' logged' }" aria-valuemin="0" aria-valuemax="28800000">
+                                        <div class="progress-bar overflow-visible text-light" data-bind="style: { width: durationPercentage() + '%' }, css: durationClass, text: duration"></div>
+                                    </div>
+                                    <button class="btn btn-sm py-0 px-1 me-2" data-bind="click: toggleLeave, visible: canToggleLeave, attr: { title: isLeave() ? 'Unmark as Leave' : 'Mark as Leave' }">
+                                        <i class="bi bi-person-slash" data-bind="css: { 'text-info': isLeave(), 'text-muted': !isLeave() }"></i>
+                                    </button>
+                                    <!-- ko if: isBussinessDay -->
+                                    <button data-bind="click: $root.openNewEntryModal" class="btn btn-sm btn-outline-primary ms-2" type="button" title="New Entry">
+                                        <i class="bi bi-plus-lg"></i>
+                                    </button>
+                                    <!-- /ko -->
+                                </div>
                             </div>
-                            <button class="btn btn-sm py-0 px-1 me-2" data-bind="click: toggleLeave, visible: canToggleLeave, attr: { title: isLeave() ? 'Unmark as Leave' : 'Mark as Leave' }">
-                                <i class="bi bi-person-slash" data-bind="css: { 'text-info': isLeave(), 'text-muted': !isLeave() }"></i>
-                            </button>
-                            <!-- ko if: isBussinessDay -->
-                            <button data-bind="click: $root.openNewEntryModal" class="btn btn-sm btn-outline-primary ms-2" type="button" title="New Entry">
-                                <i class="bi bi-plus-lg"></i>
-                            </button>
-                            <!-- /ko -->
+                            <div class="card-body">
+                                <!-- ENTRIES -->
+                                <ul data-bind="foreach: entries, visible: entries().length > 0" class="list-group list-group-flush">
+                                    <li data-bind="css: { readOnly: readOnly }" class="list-group-item px-0">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <div class="fw-bold">
+                                                    <span class="me-2" data-bind="attr: { title: task }, css: scopeClasses"></span>
+                                                    <span data-bind="text: project"></span>
+                                                    <span class="text-muted small" data-bind="text: task, visible: scope() !== 'global'"></span>
+                                                </div>
+                                            </div>
+                                            <div class="d-flex align-items-center">
+                                                <i class="bi bi-stopwatch me-1"></i>
+                                                <strong data-bind="text: duration"></strong>
+                                            </div>
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-start mt-2">
+                                            <p style="white-space: pre-wrap;" data-bind="text: notes" class="text-muted small mb-0 me-3"></p>
+                                            <div data-bind="hidden: readOnly" class="flex-shrink-0">
+                                                <div class="btn-group btn-group-sm">
+                                                    <button data-bind="click: updateTime.bind($data, -1800000)" class="btn btn-outline-secondary" title="Subtract 30m"><i class="bi bi-dash"></i></button>
+                                                    <button data-bind="click: updateTime.bind($data, 1800000)" class="btn btn-outline-secondary" title="Add 30m"><i class="bi bi-plus"></i></button>
+                                                    <button data-bind="click: edit" class="btn btn-outline-secondary" title="Edit"><i class="bi bi-pencil-square"></i></button>
+                                                    <button data-bind="click: remove" class="btn btn-outline-danger" title="Remove"><i class="bi bi-trash"></i></button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </li>
+                                </ul>
+                                <div data-bind="visible: entries().length === 0" class="text-center text-muted p-3">No entries yet</div>
+                            </div>
                         </div>
+                        <!-- /ko -->
                     </div>
-                    <div class="card-body">
-                        <!-- ENTRIES -->
-                        <ul data-bind="foreach: entries, visible: entries().length > 0" class="list-group list-group-flush">
-                            <li data-bind="css: { readOnly: readOnly }" class="list-group-item px-0">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <div class="fw-bold">
-                                            <span class="me-2" data-bind="attr: { title: task }, css: scopeClasses"></span> <span data-bind="text: project"></span> <span class="text-muted small" data-bind="text: task, visible: scope() !== 'global'"></span>
-                                        </div>
-                                    </div>
-                                    <div class="d-flex align-items-center">
-                                        <i class="bi bi-stopwatch me-1"></i>
-                                        <strong data-bind="text: duration"></strong>
-                                    </div>
-                                </div>
-                                <div class="d-flex justify-content-between align-items-start mt-2">
-                                    <p style="white-space: pre-wrap;" data-bind="text: notes, visible: day.visibleNotes" class="text-muted small mb-0 me-3"></p>
-                                    <div data-bind="hidden: readOnly" class="flex-shrink-0">
-                                        <div class="btn-group btn-group-xs">
-                                            <button data-bind="click: updateTime.bind($data, -1800000)" class="btn btn-outline-secondary" title="Subtract 30m"><i class="bi bi-dash"></i></button>
-                                            <button data-bind="click: updateTime.bind($data, 1800000)" class="btn btn-outline-secondary" title="Add 30m"><i class="bi bi-plus"></i></button>
-                                            <button data-bind="click: edit" class="btn btn-outline-secondary" title="Edit"><i class="bi bi-pencil-square"></i></button>
-                                            <button data-bind="click: remove" class="btn btn-outline-danger" title="Remove"><i class="bi bi-trash"></i></button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </li>
-                        </ul>
-                        <div data-bind="visible: entries().length === 0" class="text-center text-muted p-3">No entries yet</div>
-                    </div>
-                 </div>
-                <!-- /ko -->
+                </div>
                 <!-- /ko -->
             </div>
         </div>

@@ -589,12 +589,21 @@ class ViewModel {
     }
     listWeeksBetweenMonth = () => {
         let days = this.listDaysBetweenMonth();
-        let weeks = [{ week: 0, days: [] }];
+        if (days.length === 0) {
+            return [];
+        }
+
+        let weeks = [];
+        let currentWeek = { week: 0, days: [] };
+        weeks.push(currentWeek);
+
         for (let day of days) {
-            if (day.getDay() === 1 && weeks.length > 0) { // Is Monday
-                weeks.push({ week: weeks.length, days: [] });
+            // if it is Monday and not the first day of the month
+            if (day.getDay() === 1 && currentWeek.days.length > 0) {
+                currentWeek = { week: weeks.length, days: [] };
+                weeks.push(currentWeek);
             }
-            weeks[weeks.length - 1].days.push(day);
+            currentWeek.days.push(day);
         }
         return weeks;
     }
@@ -611,11 +620,29 @@ class ViewModel {
 
 function Week(week, entries) {
     let days = week.days.map(d => new Day(d, entries));
-    return {
-        week: ko.observable(week),
+    const formatDate = (date) => {
+        return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    };
+    const startDate = week.days[0];
+    const endDate = week.days[week.days.length - 1];
+
+    const self = {
         days: ko.observableArray(days),
-        isVisible: ko.observable(! days.every(d => d.isVisible())),
-    }
+        title: `Week ${week.week + 1}`,
+        dateRange: `${formatDate(startDate)} - ${formatDate(endDate)}`,
+        isCollapsed: ko.observable(false),
+        id: `week-collapse-${week.week}`,
+    };
+
+    self.toggleCollapse = function() {
+        self.isCollapsed(!self.isCollapsed());
+    };
+
+    self.isVisible = ko.computed(function() {
+        return self.days().some(d => d.isVisible());
+    });
+
+    return self;
 }
 
 function Day (date, entries) {
