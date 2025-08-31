@@ -860,6 +860,21 @@ function Day (date, entries) {
         return day.entries().length === 0;
     });
 
+    day.durationPercentage = ko.computed(function() {
+        if (!day.isBussinessDay() || day.durationMs <= 0) {
+            return 0;
+        }
+        const percentage = (day.durationMs / MAX_TIME_SPENT) * 100;
+        return Math.min(percentage, 100);
+    });
+
+    day.durationClass = ko.computed(function() {
+        const percentage = (day.durationMs / MAX_TIME_SPENT) * 100;
+        if (percentage < 100) return 'bg-warning';
+        if (percentage >= 100 && percentage < 110) return 'bg-success';
+        return 'bg-danger'; // over 110%
+    });
+
     return day;
 }
 
