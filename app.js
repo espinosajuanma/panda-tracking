@@ -75,6 +75,7 @@ class Slingr {
 class ViewModel {
     constructor() {
         this.slingr = new Slingr('solutions', 'prod');
+        this.originalTitle = document.title;
 
         // Login
         this.email = ko.observable(localStorage.getItem('solutions:timetracking:email') || null);
@@ -207,6 +208,38 @@ class ViewModel {
 
         this.keybindingsHelpModal = null;
 
+        // Pomodoro
+        this.pomodoroModal = null;
+        this.pomodoroDurationMinutes = ko.observable(50);
+        this.pomodoroRemainingTime = ko.observable(50 * 60);
+        this.pomodoroTimerId = null;
+        this.pomodoroIsRunning = ko.observable(false);
+        this.pomodoroFinished = ko.observable(false);
+        this.faviconBlinkerId = null;
+        this.originalFavicon = null; // will be set later
+        this.blankFavicon = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
+        this.pomodoroDisplayTime = ko.computed(() => {
+            const totalSeconds = this.pomodoroRemainingTime();
+            const isNegative = totalSeconds < 0;
+            const absSeconds = Math.abs(totalSeconds);
+            const minutes = Math.floor(absSeconds / 60);
+            const seconds = absSeconds % 60;
+            const formattedTime = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+            return isNegative ? `-${formattedTime}` : formattedTime;
+        });
+
+        ko.computed(() => {
+            if (this.pomodoroIsRunning()) {
+                const time = this.pomodoroDisplayTime();
+                document.title = `${time} - ${this.originalTitle}`;
+            } else {
+                if (document.title !== this.originalTitle) {
+                    document.title = this.originalTitle;
+                }
+            }
+        });
+
         this.submitRemove = async () => {
             const entryToRemove = this.entryForRemoval();
             if (!entryToRemove) return;
@@ -272,6 +305,63 @@ class ViewModel {
         this.keybindingsHelpModal.show();
     }
 
+    showPomodoroModal = () => {
+        if (!this.originalFavicon) {
+            const faviconEl = document.getElementById('runtimeAppFavicon');
+            if (faviconEl) {
+                this.originalFavicon = faviconEl.href;
+            }
+        }
+        if (!this.pomodoroModal) {
+            this.pomodoroModal = new bootstrap.Modal(document.getElementById('pomodoroModal'));
+        }
+        // Reset timer if not running
+        if (!this.pomodoroIsRunning()) {
+            this.pomodoroRemainingTime(this.pomodoroDurationMinutes() * 60);
+            this.pomodoroFinished(false);
+        }
+        this.pomodoroModal.show();
+    }
+
+    startPomodoro = () => {
+        if (this.pomodoroIsRunning()) return;
+
+        this.pomodoroRemainingTime(this.pomodoroDurationMinutes() * 60);
+        this.pomodoroIsRunning(true);
+        this.pomodoroFinished(false);
+        this.stopFaviconBlinking();
+
+        this.pomodoroTimerId = setInterval(() => {
+            const remaining = this.pomodoroRemainingTime() - 1;
+            this.pomodoroRemainingTime(remaining);
+            if (remaining === 0) {
+                this.pomodoroFinished(true);
+                this.startFaviconBlinking();
+            }
+        }, 1000);
+    }
+
+    stopPomodoro = () => {
+        if (!this.pomodoroIsRunning()) return;
+
+        clearInterval(this.pomodoroTimerId);
+        this.pomodoroTimerId = null;
+        this.pomodoroIsRunning(false);
+        this.pomodoroFinished(false);
+        this.stopFaviconBlinking();
+        if (this.pomodoroModal) {
+            this.pomodoroModal.hide();
+        }
+    }
+
+    restartPomodoro = () => {
+        if (!this.pomodoroIsRunning()) return;
+
+        this.pomodoroRemainingTime(this.pomodoroDurationMinutes() * 60);
+        this.pomodoroFinished(false);
+        this.stopFaviconBlinking();
+    }
+
     activateDayNavigation = () => {
         this.navigationMode('day');
         // Wait for visibleDays to update
@@ -289,6 +379,29 @@ class ViewModel {
         this.navigationMode('none');
         this.selectedDay(null);
         this.selectedEntry(null);
+    }
+
+    startFaviconBlinking = () => {
+        if (this.faviconBlinkerId) return;
+        let state = false;
+        this.faviconBlinkerId = setInterval(() => {
+            const favicon = document.getElementById('runtimeAppFavicon');
+            if (favicon) {
+                favicon.href = state ? this.originalFavicon : this.blankFavicon;
+                state = !state;
+            }
+        }, 500);
+    }
+
+    stopFaviconBlinking = () => {
+        if (this.faviconBlinkerId) {
+            clearInterval(this.faviconBlinkerId);
+            this.faviconBlinkerId = null;
+        }
+        const favicon = document.getElementById('runtimeAppFavicon');
+        if (favicon && this.originalFavicon) {
+            favicon.href = this.originalFavicon;
+        }
     }
 
     login = async () => {

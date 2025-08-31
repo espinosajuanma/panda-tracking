@@ -41,6 +41,9 @@
                         <input class="form-check-input" type="checkbox" role="switch" id="keybindingsSwitch" data-bind="checked: keybindingsEnabled">
                         <label class="form-check-label" for="keybindingsSwitch"><i class="bi bi-keyboard"></i></label>
                     </div>
+                    <button class="btn btn-sm me-3" data-bind="click: showPomodoroModal, css: { 'btn-danger': pomodoroIsRunning(), 'btn-outline-light': !pomodoroIsRunning() }" title="Focus Mode (Pomodoro)">
+                        <i class="bi bi-stopwatch"></i>
+                    </button>
                     <div class="form-check form-switch me-3">
                         <input class="form-check-input" type="checkbox" role="switch" id="themeSwitchNav" data-bind="checked: isDarkMode">
                         <label class="form-check-label" for="themeSwitchNav"><i data-bind="css: isDarkMode() ? 'bi-moon-stars-fill' : 'bi-sun-fill'"></i></label>
@@ -433,6 +436,39 @@
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="button" class="btn btn-danger" data-bind="click: submitRemove">Delete</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pomodoro Modal -->
+        <div class="modal fade" id="pomodoroModal" tabindex="-1" aria-labelledby="pomodoroModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="pomodoroModalLabel"><i class="bi bi-stopwatch-fill text-danger me-2"></i>Focus Session</h5>
+                    </div>
+                    <div class="modal-body text-center">
+                        <h1 class="display-1 fw-bold" data-bind="text: pomodoroDisplayTime, css: { 'text-danger': pomodoroFinished }"></h1>
+                        <div class="mb-3 w-75 mx-auto" data-bind="if: !pomodoroIsRunning()">
+                            <label for="pomodoroDuration" class="form-label">Session duration (minutes)</label>
+                            <input type="number" class="form-control" id="pomodoroDuration" data-bind="value: pomodoroDurationMinutes">
+                        </div>
+                    </div>
+                    <div class="modal-footer d-flex justify-content-center border-0">
+                        <!-- ko ifnot: pomodoroIsRunning -->
+                        <button type="button" class="btn btn-success btn-lg" data-bind="click: startPomodoro">Start</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <!-- /ko -->
+                        <!-- ko if: pomodoroIsRunning -->
+                        <button type="button" class="btn btn-danger" data-bind="click: stopPomodoro">
+                            <i class="bi bi-stop-fill"></i> Stop
+                        </button>
+                        <button type="button" class="btn btn-warning" data-bind="click: restartPomodoro">
+                            <i class="bi bi-arrow-clockwise"></i> Restart
+                        </button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Hide</button>
+                        <!-- /ko -->
                     </div>
                 </div>
             </div>
