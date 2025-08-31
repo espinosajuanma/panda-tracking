@@ -267,6 +267,7 @@ class ViewModel {
 
         this.theme.subscribe(newTheme => {
             localStorage.setItem('solutions:timetracking:theme', newTheme);
+            document.documentElement.setAttribute('data-bs-theme', newTheme);
             if (this.calendar) {
                 this.calendar.set({ selectedTheme: newTheme });
             }
@@ -962,8 +963,8 @@ function Day (date, entries) {
                 this.time(formatMsToDuration(this.timeSpent()));
             }
         },
-        task: ko.observable(null),
-        ticket: ko.observable(null),
+        taskId: ko.observable(null),
+        ticketId: ko.observable(null),
         tasks: ko.observableArray([]),
         tickets: ko.observableArray([]),
         toggleLeave: async (day) => {
@@ -985,12 +986,12 @@ function Day (date, entries) {
                     return;
                 }
                 // Ensure task/ticket is selected if scope is task/ticket
-                if (day.scope() === 'task' && !day.task()) {
+                if (day.scope() === 'task' && !day.taskId()) {
                     model.addToast('Please select a task.', 'error');
                     model.loading(false);
                     return;
                 }
-                if (day.scope() === 'supportTicket' && !day.ticket()) {
+                if (day.scope() === 'supportTicket' && !day.ticketId()) {
                     model.addToast('Please select a ticket.', 'error');
                     model.loading(false);
                     return;
@@ -999,8 +1000,8 @@ function Day (date, entries) {
                 const newEntryData = await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/logTime`, {
                     project: day.project().id,
                     scope: day.scope(),
-                    task: day.scope() === 'task' && day.task() ? day.task().id : null,
-                    ticket: day.scope() === 'supportTicket' && day.ticket() ? day.ticket().id : null,
+                    task: day.scope() === 'task' ? day.taskId() : null,
+                    ticket: day.scope() === 'supportTicket' ? day.ticketId() : null,
                     forMe: true,
                     date: day.dateStr(),
                     timeSpent: parseInt(day.timeSpent()),
@@ -1009,11 +1010,17 @@ function Day (date, entries) {
 
                 const entryForViewModel = { ...newEntryData };
                 entryForViewModel.project = { id: day.project().id, label: day.project().name };
-                if (day.scope() === 'task' && day.task()) {
-                    entryForViewModel.task = { id: day.task().id, label: day.task().name };
+                if (day.scope() === 'task' && day.taskId()) {
+                    const taskObj = day.tasks().find(t => t.id === day.taskId());
+                    if (taskObj) {
+                        entryForViewModel.task = { id: taskObj.id, label: taskObj.name };
+                    }
                 }
-                if (day.scope() === 'supportTicket' && day.ticket()) {
-                    entryForViewModel.ticket = { id: day.ticket().id, label: day.ticket().name };
+                if (day.scope() === 'supportTicket' && day.ticketId()) {
+                    const ticketObj = day.tickets().find(t => t.id === day.ticketId());
+                    if (ticketObj) {
+                        entryForViewModel.ticket = { id: ticketObj.id, label: ticketObj.name };
+                    }
                 }
 
                 // Add new entry to the day
@@ -1036,8 +1043,8 @@ function Day (date, entries) {
                 day.notes('');
                 day.timeSpent(1 * 60 * 60 * 1000); // Reset to 1 hour
                 day.scope('global'); // Reset scope to global
-                day.task(null); // Clear task selection
-                day.ticket(null); // Clear ticket selection
+                day.taskId(null); // Clear task selection
+                day.ticketId(null); // Clear ticket selection
                 // Project is not reset as it might be common for multiple entries
 
                 model.newEntryModal.hide();
@@ -1068,10 +1075,10 @@ function Day (date, entries) {
         if (!day.project()) {
             return false;
         }
-        if (day.scope() === 'task' && !day.task()) {
+        if (day.scope() === 'task' && !day.taskId()) {
             return false;
         }
-        if (day.scope() === 'supportTicket' && !day.ticket()) {
+        if (day.scope() === 'supportTicket' && !day.ticketId()) {
             return false;
         }
         if (day.notes().trim() === '') {
@@ -1139,8 +1146,8 @@ function Day (date, entries) {
 
     day.project.subscribe(async () => await loadScopeOptions());
     day.scope.subscribe(async () => {
-        day.task(null);
-        day.ticket(null);
+        day.taskId(null);
+        day.ticketId(null);
         await loadScopeOptions();
     });
 
@@ -1276,8 +1283,8 @@ function Entry (entry, day) {
         // Edit functionality
         edit_project: ko.observable(),
         edit_scope: ko.observable(),
-        edit_task: ko.observable(),
-        edit_ticket: ko.observable(),
+        edit_taskId: ko.observable(),
+        edit_ticketId: ko.observable(),
         edit_notes: ko.observable(),
         edit_timeSpent: ko.observable(),
         edit_time: ko.observable(''),
@@ -1322,12 +1329,10 @@ function Entry (entry, day) {
                 await self.loadEditScopeOptions();
 
                 if (self.scope() === 'task' && self.raw.task) {
-                    const taskObj = self.edit_tasks().find(t => t.id === self.raw.task.id);
-                    self.edit_task(taskObj);
+                    self.edit_taskId(self.raw.task.id);
                 }
                 if (self.scope() === 'supportTicket' && self.raw.ticket) {
-                    const ticketObj = self.edit_tickets().find(t => t.id === self.raw.ticket.id);
-                    self.edit_ticket(ticketObj);
+                    self.edit_ticketId(self.raw.ticket.id);
                 }
             } finally {
                 isInitializing = false;
@@ -1374,8 +1379,8 @@ function Entry (entry, day) {
             try {
                  const payload = {
                     project: self.edit_project().id,
-                    task: self.edit_scope() === 'task' && self.edit_task() ? self.edit_task().id : null,
-                    ticket: self.edit_scope() === 'supportTicket' && self.edit_ticket() ? self.edit_ticket().id : null,
+                    task: self.edit_scope() === 'task' ? self.edit_taskId() : null,
+                    ticket: self.edit_scope() === 'supportTicket' ? self.edit_ticketId() : null,
                     timeSpent: parseInt(self.edit_timeSpent()),
                     notes: self.edit_notes(),
                 };
@@ -1436,17 +1441,17 @@ function Entry (entry, day) {
     });
     self.edit_scope.subscribe(async () => {
         if (isInitializing) return;
-        self.edit_task(null);
-        self.edit_ticket(null);
+        self.edit_taskId(null);
+        self.edit_ticketId(null);
         await self.loadEditScopeOptions();
     });
 
     self.isEditLoggable = ko.computed(function() {
         if (!self.edit_project()) return false;
-        if (self.edit_scope() === 'task' && !self.edit_task()) {
+        if (self.edit_scope() === 'task' && !self.edit_taskId()) {
             return false;
         }
-        if (self.edit_scope() === 'supportTicket' && !self.edit_ticket()) {
+        if (self.edit_scope() === 'supportTicket' && !self.edit_ticketId()) {
             return false;
         }
         if (self.edit_notes() && self.edit_notes().trim() === '') {
@@ -1543,6 +1548,43 @@ function getMsFromHours(hours) {
 }
 
 const model = new ViewModel();
+
+// A custom binding for select2
+ko.bindingHandlers.select2 = {
+    after: ['options', 'value'],
+    init: function(element, valueAccessor, allBindings) {
+        const $element = $(element);
+        const options = ko.unwrap(valueAccessor()) || {};
+        $element.select2(options);
+
+        // Handle value changes from the UI
+        const value = allBindings.get('value');
+        if (ko.isObservable(value)) {
+            $element.on('change', function() {
+                value($element.val());
+            });
+        }
+
+        // Handle disposal
+        ko.utils.domNodeDisposal.addDisposeCallback(element, function() {
+            $element.select2('destroy');
+        });
+    },
+    update: function(element, valueAccessor, allBindings) {
+        // This is to make the binding aware of options changes
+        ko.unwrap(allBindings.get('options'));
+
+        // The 'after' property should ensure that knockout has updated the options
+        // before this update function is called.
+        // We can then set the value.
+        const $element = $(element);
+        const value = allBindings.get('value');
+        if (ko.isObservable(value)) {
+            $element.val(ko.unwrap(value)).trigger('change.select2');
+        }
+    }
+};
+
 document.addEventListener('DOMContentLoaded', () => {
     ko.applyBindings(model);
     document.addEventListener('keydown', (e) => {
