@@ -249,71 +249,70 @@
                     </div>
                     <!-- ko with: selectedDayForNewEntry -->
                     <div class="modal-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Project</label>
-                                    <select data-bind="options: $root.projects, optionsText: 'name', value: project" class="form-select"></select>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Scope</label>
-                                    <div class="btn-group w-100" role="group" data-bind="attr: { 'aria-label': 'Scope for ' + dateStr() }">
-                                        <input type="radio" class="btn-check" value="global" data-bind="checked: scope, attr: { name: 'scope-type-modal-' + dateStr(), id: 'scope-global-modal-' + dateStr() }" autocomplete="off" checked>
-                                        <label class="btn btn-outline-primary" data-bind="attr: { for: 'scope-global-modal-' + dateStr() }" title="Global"><i class="bi bi-globe-americas me-1"></i> Global</label>
+                        <div class="row mb-3">
+                            <div class="col-md-5">
+                                <label class="form-label">Project</label>
+                                <select data-bind="options: $root.projects, optionsText: 'name', value: project" class="form-select"></select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Scope</label>
+                                <div class="btn-group w-100" role="group" data-bind="attr: { 'aria-label': 'Scope for ' + dateStr() }">
+                                    <input type="radio" class="btn-check" value="global" data-bind="checked: scope, attr: { name: 'scope-type-modal-' + dateStr(), id: 'scope-global-modal-' + dateStr() }" autocomplete="off" checked>
+                                    <label class="btn btn-outline-primary" data-bind="attr: { for: 'scope-global-modal-' + dateStr() }" title="Global"><i class="bi bi-globe-americas me-1"></i></label>
 
-                                        <input type="radio" class="btn-check" value="task" data-bind="checked: scope, attr: { name: 'scope-type-modal-' + dateStr(), id: 'scope-task-modal-' + dateStr() }" autocomplete="off">
-                                        <label class="btn btn-outline-primary" data-bind="attr: { for: 'scope-task-modal-' + dateStr() }" title="Task"><i class="bi bi-journal-check me-1"></i> Task</label>
+                                    <input type="radio" class="btn-check" value="task" data-bind="checked: scope, attr: { name: 'scope-type-modal-' + dateStr(), id: 'scope-task-modal-' + dateStr() }" autocomplete="off">
+                                    <label class="btn btn-outline-primary" data-bind="attr: { for: 'scope-task-modal-' + dateStr() }" title="Task"><i class="bi bi-journal-check me-1"></i></label>
 
-                                        <input type="radio" class="btn-check" value="supportTicket" data-bind="checked: scope, attr: { name: 'scope-type-modal-' + dateStr(), id: 'scope-support-ticket-modal-' + dateStr() }" autocomplete="off">
-                                        <label class="btn btn-outline-primary" data-bind="attr: { for: 'scope-support-ticket-modal-' + dateStr() }" title="Support Ticket"><i class="bi bi-receipt me-1"></i> Ticket</label>
-                                    </div>
-                                </div>
-                                <div data-bind="if: scope() === 'task'" class="mb-3">
-                                    <label class="form-label">Task</label>
-                                    <!-- ko if: tasks().length > 0 -->
-                                    <select data-bind="
-                                        options: tasks,
-                                        optionsText: 'name',
-                                        optionsValue: 'id',
-                                        value: taskId,
-                                        optionsCaption: 'Select Task...',
-                                        select2: { theme: 'bootstrap-5', dropdownParent: $('#newEntryModal'), width: '100%' }"
-                                        class="form-select"></select>
-                                    <!-- /ko -->
-                                    <!-- ko if: tasks().length === 0 && project() -->
-                                    <div class="form-text">No tasks for this project.</div>
-                                    <!-- /ko -->
-                                </div>
-                                <div data-bind="if: scope() === 'supportTicket'" class="mb-3">
-                                    <label class="form-label">Support Ticket</label>                                    <!-- ko if: tickets().length > 0 -->
-                                    <select data-bind="
-                                        options: tickets,
-                                        optionsText: 'name',
-                                        optionsValue: 'id',
-                                        value: ticketId,
-                                        optionsCaption: 'Select Support Ticket...',
-                                        select2: { theme: 'bootstrap-5', dropdownParent: $('#newEntryModal'), width: '100%' }"
-                                        class="form-select"></select>
-                                    <!-- /ko -->
-                                    <!-- ko if: tickets().length === 0 && project() -->
-                                    <div class="form-text">No support tickets for this project.</div>
-                                    <!-- /ko -->
+                                    <input type="radio" class="btn-check" value="supportTicket" data-bind="checked: scope, attr: { name: 'scope-type-modal-' + dateStr(), id: 'scope-support-ticket-modal-' + dateStr() }" autocomplete="off">
+                                    <label class="btn btn-outline-primary" data-bind="attr: { for: 'scope-support-ticket-modal-' + dateStr() }" title="Support Ticket"><i class="bi bi-receipt me-1"></i></label>
                                 </div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label"><i class="bi bi-stopwatch"></i> Duration</label>
-                                    <div class="input-group">
-                                        <button class="btn btn-outline-secondary" type="button" data-bind="click: updateTimeSpentInModal.bind($data, -1800000), attr: { disabled: $root.loading() }">-30m</button>
-                                        <input type="text" class="form-control text-center fw-bold" data-bind="value: time, event: { change: updateTimeFromInput }, attr: { disabled: $root.loading() }">
-                                        <button class="btn btn-outline-secondary" type="button" data-bind="click: updateTimeSpentInModal.bind($data, 1800000), attr: { disabled: $root.loading() }">+30m</button>
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Notes</label>
-                                    <textarea placeholder="What did you work on?" data-bind="value: notes" name="notes" class="form-control" rows="5"></textarea>
+                            <div class="col-md-4">
+                                <label class="form-label"><i class="bi bi-stopwatch"></i> Duration</label>
+                                <div class="input-group">
+                                    <button class="btn btn-outline-secondary" type="button" data-bind="click: updateTimeSpentInModal.bind($data, -1800000), attr: { disabled: $root.loading() }">-30m</button>
+                                    <input type="text" class="form-control text-center fw-bold" data-bind="value: time, event: { change: updateTimeFromInput }, attr: { disabled: $root.loading() }">
+                                    <button class="btn btn-outline-secondary" type="button" data-bind="click: updateTimeSpentInModal.bind($data, 1800000), attr: { disabled: $root.loading() }">+30m</button>
                                 </div>
                             </div>
+                        </div>
+                        <div class="mb-3" data-bind="if: scope() !== 'global'">
+                            <div data-bind="if: scope() === 'task'">
+                                <label class="form-label">Task</label>
+                                <!-- ko if: tasks().length > 0 -->
+                                <select data-bind="
+                                    options: tasks,
+                                    optionsText: 'name',
+                                    optionsValue: 'id',
+                                    value: taskId,
+                                    optionsCaption: 'Select Task...',
+                                    select2: { theme: 'bootstrap-5', dropdownParent: $('#newEntryModal'), width: '100%' }"
+                                    class="form-select"></select>
+                                <!-- /ko -->
+                                <!-- ko if: tasks().length === 0 && project() -->
+                                <div class="form-text">No tasks for this project.</div>
+                                <!-- /ko -->
+                            </div>
+                            <div data-bind="if: scope() === 'supportTicket'">
+                                <label class="form-label">Support Ticket</label>
+                                <!-- ko if: tickets().length > 0 -->
+                                <select data-bind="
+                                    options: tickets,
+                                    optionsText: 'name',
+                                    optionsValue: 'id',
+                                    value: ticketId,
+                                    optionsCaption: 'Select Support Ticket...',
+                                    select2: { theme: 'bootstrap-5', dropdownParent: $('#newEntryModal'), width: '100%' }"
+                                    class="form-select"></select>
+                                <!-- /ko -->
+                                <!-- ko if: tickets().length === 0 && project() -->
+                                <div class="form-text">No support tickets for this project.</div>
+                                <!-- /ko -->
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea placeholder="What did you work on?" data-bind="value: notes" name="notes" class="form-control" rows="5"></textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -335,71 +334,70 @@
                     </div>
                     <!-- ko with: selectedEntryForEdit -->
                     <div class="modal-body">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label">Project</label>
-                                    <select data-bind="options: $root.projects, optionsText: 'name', value: edit_project" class="form-select"></select>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Scope</label>
-                                    <div class="btn-group w-100" role="group" data-bind="attr: { 'aria-label': 'Scope for ' + id() }">
-                                        <input type="radio" class="btn-check" value="global" data-bind="checked: edit_scope, attr: { name: 'edit-scope-type-modal-' + id(), id: 'edit-scope-global-modal-' + id() }" autocomplete="off">
-                                        <label class="btn btn-outline-primary" data-bind="attr: { for: 'edit-scope-global-modal-' + id() }" title="Global"><i class="bi bi-globe-americas me-1"></i> Global</label>
+                        <div class="row mb-3">
+                            <div class="col-md-5">
+                                <label class="form-label">Project</label>
+                                <select data-bind="options: $root.projects, optionsText: 'name', value: edit_project" class="form-select"></select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label">Scope</label>
+                                <div class="btn-group w-100" role="group" data-bind="attr: { 'aria-label': 'Scope for ' + id() }">
+                                    <input type="radio" class="btn-check" value="global" data-bind="checked: edit_scope, attr: { name: 'edit-scope-type-modal-' + id(), id: 'edit-scope-global-modal-' + id() }" autocomplete="off">
+                                    <label class="btn btn-outline-primary" data-bind="attr: { for: 'edit-scope-global-modal-' + id() }" title="Global"><i class="bi bi-globe-americas me-1"></i></label>
 
-                                        <input type="radio" class="btn-check" value="task" data-bind="checked: edit_scope, attr: { name: 'edit-scope-type-modal-' + id(), id: 'edit-scope-task-modal-' + id() }" autocomplete="off">
-                                        <label class="btn btn-outline-primary" data-bind="attr: { for: 'edit-scope-task-modal-' + id() }" title="Task"><i class="bi bi-journal-check me-1"></i> Task</label>
+                                    <input type="radio" class="btn-check" value="task" data-bind="checked: edit_scope, attr: { name: 'edit-scope-type-modal-' + id(), id: 'edit-scope-task-modal-' + id() }" autocomplete="off">
+                                    <label class="btn btn-outline-primary" data-bind="attr: { for: 'edit-scope-task-modal-' + id() }" title="Task"><i class="bi bi-journal-check me-1"></i></label>
 
-                                        <input type="radio" class="btn-check" value="supportTicket" data-bind="checked: edit_scope, attr: { name: 'edit-scope-type-modal-' + id(), id: 'edit-scope-support-ticket-modal-' + id() }" autocomplete="off">
-                                        <label class="btn btn-outline-primary" data-bind="attr: { for: 'edit-scope-support-ticket-modal-' + id() }" title="Support Ticket"><i class="bi bi-receipt me-1"></i> Ticket</label>
-                                    </div>
-                                </div>
-                                <div data-bind="if: edit_scope() === 'task'" class="mb-3">
-                                    <label class="form-label">Task</label>
-                                    <!-- ko if: edit_tasks().length > 0 -->
-                                    <select data-bind="
-                                        options: edit_tasks,
-                                        optionsText: 'name',
-                                        optionsValue: 'id',
-                                        value: edit_taskId,
-                                        optionsCaption: 'Select Task...',
-                                        select2: { theme: 'bootstrap-5', dropdownParent: $('#editEntryModal'), width: '100%' }"
-                                        class="form-select"></select>
-                                    <!-- /ko -->
-                                    <!-- ko if: edit_tasks().length === 0 && edit_project() -->
-                                    <div class="form-text">No tasks for this project.</div>
-                                    <!-- /ko -->
-                                </div>
-                                <div data-bind="if: edit_scope() === 'supportTicket'" class="mb-3">
-                                    <label class="form-label">Support Ticket</label>                                    <!-- ko if: edit_tickets().length > 0 -->
-                                    <select data-bind="
-                                        options: edit_tickets,
-                                        optionsText: 'name',
-                                        optionsValue: 'id',
-                                        value: edit_ticketId,
-                                        optionsCaption: 'Select Support Ticket...',
-                                        select2: { theme: 'bootstrap-5', dropdownParent: $('#editEntryModal'), width: '100%' }"
-                                        class="form-select"></select>
-                                    <!-- /ko -->
-                                    <!-- ko if: edit_tickets().length === 0 && edit_project() -->
-                                    <div class="form-text">No support tickets for this project.</div>
-                                    <!-- /ko -->
+                                    <input type="radio" class="btn-check" value="supportTicket" data-bind="checked: edit_scope, attr: { name: 'edit-scope-type-modal-' + id(), id: 'edit-scope-support-ticket-modal-' + id() }" autocomplete="off">
+                                    <label class="btn btn-outline-primary" data-bind="attr: { for: 'edit-scope-support-ticket-modal-' + id() }" title="Support Ticket"><i class="bi bi-receipt me-1"></i></label>
                                 </div>
                             </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label class="form-label"><i class="bi bi-stopwatch"></i> Duration</label>
-                                    <div class="input-group">
-                                        <button class="btn btn-outline-secondary" type="button" data-bind="click: updateEditTimeSpent.bind($data, -1800000), attr: { disabled: $root.loading() }">-30m</button>
-                                        <input type="text" class="form-control text-center fw-bold" data-bind="value: edit_time, event: { change: updateEditTimeFromInput }, attr: { disabled: $root.loading() }">
-                                        <button class="btn btn-outline-secondary" type="button" data-bind="click: updateEditTimeSpent.bind($data, 1800000), attr: { disabled: $root.loading() }">+30m</button>
-                                    </div>
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">Notes</label>
-                                    <textarea placeholder="What did you work on?" data-bind="value: edit_notes" name="notes" class="form-control" rows="5"></textarea>
+                            <div class="col-md-4">
+                                <label class="form-label"><i class="bi bi-stopwatch"></i> Duration</label>
+                                <div class="input-group">
+                                    <button class="btn btn-outline-secondary" type="button" data-bind="click: updateEditTimeSpent.bind($data, -1800000), attr: { disabled: $root.loading() }">-30m</button>
+                                    <input type="text" class="form-control text-center fw-bold" data-bind="value: edit_time, event: { change: updateEditTimeFromInput }, attr: { disabled: $root.loading() }">
+                                    <button class="btn btn-outline-secondary" type="button" data-bind="click: updateEditTimeSpent.bind($data, 1800000), attr: { disabled: $root.loading() }">+30m</button>
                                 </div>
                             </div>
+                        </div>
+                        <div class="mb-3" data-bind="if: edit_scope() !== 'global'">
+                            <div data-bind="if: edit_scope() === 'task'">
+                                <label class="form-label">Task</label>
+                                <!-- ko if: edit_tasks().length > 0 -->
+                                <select data-bind="
+                                    options: edit_tasks,
+                                    optionsText: 'name',
+                                    optionsValue: 'id',
+                                    value: edit_taskId,
+                                    optionsCaption: 'Select Task...',
+                                    select2: { theme: 'bootstrap-5', dropdownParent: $('#editEntryModal'), width: '100%' }"
+                                    class="form-select"></select>
+                                <!-- /ko -->
+                                <!-- ko if: edit_tasks().length === 0 && edit_project() -->
+                                <div class="form-text">No tasks for this project.</div>
+                                <!-- /ko -->
+                            </div>
+                            <div data-bind="if: edit_scope() === 'supportTicket'">
+                                <label class="form-label">Support Ticket</label>
+                                <!-- ko if: edit_tickets().length > 0 -->
+                                <select data-bind="
+                                    options: edit_tickets,
+                                    optionsText: 'name',
+                                    optionsValue: 'id',
+                                    value: edit_ticketId,
+                                    optionsCaption: 'Select Support Ticket...',
+                                    select2: { theme: 'bootstrap-5', dropdownParent: $('#editEntryModal'), width: '100%' }"
+                                    class="form-select"></select>
+                                <!-- /ko -->
+                                <!-- ko if: edit_tickets().length === 0 && edit_project() -->
+                                <div class="form-text">No support tickets for this project.</div>
+                                <!-- /ko -->
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea placeholder="What did you work on?" data-bind="value: edit_notes" name="notes" class="form-control" rows="5"></textarea>
                         </div>
                     </div>
                     <div class="modal-footer">
