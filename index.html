@@ -10,6 +10,15 @@
     <link rel="stylesheet" href="./style.css">
     <link rel="stylesheet" href="./vanilla-calendar.css">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <style>
+        #back-to-top-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 30px;
+            display: none;
+            z-index: 99;
+        }
+    </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.5.0/knockout-min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
@@ -78,81 +87,81 @@
         <!-- DASHBOARD -->
         <div data-bind="visible: logged, css: { loading: loading }" id="time-tracking-body">
             <div class="card shadow-sm mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="card-title mb-0">Monthly Overview</h5>
+                    <button data-bind="click: updateDashboard, attr: { disabled: loading }" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+                </div>
                 <div class="card-body d-flex justify-content-start align-items-start">
-                <!-- CALENDAR SELECTOR -->
-                <div id="calendar" class="me-4"></div>
-                <!-- STATS -->
-                <div id="stats" class="flex-grow-1">
-                    <h5 class="card-title">Monthly Stats</h5>
-                    <hr>
-                    <div class="mb-4 row">
-                        <div class="col-md-5">
-                            <div id="month-progress">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <h6>Month Progress</h6>
-                                    <div>
-                                        <span class="fw-bold" data-bind="text: monthProgress.total"></span>
-                                        <span class="text-warning small ms-1" data-bind="if: monthProgress.missing() > 0">
-                                            (<i class="bi bi-exclamation-triangle-fill"></i> <span data-bind="text: formatMsToDuration(monthProgress.missing())"></span> missing)
+                    <!-- CALENDAR SELECTOR -->
+                    <div id="calendar" class="me-4"></div>
+                    <!-- STATS -->
+                    <div id="stats" class="flex-grow-1">
+                        <div class="mb-4 row">
+                            <div class="col-md-5">
+                                <div id="month-progress">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <h6>Month Progress</h6>
+                                        <div>
+                                            <span class="fw-bold" data-bind="text: monthProgress.total"></span>
+                                            <span class="text-warning small ms-1" data-bind="if: monthProgress.missing() > 0">
+                                                (<i class="bi bi-exclamation-triangle-fill"></i> <span data-bind="text: formatMsToDuration(monthProgress.missing())"></span> missing)
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div style="position: relative; height:150px; width: 150px; margin: auto;">
+                                        <canvas id="monthScopeChart"></canvas>
+                                    </div>
+                                    <div class="d-flex justify-content-center flex-wrap mt-2 small text-muted" data-bind="foreach: monthProgress.scopes">
+                                        <span class="mx-2 d-flex align-items-center">
+                                            <i class="bi bi-circle-fill me-1" data-bind="css: textColor"></i>
+                                            <span data-bind="text: name"></span>:
+                                            <b class="ms-1" data-bind="text: duration"></b>
                                         </span>
                                     </div>
                                 </div>
-                                <div style="position: relative; height:150px; width: 150px; margin: auto;">
-                                    <canvas id="monthScopeChart"></canvas>
-                                </div>
-                                <div class="d-flex justify-content-center flex-wrap mt-2 small text-muted" data-bind="foreach: monthProgress.scopes">
-                                    <span class="mx-2 d-flex align-items-center">
-                                        <i class="bi bi-circle-fill me-1" data-bind="css: textColor"></i>
-                                        <span data-bind="text: name"></span>:
-                                        <b class="ms-1" data-bind="text: duration"></b>
-                                    </span>
+                            </div>
+                            <div class="col-md-7">
+                                 <div id="projects">
+                                    <h6 class="mt-2">Projects</h6>
+                                    <div style="position: relative; height:200px">
+                                        <canvas id="projectHoursChart"></canvas>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                        <div class="col-md-7">
-                             <div id="projects">
-                                <h6 class="mt-2">Projects</h6>
-                                <div style="position: relative; height:200px">
-                                    <canvas id="projectHoursChart"></canvas>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mt-4 d-flex justify-content-between align-items-center">
-                        <div>
-                            <button data-bind="click: updateDashboard, attr: { disabled: loading }" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
-                        </div>
-                        <div class="d-flex align-items-center small">
-                            <div class="form-check form-switch me-3">
-                                <input class="form-check-input" type="checkbox" role="switch" id="filterMissingHours" data-bind="checked: filterMissingHours">
-                                <label class="form-check-label" for="filterMissingHours">Missing Hours</label>
-                            </div>
-                            <div class="form-check form-switch me-3">
-                                <input class="form-check-input" type="checkbox" role="switch" id="filterHideLeaveDays" data-bind="checked: filterHideLeaveDays">
-                                <label class="form-check-label" for="filterHideLeaveDays">Hide Leave</label>
-                            </div>
-                            <div class="form-check form-switch me-3">
-                                <input class="form-check-input" type="checkbox" role="switch" id="filterOnlyToday" data-bind="checked: filterOnlyToday">
-                                <label class="form-check-label" for="filterOnlyToday">Today Only</label>
-                            </div>
-                            <div class="form-check form-switch me-3">
-                                <input class="form-check-input" type="checkbox" role="switch" id="filterOnlyCurrentWeek" data-bind="checked: filterOnlyCurrentWeek">
-                                <label class="form-check-label" for="filterOnlyCurrentWeek">This Week</label>
-                            </div>
-                            <div class="form-check form-switch me-2">
-                                <input class="form-check-input" type="checkbox" role="switch" id="showWeekends" data-bind="checked: showWeekends">
-                                <label class="form-check-label" for="showWeekends">Show Weekends</label>
-                            </div>
-                            <button data-bind="click: goToToday, attr: { disabled: loading }" class="btn btn-sm btn-outline-primary ms-2"><i class="bi bi-calendar-event"></i> Today</button>
                         </div>
                     </div>
                 </div>
             </div>
-            </div>
 
+            <!-- Filters & Actions Toolbar -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5>Month entries</h5>
+                <div class="d-flex align-items-center small">
+                    <div class="form-check form-switch me-3">
+                        <input class="form-check-input" type="checkbox" role="switch" id="filterMissingHours" data-bind="checked: filterMissingHours">
+                        <label class="form-check-label" for="filterMissingHours">Missing Hours</label>
+                    </div>
+                    <div class="form-check form-switch me-3">
+                        <input class="form-check-input" type="checkbox" role="switch" id="filterHideLeaveDays" data-bind="checked: filterHideLeaveDays">
+                        <label class="form-check-label" for="filterHideLeaveDays">Hide Leave</label>
+                    </div>
+                    <div class="form-check form-switch me-3">
+                        <input class="form-check-input" type="checkbox" role="switch" id="filterOnlyToday" data-bind="checked: filterOnlyToday">
+                        <label class="form-check-label" for="filterOnlyToday">Today Only</label>
+                    </div>
+                    <div class="form-check form-switch me-3">
+                        <input class="form-check-input" type="checkbox" role="switch" id="filterOnlyCurrentWeek" data-bind="checked: filterOnlyCurrentWeek">
+                        <label class="form-check-label" for="filterOnlyCurrentWeek">This Week</label>
+                    </div>
+                    <div class="form-check form-switch me-2">
+                        <input class="form-check-input" type="checkbox" role="switch" id="showWeekends" data-bind="checked: showWeekends">
+                        <label class="form-check-label" for="showWeekends">Show Weekends</label>
+                    </div>
+                    <button data-bind="click: goToToday, attr: { disabled: loading }" class="btn btn-sm btn-outline-primary ms-2"><i class="bi bi-calendar-event"></i> Today</button>
+                </div>
+            </div>
             <!-- DAYS -->
             <div id="entries">
-                <h5>Month entries</h5>
                 <!-- ko foreach: { data: weeks, as: 'week' } -->
                 <div data-bind="visible: week.isVisible">
                     <h5 class="mt-4 d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bind="attr: { 'data-bs-target': '#' + week.id }, click: week.toggleCollapse" style="cursor: pointer;">
@@ -231,7 +240,7 @@
         <!-- ko if: keybindingsEnabled -->
         <div class="navigation-mode-indicator bg-secondary-subtle text-secondary-emphasis border rounded-pill shadow-sm" data-bind="if: navigationMode() !== 'none'">
             <i class="bi bi-keyboard-fill me-1"></i>
-            <span data-bind="if: navigationMode() === 'day'">Day Navigation (j/k, Enter)</span>
+            <span data-bind="if: navigationMode() === 'day'">Day Navigation (j/k, a, Enter)</span>
             <span data-bind="if: navigationMode() === 'entry'">Entry Navigation (j/k, a, e, r, +/-, Esc)</span>
         </div>
         <!-- /ko -->
@@ -409,6 +418,10 @@
             </div>
         </div>
     </main>
+
+    <button type="button" class="btn btn-primary rounded-circle shadow-lg" id="back-to-top-btn" title="Back to top">
+        <i class="bi bi-arrow-up fs-4"></i>
+    </button>
 
     <footer class="text-center text-body-secondary py-3 mt-5 border-top">
         <p class="mb-0">Made with <i class="bi bi-heart-fill text-danger"></i> by a tired panda</p>

@@ -395,6 +395,10 @@ class ViewModel {
                     this.scrollToDay(this.selectedDay());
                 }
                 break;
+            case 'a':
+                e.preventDefault();
+                this.openNewEntryModal(this.selectedDay());
+                break;
             case 'Enter':
                 e.preventDefault();
                 if (this.selectedDay()) {
@@ -1474,4 +1478,23 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('keydown', (e) => {
         model.handleKeyPress(e);
     });
+
+    // Back to top button logic
+    const backToTopBtn = document.getElementById("back-to-top-btn");
+
+    if (backToTopBtn) {
+        const scrollFunction = () => {
+            if (document.body.scrollTop > 100 || document.documentElement.scrollTop > 100) {
+                backToTopBtn.style.display = "block";
+            } else {
+                backToTopBtn.style.display = "none";
+            }
+        };
+
+        window.addEventListener('scroll', scrollFunction);
+
+        backToTopBtn.addEventListener("click", () => {
+            window.scrollTo({top: 0, behavior: 'smooth'});
+        });
+    }
 });
