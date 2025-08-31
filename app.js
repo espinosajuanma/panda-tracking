@@ -942,6 +942,29 @@ function Day (date, entries) {
         timeSpent: ko.observable(1 * 60 * 60 * 1000),
         time: ko.observable('1h'),
         project: ko.observable(null),
+        updateDay: async function() {
+            let query = {
+                _size: 1000,
+                _sortField: 'createdAt',
+                _sortType: 'asc',
+                date: this.dateStr(),
+                person: model.slingr.user.id,
+            }
+            let { items: entries } = await model.slingr.get(`/data/${TIME_TRACKING_ENTITY}`, query);
+
+            this.entries.removeAll();
+            this.durationMs = 0;
+            this.durationBillableMs = 0;
+
+            for (let entry of entries) {
+                let entryDate = new Entry(entry, this);
+                this.durationMs += entryDate.raw.timeSpent;
+                this.durationBillableMs += entry.timeSpent;
+                this.entries.push(entryDate);
+            }
+            this.duration(formatMsToDuration(this.durationMs));
+            this.durationBillable(formatMsToDuration(this.durationBillableMs));
+        },
         updateTimeSpentInModal: function(amount) {
             let current = this.timeSpent();
             let newValue = current + amount;
@@ -997,7 +1020,7 @@ function Day (date, entries) {
                     return;
                 }
 
-                const newEntryData = await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/logTime`, {
+                await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/logTime`, {
                     project: day.project().id,
                     scope: day.scope(),
                     task: day.scope() === 'task' ? day.taskId() : null,
@@ -1008,36 +1031,16 @@ function Day (date, entries) {
                     notes: day.notes(),
                 });
 
-                const entryForViewModel = { ...newEntryData };
-                entryForViewModel.project = { id: day.project().id, label: day.project().name };
-                if (day.scope() === 'task' && day.taskId()) {
-                    const taskObj = day.tasks().find(t => t.id === day.taskId());
-                    if (taskObj) {
-                        entryForViewModel.task = { id: taskObj.id, label: taskObj.name };
-                    }
-                }
-                if (day.scope() === 'supportTicket' && day.ticketId()) {
-                    const ticketObj = day.tickets().find(t => t.id === day.ticketId());
-                    if (ticketObj) {
-                        entryForViewModel.ticket = { id: ticketObj.id, label: ticketObj.name };
-                    }
-                }
-
-                // Add new entry to the day
-                const newEntry = new Entry(entryForViewModel, day);
-                day.entries.push(newEntry);
+                await day.updateDay();
 
                 // Update selection for keybindings
                 if (model.keybindingsEnabled() && model.navigationMode() === 'entry') {
-                    model.selectedEntry(newEntry);
-                    setTimeout(() => model.scrollToEntry(newEntry), 50);
+                    const newEntry = day.entries()[day.entries().length - 1];
+                    if (newEntry) {
+                        model.selectedEntry(newEntry);
+                        setTimeout(() => model.scrollToEntry(newEntry), 50);
+                    }
                 }
-
-                // Update day totals
-                day.durationMs += newEntry.raw.timeSpent;
-                day.duration(formatMsToDuration(day.durationMs));
-                day.durationBillableMs += newEntry.raw.timeSpent;
-                day.durationBillable(formatMsToDuration(day.durationBillableMs));
 
                 // Reset form fields after successful log
                 day.notes('');
@@ -1045,7 +1048,6 @@ function Day (date, entries) {
                 day.scope('global'); // Reset scope to global
                 day.taskId(null); // Clear task selection
                 day.ticketId(null); // Clear ticket selection
-                // Project is not reset as it might be common for multiple entries
 
                 model.newEntryModal.hide();
                 await model.updateStats();
