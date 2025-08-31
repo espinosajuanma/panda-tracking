@@ -164,20 +164,9 @@ class ViewModel {
         this.keybindingsEnabled.subscribe(val => {
             localStorage.setItem('solutions:timetracking:keybindingsEnabled', JSON.stringify(val));
             if (val) {
-                this.navigationMode('day');
-                // Wait for visibleDays to update
-                setTimeout(() => {
-                    if (!this.selectedDay() && this.visibleDays().length > 0) {
-                        this.selectedDay(this.visibleDays()[0]);
-                    }
-                    if (this.selectedDay()) {
-                        this.scrollToDay(this.selectedDay());
-                    }
-                }, 100);
+                this.activateDayNavigation();
             } else {
-                this.navigationMode('none');
-                this.selectedDay(null);
-                this.selectedEntry(null);
+                this.deactivateKeybindings();
             }
         });
 
@@ -274,6 +263,25 @@ class ViewModel {
         });
     }
 
+    activateDayNavigation = () => {
+        this.navigationMode('day');
+        // Wait for visibleDays to update
+        setTimeout(() => {
+            if (!this.selectedDay() && this.visibleDays().length > 0) {
+                this.selectedDay(this.visibleDays()[0]);
+            }
+            if (this.selectedDay()) {
+                this.scrollToDay(this.selectedDay());
+            }
+        }, 100);
+    }
+
+    deactivateKeybindings = () => {
+        this.navigationMode('none');
+        this.selectedDay(null);
+        this.selectedEntry(null);
+    }
+
     login = async () => {
         this.logginIn(true);
         this.slingr.token = null;
@@ -319,9 +327,21 @@ class ViewModel {
         }
     }
 
+    expandWeekAndScroll = (day) => {
+        if (!day) return;
+        const week = day.week;
+        if (week && week.isCollapsed()) {
+            week.isCollapsed(false);
+            const weekElement = document.getElementById(week.id);
+            if (weekElement) {
+                const bsCollapse = bootstrap.Collapse.getOrCreateInstance(weekElement);
+                bsCollapse.show();
+            }
+        }
+        this.scrollToDay(day);
+    }
+
     handleKeyPress = (e) => {
-        if (!this.keybindingsEnabled()) return;
- 
         const activeModalElement = document.querySelector('.modal.show');
         const isModalOpen = !!activeModalElement;
  
@@ -330,6 +350,8 @@ class ViewModel {
             return;
         }
  
+        if (!this.keybindingsEnabled()) return;
+
         const isInputFocused = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
  
         if (isInputFocused) {
@@ -385,15 +407,17 @@ class ViewModel {
             case 'j':
                 e.preventDefault();
                 if (currentIndex < visibleDays.length - 1) {
-                    this.selectedDay(visibleDays[currentIndex + 1]);
-                    this.scrollToDay(this.selectedDay());
+                    const newDay = visibleDays[currentIndex + 1];
+                    this.selectedDay(newDay);
+                    this.expandWeekAndScroll(newDay);
                 }
                 break;
             case 'k':
                 e.preventDefault();
                 if (currentIndex > 0) {
-                    this.selectedDay(visibleDays[currentIndex - 1]);
-                    this.scrollToDay(this.selectedDay());
+                    const newDay = visibleDays[currentIndex - 1];
+                    this.selectedDay(newDay);
+                    this.expandWeekAndScroll(newDay);
                 }
                 break;
             case 'a':
@@ -412,6 +436,10 @@ class ViewModel {
                         this.selectedEntry(null);
                     }
                 }
+                break;
+            case 't':
+                e.preventDefault();
+                this.goToToday();
                 break;
         }
     }
@@ -546,20 +574,37 @@ class ViewModel {
             onClickMonth: async (calendar, event) => {
                 this.month(calendar.context.selectedMonth);
                 await this.updateDashboard();
+                if (this.keybindingsEnabled()) {
+                    this.activateDayNavigation();
+                }
                 this.calendar.selectedMonth = calendar.context.selectedMonth;
                 this.calendar.update();
             },
             onClickYear: async (calendar, event) => {
                 this.year(calendar.context.selectedYear);
                 await this.updateDashboard();
+                if (this.keybindingsEnabled()) {
+                    this.activateDayNavigation();
+                }
                 this.calendar.selectedMonth = calendar.context.selectedMonth;
                 this.calendar.selectedYear = calendar.context.selectedYear;
                 this.calendar.update();
+            },
+            onClickArrow: async (calendar, event) => {
+                this.month(calendar.context.selectedMonth);
+                this.year(calendar.context.selectedYear);
+                await this.updateDashboard();
+                if (this.keybindingsEnabled()) {
+                    this.activateDayNavigation();
+                }
             }
         }
         this.calendar = new VanillaCalendarPro.Calendar('#calendar', settings);
         this.calendar.init();
         await this.updateDashboard();
+        if (this.keybindingsEnabled()) {
+            this.activateDayNavigation();
+        }
     }
 
     updateDashboard = async () => {
@@ -571,13 +616,29 @@ class ViewModel {
 
     goToToday = async () => {
         let today = new Date();
+        const todayDateStr = getDateString(today);
+
         if (this.month() !== today.getMonth() || this.year() !== today.getFullYear()) {
             this.month(today.getMonth());
             this.year(today.getFullYear());
             this.calendar.set({ selectedMonth: this.month(), selectedYear: this.year() });
             await this.updateDashboard();
         }
-        document.getElementById(getDateString(today)).scrollIntoView({ behavior: 'smooth' });
+
+        // After updateDashboard, data is fresh.
+        const allDays = this.weeks().map(w => w.days()).flat();
+        const todayDayObject = allDays.find(d => d.dateStr() === todayDateStr);
+
+        if (todayDayObject) {
+            // If keybindings are on and today is visible, select it.
+            if (this.keybindingsEnabled() && todayDayObject.isVisible()) {
+                this.selectedDay(todayDayObject);
+                this.expandWeekAndScroll(todayDayObject);
+            } else {
+                // Otherwise, just scroll to it.
+                this.scrollToDay(todayDayObject);
+            }
+        }
     }
 
     // Get holidays of the month
@@ -885,7 +946,6 @@ class ViewModel {
 /* Classes */
 
 function Week(week, entries) {
-    let days = week.days.map(d => new Day(d, entries));
     const formatDate = (date) => {
         return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
     };
@@ -893,12 +953,14 @@ function Week(week, entries) {
     const endDate = week.days[week.days.length - 1];
 
     const self = {
-        days: ko.observableArray(days),
         title: `Week ${week.week + 1}`,
         dateRange: `${formatDate(startDate)} - ${formatDate(endDate)}`,
         isCollapsed: ko.observable(false),
         id: `week-collapse-${week.week}`,
     };
+
+    let days = week.days.map(d => new Day(d, entries, self));
+    self.days = ko.observableArray(days);
 
     self.toggleCollapse = function() {
         self.isCollapsed(!self.isCollapsed());
@@ -911,7 +973,7 @@ function Week(week, entries) {
     return self;
 }
 
-function Day (date, entries) {
+function Day (date, entries, week) {
     const MAX_TIME_SPENT = 8 * 60 * 60 * 1000;
     let dateStr = getDateString(date);
     let holiday = model.holidays().find(h => h.day === dateStr);
@@ -930,6 +992,7 @@ function Day (date, entries) {
         }),
         date: date,
         dateStr: ko.observable(dateStr),
+        week: week,
         holidayDetail: ko.observable(holiday?.title),
         entries: ko.observableArray([]),
         durationMs: 0,
