@@ -174,6 +174,36 @@ class ViewModel {
         this.entryForRemoval = ko.observable(null);
         this.removeConfirmModal = null;
 
+        this.submitRemove = async () => {
+            const entryToRemove = this.entryForRemoval();
+            if (!entryToRemove) return;
+
+            this.loading(true);
+            try {
+                await this.slingr.delete(`/data/${TIME_TRACKING_ENTITY}/${entryToRemove.id()}`);
+
+                const day = entryToRemove.day;
+                day.entries.remove(entryToRemove);
+
+                // Update day totals
+                day.durationMs -= entryToRemove.raw.timeSpent;
+                day.duration(formatMsToDuration(day.durationMs));
+                day.durationBillableMs -= entryToRemove.raw.timeSpent;
+                day.durationBillable(formatMsToDuration(day.durationBillableMs));
+
+                await this.updateStats();
+
+                this.addToast('Entry removed successfully.', 'success');
+                this.removeConfirmModal.hide();
+                this.entryForRemoval(null);
+            } catch (e) {
+                console.error(e);
+                this.addToast('Error removing entry.', 'error');
+            } finally {
+                this.loading(false);
+            }
+        }
+
         // Theme
         const storedTheme = localStorage.getItem('solutions:timetracking:theme') || 'dark';
         this.theme = ko.observable(storedTheme);
@@ -664,15 +694,10 @@ function Day (date, entries) {
         }),
         date: date,
         dateStr: ko.observable(dateStr),
-        isToday: ko.observable(isToday),
-        isHoliday: ko.observable(isHoliday),
-        isLeave: ko.observable(isLeave),
-        isWeekend: ko.observable(isWeekend),
-        isBussinessDay: ko.observable(isBussinessDay),
         holidayDetail: ko.observable(holiday?.title),
         entries: ko.observableArray([]),
         durationMs: 0,
-        durationBillable: 0,
+        durationBillableMs: 0,
         durationNonBillable: 0,
         visibleNotes: ko.observable(true),
         // Form
@@ -692,7 +717,7 @@ function Day (date, entries) {
             } else {
                 model.leaveDays.push(dateStr);
             }
-            await model.updateTimeTracking();
+            await model.updateStats();
         },
         logEntry: async (day) => {
             model.loading(true);
@@ -715,7 +740,7 @@ function Day (date, entries) {
                     return;
                 }
 
-                await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/logTime`, {
+                const newEntryData = await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/logTime`, {
                     project: day.project().id,
                     scope: day.scope(),
                     task: day.scope() === 'task' && day.task() ? day.task().id : null,
@@ -725,6 +750,26 @@ function Day (date, entries) {
                     timeSpent: parseInt(day.timeSpent()),
                     notes: day.notes(),
                 });
+
+                const entryForViewModel = { ...newEntryData };
+                entryForViewModel.project = { id: day.project().id, label: day.project().name };
+                if (day.scope() === 'task' && day.task()) {
+                    entryForViewModel.task = { id: day.task().id, label: day.task().name };
+                }
+                if (day.scope() === 'supportTicket' && day.ticket()) {
+                    entryForViewModel.ticket = { id: day.ticket().id, label: day.ticket().name };
+                }
+
+                // Add new entry to the day
+                const newEntry = new Entry(entryForViewModel, day);
+                day.entries.push(newEntry);
+
+                // Update day totals
+                day.durationMs += newEntry.raw.timeSpent;
+                day.duration(formatMsToDuration(day.durationMs));
+                day.durationBillableMs += newEntry.raw.timeSpent;
+                day.durationBillable(formatMsToDuration(day.durationBillableMs));
+
                 // Reset form fields after successful log
                 day.notes('');
                 day.timeSpent(1 * 60 * 60 * 1000); // Reset to 1 hour
@@ -734,7 +779,7 @@ function Day (date, entries) {
                 // Project is not reset as it might be common for multiple entries
 
                 model.newEntryModal.hide();
-                await model.updateTimeTracking();
+                await model.updateStats();
             } catch(e) {
                 console.error(e);
                 model.addToast('Error logging entry.', 'error');
@@ -745,6 +790,17 @@ function Day (date, entries) {
             day.visibleNotes(! day.visibleNotes());
         }
     }
+
+    day.isToday = ko.observable(isToday);
+    day.isHoliday = ko.observable(isHoliday);
+    day.isWeekend = ko.observable(isWeekend);
+    day.isLeave = ko.computed(function() {
+        return model.leaveDays().includes(dateStr);
+    });
+    day.isBussinessDay = ko.computed(function() {
+        return !day.isWeekend() && !day.isHoliday() && !day.isLeave();
+    });
+
 
     day.isLoggable = ko.computed(function() {
         if (!day.project()) {
@@ -831,11 +887,11 @@ function Day (date, entries) {
         let entryDate = new Entry(entry, day);
 
         day.durationMs += entryDate.raw.timeSpent;
-        day.durationBillable += entry.timeSpent;
+        day.durationBillableMs += entry.timeSpent;
         day.entries.push(entryDate);
     }
     day.duration = ko.observable(formatMsToDuration(day.durationMs));
-    day.durationBillable = ko.observable(formatMsToDuration(day.durationBillable));
+    day.durationBillable = ko.observable(formatMsToDuration(day.durationBillableMs));
     day.durationNonBillable = ko.observable(formatMsToDuration(day.durationNonBillable));
 
     day.isMissingTime = ko.computed(function() {
@@ -929,8 +985,23 @@ function Entry (entry, day) {
             const newTime = this.raw.timeSpent + amount;
             try {
                 const payload = { ...this.raw, timeSpent: newTime };
-                await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/${this.id()}`, payload);
-                await model.updateTimeTracking();
+                const updatedEntryData = await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/${this.id()}`, payload);
+
+                const day = this.day;
+                const oldTime = this.raw.timeSpent;
+
+                // Update entry
+                this.raw = updatedEntryData;
+                this.timeSpent(updatedEntryData.timeSpent);
+                this.duration(formatMsToDuration(updatedEntryData.timeSpent));
+
+                // Update day totals
+                day.durationMs = day.durationMs - oldTime + updatedEntryData.timeSpent;
+                day.duration(formatMsToDuration(day.durationMs));
+                day.durationBillableMs = day.durationBillableMs - oldTime + updatedEntryData.timeSpent;
+                day.durationBillable(formatMsToDuration(day.durationBillableMs));
+
+                await model.updateStats();
             } catch (e) {
                 console.error(e);
                 model.addToast('Error updating time entry.', 'error');
@@ -1018,17 +1089,36 @@ function Entry (entry, day) {
         submitEdit: async function() {
             model.loading(true);
             try {
-                const payload = {
+                 const payload = {
                     project: self.edit_project().id,
                     task: self.edit_scope() === 'task' && self.edit_task() ? self.edit_task().id : null,
                     ticket: self.edit_scope() === 'supportTicket' && self.edit_ticket() ? self.edit_ticket().id : null,
                     timeSpent: parseInt(self.edit_timeSpent()),
                     notes: self.edit_notes(),
                 };
-                await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/${self.id()}`, payload);
-                model.addToast('Entry updated successfully.', 'success');
+                const updatedEntryData = await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/${self.id()}`, payload);
+
+                const day = self.day;
+                const oldTime = self.raw.timeSpent;
+
+                // Update entry
+                self.raw = updatedEntryData;
+                self.project(updatedEntryData.project.label);
+                self.scope(updatedEntryData.task ? 'task' : updatedEntryData.ticket ? 'supportTicket' : 'global');
+                self.task(updatedEntryData.task?.label ?? updatedEntryData.ticket?.label ?? 'Global to the project');
+                self.timeSpent(updatedEntryData.timeSpent);
+                self.duration(formatMsToDuration(updatedEntryData.timeSpent));
+                self.notes(updatedEntryData.notes);
+
+                // Update day totals
+                day.durationMs = day.durationMs - oldTime + updatedEntryData.timeSpent;
+                day.duration(formatMsToDuration(day.durationMs));
+                day.durationBillableMs = day.durationBillableMs - oldTime + updatedEntryData.timeSpent;
+                day.durationBillable(formatMsToDuration(day.durationBillableMs));
+
                 model.editEntryModal.hide();
-                await model.updateTimeTracking();
+                await model.updateStats();
+                model.addToast('Entry updated successfully.', 'success');
             } catch (e) {
                 console.error(e);
                 model.addToast('Error updating entry.', 'error');
@@ -1037,19 +1127,6 @@ function Entry (entry, day) {
         },
         remove: (entry) => {
             model.openRemoveConfirmModal(entry);
-        },
-        submitRemove: async function() {
-            model.loading(true);
-            try {
-                await model.slingr.delete(`/data/${TIME_TRACKING_ENTITY}/${this.entryForRemoval().id()}`);
-                model.addToast('Entry removed successfully.', 'success');
-                model.removeConfirmModal.hide();
-                await model.updateTimeTracking();
-            } catch (e) {
-                console.error(e);
-                model.addToast('Error removing entry.', 'error');
-            }
-            model.loading(false);
         },
     };
 
