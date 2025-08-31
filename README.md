@@ -1,4 +1,4 @@
-# Time Tracking App
+# Panda Tracking App
 
 A personal time tracking application built to simplify logging work hours, with a focus on speed and usability.
 
