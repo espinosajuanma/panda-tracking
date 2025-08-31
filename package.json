@@ -1,15 +1,19 @@
 {
   "name": "time-tracking",
   "version": "1.0.0",
-  "description": "I got tired of having to go to the HQ application to track my time at work. So I built my own",
+  "description": "I got tired using the Solutions app to track my time at work. So I built my own",
   "main": "app.js",
   "scripts": {
+    "start": "live-server ./src",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
-  "author": "",
+  "author": "A tired panda",
   "license": "ISC",
   "dependencies": {
     "vanilla-calendar-pro": "^3.0.3"
+  },
+  "devDependencies": {
+    "live-server": "^1.2.2"
   }
 }
