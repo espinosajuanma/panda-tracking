@@ -1062,6 +1062,63 @@ class ViewModel {
         }
     }
 
+    exportToCsv = () => {
+        try {
+            const headers = ["Date", "Project", "Scope", "Task/Ticket", "Duration", "Notes"];
+            const rows = [];
+
+            this.weeks().forEach(week => {
+                if (!week.isVisible()) return;
+                week.days().forEach(day => {
+                    if (!day.isVisible()) return;
+                    day.entries().forEach(entry => {
+                        const sanitize = (str) => str.replace(/"/g, '""').replace(/\r?\n/g, ' ');
+                        const notes = sanitize(entry.notes() || '');
+                        const task = sanitize(entry.task() || '');
+                        const scopes = { task: 'Task', supportTicket: 'Ticket', global: 'Global' };
+                        const scope = scopes[scope];
+
+                        const rowData = [
+                            day.dateStr(),
+                            `"${entry.project()}"`,
+                            `"${scope}"`,
+                            `"${task}"`,
+                            `"${entry.duration()}"`,
+                            `"${notes}"`
+                        ];
+                        rows.push(rowData.join(","));
+                    });
+                });
+            });
+
+            if (rows.length === 0) {
+                this.addToast('No visible entries to export.', 'info', 'Export');
+                return;
+            }
+
+            let csvContent = headers.join(",") + "\r\n" + rows.join("\r\n");
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+
+            const monthDate = new Date(this.year(), this.month(), 1);
+            const monthName = monthDate.toLocaleString('default', { month: 'long' });
+            const year = this.year();
+            link.setAttribute("download", `time-entries-${monthName}-${year}.csv`);
+            
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            this.addToast('Your time entries have been exported.', 'success', 'Export Successful');
+        } catch (e) {
+            console.error('Error exporting to CSV', e);
+            this.addToast('An unexpected error occurred during export.', 'error', 'Export Failed');
+        }
+    };
+
     // Calendar utils
     listDaysBetweenMonth = () => {
         let days = [];

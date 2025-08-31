@@ -160,7 +160,8 @@
                         <input class="form-check-input" type="checkbox" role="switch" id="showWeekends" data-bind="checked: showWeekends">
                         <label class="form-check-label" for="showWeekends">Show Weekends</label>
                     </div>
-                    <button data-bind="click: goToToday, attr: { disabled: loading }" class="btn btn-sm btn-outline-primary ms-2"><i class="bi bi-calendar-event"></i> Today</button>
+                    <button data-bind="click: goToToday, attr: { disabled: loading }" class="btn btn-sm btn-outline-primary ms-2" title="Go to Today"><i class="bi bi-calendar-event"></i> Today</button>
+                    <button data-bind="click: exportToCsv, attr: { disabled: loading }" class="btn btn-sm btn-outline-success ms-2" title="Export visible entries to CSV"><i class="bi bi-file-earmark-spreadsheet"></i> Export</button>
                 </div>
             </div>
             <!-- DAYS -->
@@ -193,7 +194,7 @@
                                         <i class="bi bi-person-slash" data-bind="css: { 'text-info': isLeave(), 'text-muted': !isLeave() }"></i>
                                     </button>
                                     <!-- ko if: isBussinessDay -->
-                                    <button data-bind="click: $root.openNewEntryModal" class="btn btn-sm btn-outline-primary ms-2" type="button" title="New Entry">
+                                    <button data-bind="click: $root.openNewEntryModal" class="btn btn-sm btn-primary ms-2" type="button" title="New Entry">
                                         <i class="bi bi-plus-lg"></i>
                                     </button>
                                     <!-- /ko -->

@@ -2,17 +2,6 @@
     --bs-body-bg: rgb(15 23 42);
 }
 
-[data-bs-theme="dark"] button.btn-outline-primary {
-    --bs-btn-color: #fff;
-    --bs-btn-bg: var(--bs-primary);
-    --bs-btn-border-color: var(--bs-primary);
-    --bs-btn-hover-color: #fff;
-    --bs-btn-hover-bg: #0b5ed7;
-    --bs-btn-hover-border-color: #0a58ca;
-    --bs-btn-active-color: #fff;
-    --bs-btn-active-bg: #0a58ca;
-    --bs-btn-active-border-color: #0a53be;
-}
 [data-bs-theme="dark"] button.btn-outline-secondary {
     --bs-btn-color: #fff;
     --bs-btn-bg: var(--bs-secondary);
