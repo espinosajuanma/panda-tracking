@@ -8,12 +8,12 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="./vanilla-calendar.css">
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js" integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="                      crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.5.0/knockout-min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
     <script src="./vanilla-calendar.js"></script>
-
 
     <script src="./app.js"></script>
     <script>
@@ -134,33 +134,35 @@
                 <div id="stats" class="flex-grow-1">
                     <h5 class="card-title">Monthly Stats</h5>
                     <hr>
-                    <div class="mb-4">
-                        <div id="month-progress">
-                            <div class="d-flex justify-content-between">
-                                <h6>Month Progress</h6>
-                                <span class="fw-bold" data-bind="text: monthProgress.total"></span>
-                            </div>
-                            <div class="progress-stacked" data-bind="foreach: monthProgress.scopes">
-                                <div class="progress-bar" role="progressbar" data-bind="style: { width: percentage }, css: colorClass, attr: { 'aria-label': scope, title: name + ': ' + duration }" data-bs-toggle="tooltip"></div>
-                            </div>
-                            <div class="d-flex justify-content-center mt-2 small text-muted" data-bind="foreach: monthProgress.scopes">
-                                <span class="mx-2 d-flex align-items-center">
-                                    <i class="bi bi-circle-fill me-1" data-bind="css: textColor"></i>
-                                    <span data-bind="text: name"></span>:
-                                    <b class="ms-1" data-bind="text: duration"></b>
-                                </span>
+                    <div class="mb-4 row">
+                        <div class="col-md-5">
+                            <div id="month-progress">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h6>Month Progress</h6>
+                                    <div>
+                                        <span class="fw-bold" data-bind="text: monthProgress.total"></span>
+                                        <span class="text-warning small ms-1" data-bind="if: monthProgress.missing() > 0">
+                                            (<i class="bi bi-exclamation-triangle-fill"></i> <span data-bind="text: formatMsToDuration(monthProgress.missing())"></span> missing)
+                                        </span>
+                                    </div>
+                                </div>
+                                <div style="position: relative; height:150px; width: 150px; margin: auto;">
+                                    <canvas id="monthScopeChart"></canvas>
+                                </div>
+                                <div class="d-flex justify-content-center flex-wrap mt-2 small text-muted" data-bind="foreach: monthProgress.scopes">
+                                    <span class="mx-2 d-flex align-items-center">
+                                        <i class="bi bi-circle-fill me-1" data-bind="css: textColor"></i>
+                                        <span data-bind="text: name"></span>:
+                                        <b class="ms-1" data-bind="text: duration"></b>
+                                    </span>
+                                </div>
                             </div>
                         </div>
-                        <div id="projects">
-                            <h6 class="mt-2">Projects</h6>
-                            <div class="list-group list-group-flush" data-bind="foreach: projects">
-                                <div class="list-group-item px-0">
-                                    <div class="d-flex justify-content-between">
-                                        <span data-bind="text: name"></span> <b data-bind="text: total"></b>
-                                    </div>
-                                    <div class="progress-stacked mt-1" data-bind="foreach: scopes">
-                                        <div class="progress-bar" role="progressbar" data-bind="style: { width: percentage }, css: colorClass, attr: { 'aria-label': scope, title: duration }" data-bs-toggle="tooltip"></div>
-                                    </div>
+                        <div class="col-md-7">
+                             <div id="projects">
+                                <h6 class="mt-2">Projects</h6>
+                                <div style="position: relative; height:200px">
+                                    <canvas id="projectHoursChart"></canvas>
                                 </div>
                             </div>
                         </div>

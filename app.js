@@ -153,7 +153,10 @@ class ViewModel {
         this.monthProgress = {
             scopes: ko.observableArray([]),
             total: ko.observable('0h'),
+            missing: ko.observable(0),
         };
+        this.monthScopeChart = null;
+        this.projectHoursChart = null;
         this.billable = ko.observable(true);
         this.notes = ko.observable('');
 
@@ -335,44 +338,104 @@ class ViewModel {
         let totalMonthMs = this.weeks().map(w => w.days()).flat().filter(d => d.isBussinessDay()).length * 8 * 60 * 60 * 1000;
         if (totalMonthMs === 0) totalMonthMs = 1; // Avoid division by zero
         let entries = this.weeks().map(w => w.days()).flat().map(d => d.entries()).flat();
-
+ 
         const scopeStats = {
-            global: { timeSpent: 0, colorClass: 'bg-primary', textColor: 'text-primary' },
-            task: { timeSpent: 0, colorClass: 'bg-success', textColor: 'text-success' },
-            supportTicket: { timeSpent: 0, colorClass: 'bg-danger', textColor: 'text-danger' },
+            global: { timeSpent: 0, color: 'rgb(13, 110, 253)', name: 'Global' },
+            task: { timeSpent: 0, color: 'rgb(25, 135, 84)', name: 'Task' },
+            supportTicket: { timeSpent: 0, color: 'rgb(220, 53, 69)', name: 'Ticket' },
         };
-
-        let totalBillable = 0;
+ 
+        let totalTimeSpent = 0;
         for (const entry of entries) {
             const scope = entry.scope();
             if (scopeStats[scope]) {
                 scopeStats[scope].timeSpent += entry.raw.timeSpent;
             }
-            totalBillable += entry.raw.timeSpent;
+            totalTimeSpent += entry.raw.timeSpent;
         }
-
+ 
         const scopeProgress = [];
+        const chartData = {
+            labels: [],
+            datasets: [{
+                data: [],
+                backgroundColor: [],
+            }]
+        };
+ 
+        const scopeClassMap = {
+            global: { colorClass: 'bg-primary', textColor: 'text-primary' },
+            task: { colorClass: 'bg-success', textColor: 'text-success' },
+            supportTicket: { colorClass: 'bg-danger', textColor: 'text-danger' },
+        };
+ 
         for (const scope in scopeStats) {
             const stat = scopeStats[scope];
-            const percentage = (stat.timeSpent / totalMonthMs) * 100;
             if (stat.timeSpent > 0) {
                 scopeProgress.push({
                     scope: scope,
-                    name: scope.charAt(0).toUpperCase() + scope.slice(1).replace('T', ' T'),
-                    colorClass: stat.colorClass,
-                    textColor: stat.textColor,
+                    name: stat.name,
+                    colorClass: scopeClassMap[scope].colorClass,
+                    textColor: scopeClassMap[scope].textColor,
                     duration: formatMsToDuration(stat.timeSpent),
-                    percentage: percentage.toFixed(2) + '%',
+                    percentage: ((stat.timeSpent / totalMonthMs) * 100).toFixed(2) + '%',
                 });
+                chartData.labels.push(stat.name);
+                chartData.datasets[0].data.push(stat.timeSpent);
+                chartData.datasets[0].backgroundColor.push(stat.color);
             }
         }
-
+ 
         this.monthProgress.scopes(scopeProgress);
-        this.monthProgress.total(formatMsToDuration(totalBillable));
+        this.monthProgress.total(formatMsToDuration(totalTimeSpent));
 
+        const missingMs = totalMonthMs - totalTimeSpent;
+        this.monthProgress.missing(missingMs > 0 ? missingMs : 0);
+ 
+        this.updateMonthScopeChart(chartData);
+ 
         await this.updateProjectStats(totalMonthMs);
     }
-
+ 
+    updateMonthScopeChart = (chartData) => {
+        const ctx = document.getElementById('monthScopeChart');
+        if (!ctx) return;
+ 
+        if (this.monthScopeChart) {
+            this.monthScopeChart.data.labels = chartData.labels;
+            this.monthScopeChart.data.datasets = chartData.datasets;
+            this.monthScopeChart.update();
+        } else {
+            this.monthScopeChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: chartData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed !== null) {
+                                        label += formatMsToDuration(context.parsed);
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
+ 
     updateProjectStats = async (totalMonthMs) => {
         let { items: projects } = await model.slingr.get('/data/projects', {
             'members.user': model.slingr.user.id,
@@ -380,47 +443,126 @@ class ViewModel {
             _sortType: 'asc',
             _size: 1000,
         });
-        this.projects([]);
+        this.projects([]); // Clear old project data
+ 
+        const projectChartData = {
+            labels: [],
+            datasets: [
+                {
+                    label: 'Global',
+                    data: [],
+                    backgroundColor: 'rgb(13, 110, 253)',
+                },
+                {
+                    label: 'Task',
+                    data: [],
+                    backgroundColor: 'rgb(25, 135, 84)',
+                },
+                {
+                    label: 'Ticket',
+                    data: [],
+                    backgroundColor: 'rgb(220, 53, 69)',
+                }
+            ]
+        };
+ 
+        const projectsWithTime = [];
+ 
         for (let project of projects) {
             let projectEntries = this.weeks()
                 .map(w => w.days()).flat()
                 .map(d => d.entries()).flat()
                 .filter(e => e.raw.project.id === project.id);
-
+ 
+            if (projectEntries.length === 0) continue;
+ 
             const projectScopeStats = {
-                global: { timeSpent: 0, colorClass: 'bg-primary' },
-                task: { timeSpent: 0, colorClass: 'bg-success' },
-                supportTicket: { timeSpent: 0, colorClass: 'bg-danger' },
+                global: 0,
+                task: 0,
+                supportTicket: 0,
             };
-
-            let totalProjectBillable = 0;
+ 
             for (const entry of projectEntries) {
                 const scope = entry.scope();
-                if (projectScopeStats[scope]) {
-                    projectScopeStats[scope].timeSpent += entry.raw.timeSpent;
-                }
-                totalProjectBillable += entry.raw.timeSpent;
-            }
-
-            const projectScopeProgress = [];
-            for (const scope in projectScopeStats) {
-                const stat = projectScopeStats[scope];
-                const percentage = (stat.timeSpent / totalMonthMs) * 100;
-                if (stat.timeSpent > 0) {
-                    projectScopeProgress.push({
-                        scope: scope,
-                        colorClass: stat.colorClass,
-                        duration: formatMsToDuration(stat.timeSpent),
-                        percentage: percentage.toFixed(2) + '%',
-                    });
+                if (projectScopeStats.hasOwnProperty(scope)) {
+                    projectScopeStats[scope] += entry.raw.timeSpent;
                 }
             }
-
-            this.projects.push({
-                id: project.id,
+            
+            projectsWithTime.push({
                 name: project.label,
-                total: ko.observable(formatMsToDuration(totalProjectBillable)),
-                scopes: ko.observableArray(projectScopeProgress),
+                stats: projectScopeStats,
+                total: projectScopeStats.global + projectScopeStats.task + projectScopeStats.supportTicket
+            });
+        }
+ 
+        // Sort projects by total time descending
+        projectsWithTime.sort((a, b) => b.total - a.total);
+ 
+        for (const project of projectsWithTime) {
+            projectChartData.labels.push(project.name);
+            projectChartData.datasets[0].data.push(project.stats.global / (1000 * 60 * 60));
+            projectChartData.datasets[1].data.push(project.stats.task / (1000 * 60 * 60));
+            projectChartData.datasets[2].data.push(project.stats.supportTicket / (1000 * 60 * 60));
+        }
+ 
+        this.updateProjectHoursChart(projectChartData);
+    }
+ 
+    updateProjectHoursChart = (chartData) => {
+        const ctx = document.getElementById('projectHoursChart');
+        if (!ctx) return;
+ 
+        if (this.projectHoursChart) {
+            this.projectHoursChart.data = chartData;
+            this.projectHoursChart.update();
+        } else {
+            this.projectHoursChart = new Chart(ctx, {
+                type: 'bar',
+                data: chartData,
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false,
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.parsed.x !== null) {
+                                        label += context.parsed.x.toFixed(1) + 'h';
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: 'Hours'
+                            }
+                        },
+                        y: {
+                            stacked: true,
+                            ticks: {
+                                autoSkip: false,
+                                callback: function(value, index, values) {
+                                    const label = this.getLabelForValue(value);
+                                    return label.length > 20 ? label.substring(0, 20) + '...' : label;
+                                }
+                            }
+                        }
+                    }
+                }
             });
         }
     }
