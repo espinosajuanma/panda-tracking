@@ -37,20 +37,20 @@
                     Time Tracking
                 </a>
                 <div class="d-flex align-items-center">
-                    <!-- ko if: logged -->
-                    <span class="navbar-text me-3" data-bind="text: slingr.user?.firstName"></span>
-                    <button class="btn btn-sm me-3" data-bind="click: logout, css: { 'btn-outline-light': isDarkMode(), 'btn-outline-dark': !isDarkMode() }">
-                        <i class="bi bi-box-arrow-right"></i> Logout
-                    </button>
-                    <!-- /ko -->
                     <div class="form-check form-switch me-3" title="Toggle Vim Keybindings">
                         <input class="form-check-input" type="checkbox" role="switch" id="keybindingsSwitch" data-bind="checked: keybindingsEnabled">
                         <label class="form-check-label" for="keybindingsSwitch"><i class="bi bi-keyboard"></i></label>
                     </div>
-                    <div class="form-check form-switch">
+                    <div class="form-check form-switch me-3">
                         <input class="form-check-input" type="checkbox" role="switch" id="themeSwitchNav" data-bind="checked: isDarkMode">
                         <label class="form-check-label" for="themeSwitchNav"><i data-bind="css: isDarkMode() ? 'bi-moon-stars-fill' : 'bi-sun-fill'"></i></label>
                     </div>
+                    <!-- ko if: logged -->
+                    <span class="navbar-text me-3" data-bind="text: slingr.user?.firstName"></span>
+                    <button class="btn btn-sm" data-bind="click: logout, css: { 'btn-outline-light': isDarkMode(), 'btn-outline-dark': !isDarkMode() }">
+                        <i class="bi bi-box-arrow-right"></i> Logout
+                    </button>
+                    <!-- /ko -->
                 </div>
             </div>
         </nav>
