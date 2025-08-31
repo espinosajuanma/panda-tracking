@@ -271,10 +271,15 @@ class ViewModel {
             onClickMonth: async (calendar, event) => {
                 this.month(calendar.context.selectedMonth);
                 await this.updateDashboard();
+                this.calendar.selectedMonth = calendar.context.selectedMonth;
+                this.calendar.update();
             },
             onClickYear: async (calendar, event) => {
                 this.year(calendar.context.selectedYear);
                 await this.updateDashboard();
+                this.calendar.selectedMonth = calendar.context.selectedMonth;
+                this.calendar.selectedYear = calendar.context.selectedYear;
+                this.calendar.update();
             }
         }
         this.calendar = new VanillaCalendarPro.Calendar('#calendar', settings);
