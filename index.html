@@ -7,6 +7,7 @@
     <link id="runtimeAppFavicon" rel="shortcut icon" type="image/png" href="https://storage.googleapis.com/static.slingrs.io/platform/apps/favicon.ico"/>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="./style.css">
     <link rel="stylesheet" href="./vanilla-calendar.css">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.5.0/knockout-min.js"></script>
@@ -23,86 +24,32 @@
             document.documentElement.setAttribute('data-bs-theme', theme);
         })();
     </script>
-    <style>
-        [data-bs-theme="dark"] {
-            --bs-body-bg: rgb(15 23 42);
-        }
-
-        [data-bs-theme="dark"] button.btn-outline-primary {
-            --bs-btn-color: #fff;
-            --bs-btn-bg: var(--bs-primary);
-            --bs-btn-border-color: var(--bs-primary);
-            --bs-btn-hover-color: #fff;
-            --bs-btn-hover-bg: #0b5ed7;
-            --bs-btn-hover-border-color: #0a58ca;
-            --bs-btn-active-color: #fff;
-            --bs-btn-active-bg: #0a58ca;
-            --bs-btn-active-border-color: #0a53be;
-        }
-        [data-bs-theme="dark"] button.btn-outline-secondary {
-            --bs-btn-color: #fff;
-            --bs-btn-bg: var(--bs-secondary);
-            --bs-btn-border-color: var(--bs-secondary);
-            --bs-btn-hover-color: #fff;
-            --bs-btn-hover-bg: #5c636a;
-            --bs-btn-hover-border-color: #565e64;
-            --bs-btn-active-color: #fff;
-            --bs-btn-active-bg: #565e64;
-            --bs-btn-active-border-color: #51585e;
-        }
-        [data-bs-theme="dark"] button.btn-outline-danger {
-            --bs-btn-color: #fff;
-            --bs-btn-bg: var(--bs-danger);
-            --bs-btn-border-color: var(--bs-danger);
-            --bs-btn-hover-color: #fff;
-            --bs-btn-hover-bg: #bb2d3b;
-            --bs-btn-hover-border-color: #b02a37;
-            --bs-btn-active-color: #fff;
-            --bs-btn-active-bg: #b02a37;
-            --bs-btn-active-border-color: #a52834;
-        }
-
-        main {
-            min-height: 100vh;
-        }
-        #login {
-            width: 50vw;
-            margin: auto;
-            margin-top: 50px;
-        }
-        #calendar {
-            height: 300px;
-            width: 250px;
-        }
-        #stats {
-            width: 100%;
-            padding: 20px;
-        }
-        .readOnly {
-            opacity: .8;
-        }
-        .loading {
-            opacity: .5;
-            pointer-events: none;
-        }
-        .switch-label {
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 1.2rem;
-        }
-        .btn-group-xs > .btn {
-            --bs-btn-padding-y: .1rem;
-            --bs-btn-padding-x: .3rem;
-            --bs-btn-font-size: .75rem;
-            --bs-btn-border-radius: .2rem;
-        }
-    </style>
 </head>
 <body data-bind="attr: { 'data-bs-theme': theme }">
-    <main class="pt-4 pb-5 container">
-        <h2 class="fw-bold text-center">Time Tracking</h2>
+    <header>
+        <nav class="navbar navbar-expand-lg mb-4 shadow-sm" data-bind="css: { 'navbar-dark bg-dark': isDarkMode(), 'navbar-light bg-light border-bottom': !isDarkMode() }">
+            <div class="container">
+                <a class="navbar-brand fw-bold" href="#">
+                    <img src="https://storage.googleapis.com/static.slingrs.io/platform/apps/favicon.ico" alt="Logo" width="24" height="24" class="d-inline-block align-text-top me-2">
+                    Time Tracking
+                </a>
+                <div class="d-flex align-items-center">
+                    <!-- ko if: logged -->
+                    <span class="navbar-text me-3" data-bind="text: slingr.user?.firstName"></span>
+                    <button class="btn btn-sm me-3" data-bind="click: logout, css: { 'btn-outline-light': isDarkMode(), 'btn-outline-dark': !isDarkMode() }">
+                        <i class="bi bi-box-arrow-right"></i> Logout
+                    </button>
+                    <!-- /ko -->
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="themeSwitchNav" data-bind="checked: isDarkMode">
+                        <label class="form-check-label" for="themeSwitchNav"><i data-bind="css: isDarkMode() ? 'bi-moon-stars-fill' : 'bi-sun-fill'"></i></label>
+                    </div>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main class="container pb-5">
 
         <!-- LOGIN -->
         <div data-bind="hidden: logged" class="card shadow-sm" id="login">
@@ -437,12 +384,8 @@
         </div>
     </main>
 
-    <footer class="text-center text-body-secondary py-4 mt-5 border-top">
-        <p class="mb-1">Made with <i class="bi bi-heart-fill text-danger"></i> by a tired panda</p>
-        <div class="form-check form-switch d-inline-block">
-            <input class="form-check-input" type="checkbox" role="switch" id="themeSwitch" data-bind="checked: isDarkMode">
-            <label class="form-check-label" for="themeSwitch"><i data-bind="css: isDarkMode() ? 'bi-moon-stars-fill' : 'bi-sun-fill'"></i></label>
-        </div>
+    <footer class="text-center text-body-secondary py-3 mt-5 border-top">
+        <p class="mb-0">Made with <i class="bi bi-heart-fill text-danger"></i> by a tired panda</p>
     </footer>
 
     <!-- Toasts -->

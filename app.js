@@ -95,7 +95,7 @@ class ViewModel {
             this.logginIn(true);
             this.slingr.getCurrentUser()
             .then(user => {
-                console.log('Logged in as', user?.id);
+                console.log('Logged in as', user);
                 this.logged(true);
                 localStorage.setItem('solutions:timetracking:token', this.slingr.token);
             })
@@ -190,9 +190,9 @@ class ViewModel {
         });
     }
 
-    
     login = async () => {
         this.logginIn(true);
+        this.slingr.token = null;
         try {
             await this.slingr.login(this.email(), this.pass());
         } catch (e) {
@@ -207,6 +207,15 @@ class ViewModel {
         this.email(null);
         this.pass(null);
         this.logginIn(false);
+    }
+
+    logout = () => {
+        this.slingr.post('/auth/logout');
+        this.slingr.token = null;
+        this.slingr.user = null;
+        localStorage.removeItem('solutions:timetracking:token');
+        this.logged(false);
+        this.addToast('Logged out successfully.', 'success');
     }
 
     openNewEntryModal = (day) => {
