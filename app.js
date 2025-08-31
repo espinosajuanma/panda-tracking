@@ -150,6 +150,48 @@ class ViewModel {
         this.filterOnlyToday = ko.observable(false);
         this.filterOnlyCurrentWeek = ko.observable(false);
 
+        // Keybindings
+        const storedKeybindings = localStorage.getItem('solutions:timetracking:keybindingsEnabled');
+        this.keybindingsEnabled = ko.observable(storedKeybindings ? JSON.parse(storedKeybindings) : false);
+        this.navigationMode = ko.observable('none'); // 'none', 'day', 'entry'
+        this.selectedDay = ko.observable(null);
+        this.selectedEntry = ko.observable(null);
+
+        this.visibleDays = ko.computed(() => {
+            return this.weeks().map(w => w.days()).flat().filter(d => d.isVisible());
+        });
+
+        this.keybindingsEnabled.subscribe(val => {
+            localStorage.setItem('solutions:timetracking:keybindingsEnabled', JSON.stringify(val));
+            if (val) {
+                this.navigationMode('day');
+                // Wait for visibleDays to update
+                setTimeout(() => {
+                    if (!this.selectedDay() && this.visibleDays().length > 0) {
+                        this.selectedDay(this.visibleDays()[0]);
+                    }
+                    if (this.selectedDay()) {
+                        this.scrollToDay(this.selectedDay());
+                    }
+                }, 100);
+            } else {
+                this.navigationMode('none');
+                this.selectedDay(null);
+                this.selectedEntry(null);
+            }
+        });
+
+        this.visibleDays.subscribe(days => {
+            if (this.keybindingsEnabled() && this.navigationMode() === 'day') {
+                if (days.length > 0 && !days.includes(this.selectedDay())) {
+                    this.selectedDay(days[0]);
+                    this.scrollToDay(days[0]);
+                } else if (days.length === 0) {
+                    this.selectedDay(null);
+                }
+            }
+        });
+
         this.monthProgress = {
             scopes: ko.observableArray([]),
             total: ko.observable('0h'),
@@ -190,6 +232,17 @@ class ViewModel {
                 day.duration(formatMsToDuration(day.durationMs));
                 day.durationBillableMs -= entryToRemove.raw.timeSpent;
                 day.durationBillable(formatMsToDuration(day.durationBillableMs));
+
+                // Update selection for keybindings
+                if (this.keybindingsEnabled() && this.navigationMode() === 'entry') {
+                    const removedIndex = day.entries.indexOf(entryToRemove);
+                    if (day.entries().length > 0) {
+                        const newIndex = Math.min(removedIndex, day.entries().length - 1);
+                        this.selectedEntry(day.entries()[newIndex]);
+                    } else {
+                        this.selectedEntry(null);
+                    }
+                }
 
                 await this.updateStats();
 
@@ -246,6 +299,184 @@ class ViewModel {
         localStorage.removeItem('solutions:timetracking:token');
         this.logged(false);
         this.addToast('Logged out successfully.', 'success');
+    }
+
+    scrollToDay = (day, block = 'center') => {
+        if (!day) return;
+        const dayElement = document.getElementById(day.dateStr());
+        if (dayElement) {
+            dayElement.scrollIntoView({ behavior: 'smooth', block: block });
+            dayElement.focus({ preventScroll: true });
+        }
+    }
+
+    scrollToEntry = (entry) => {
+        if (!entry) return;
+        const entryElement = document.getElementById('entry-' + entry.id());
+        if (entryElement) {
+            entryElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+
+    handleKeyPress = (e) => {
+        if (!this.keybindingsEnabled()) return;
+ 
+        const activeModalElement = document.querySelector('.modal.show');
+        const isModalOpen = !!activeModalElement;
+ 
+        if (isModalOpen) {
+            this.handleModalKeys(e, activeModalElement);
+            return;
+        }
+ 
+        const isInputFocused = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
+ 
+        if (isInputFocused) {
+            if (e.key === 'Escape') {
+                document.activeElement.blur();
+                e.preventDefault();
+            }
+            return;
+        }
+ 
+        const mode = this.navigationMode();
+        if (mode === 'day') {
+            this.handleDayNavigation(e);
+        } else if (mode === 'entry') {
+            this.handleEntryNavigation(e);
+        }
+    }
+ 
+    handleModalKeys = (e, modalElement) => {
+        switch (e.key) {
+            case 'Escape':
+                e.preventDefault();
+                const modal = bootstrap.Modal.getInstance(modalElement);
+                if (modal) {
+                    modal.hide();
+                }
+                break;
+            case 'Enter':
+                // Allow default behavior for Enter in textareas (new line), unless Ctrl/Meta is pressed.
+                if (document.activeElement.tagName === 'TEXTAREA' && !e.ctrlKey && !e.metaKey) {
+                    return;
+                }
+                e.preventDefault();
+                const confirmButton = modalElement.querySelector('.modal-footer .btn-primary, .modal-footer .btn-danger');
+                if (confirmButton && !confirmButton.disabled) {
+                    confirmButton.click();
+                }
+                break;
+        }
+    }
+
+    handleDayNavigation = (e) => {
+        const visibleDays = this.visibleDays();
+        if (visibleDays.length === 0) return;
+
+        let currentIndex = visibleDays.indexOf(this.selectedDay());
+        if (currentIndex === -1 && visibleDays.length > 0) {
+            currentIndex = 0;
+            this.selectedDay(visibleDays[0]);
+        }
+
+        switch (e.key) {
+            case 'j':
+                e.preventDefault();
+                if (currentIndex < visibleDays.length - 1) {
+                    this.selectedDay(visibleDays[currentIndex + 1]);
+                    this.scrollToDay(this.selectedDay());
+                }
+                break;
+            case 'k':
+                e.preventDefault();
+                if (currentIndex > 0) {
+                    this.selectedDay(visibleDays[currentIndex - 1]);
+                    this.scrollToDay(this.selectedDay());
+                }
+                break;
+            case 'Enter':
+                e.preventDefault();
+                if (this.selectedDay()) {
+                    this.navigationMode('entry');
+                    if (this.selectedDay().entries().length > 0) {
+                        const firstEntry = this.selectedDay().entries()[0];
+                        this.selectedEntry(firstEntry);
+                        setTimeout(() => this.scrollToEntry(firstEntry), 50);
+                    } else {
+                        this.selectedEntry(null);
+                    }
+                }
+                break;
+        }
+    }
+
+    handleEntryNavigation = (e) => {
+        const currentDay = this.selectedDay();
+        if (!currentDay) return;
+
+        const entries = currentDay.entries();
+        let currentIndex = entries.indexOf(this.selectedEntry());
+
+        if (entries.length === 0 && ['j', 'k', 'e', 'r', '+', '-'].includes(e.key)) {
+            e.preventDefault();
+            return; // No entries to navigate/act on
+        }
+
+        switch (e.key) {
+            case 'j':
+                e.preventDefault();
+                if (entries.length > 0) {
+                    if (currentIndex === -1) {
+                        this.selectedEntry(entries[0]);
+                    } else if (currentIndex < entries.length - 1) {
+                        this.selectedEntry(entries[currentIndex + 1]);
+                    }
+                    this.scrollToEntry(this.selectedEntry());
+                }
+                break;
+            case 'k':
+                e.preventDefault();
+                if (currentIndex > 0) {
+                    this.selectedEntry(entries[currentIndex - 1]);
+                    this.scrollToEntry(this.selectedEntry());
+                }
+                break;
+            case 'Escape':
+                e.preventDefault();
+                this.navigationMode('day');
+                this.selectedEntry(null);
+                this.scrollToDay(this.selectedDay());
+                break;
+            case 'a':
+                e.preventDefault();
+                this.openNewEntryModal(currentDay);
+                break;
+            case 'e':
+                e.preventDefault();
+                if (this.selectedEntry()) {
+                    this.selectedEntry().edit(this.selectedEntry());
+                }
+                break;
+            case 'r':
+                e.preventDefault();
+                if (this.selectedEntry()) {
+                    this.openRemoveConfirmModal(this.selectedEntry());
+                }
+                break;
+            case '+':
+                e.preventDefault();
+                if (this.selectedEntry() && !this.selectedEntry().readOnly()) {
+                    this.selectedEntry().updateTime(1800000); // 30 minutes
+                }
+                break;
+            case '-':
+                e.preventDefault();
+                if (this.selectedEntry() && !this.selectedEntry().readOnly()) {
+                    this.selectedEntry().updateTime(-1800000); // -30 minutes
+                }
+                break;
+        }
     }
 
     openNewEntryModal = (day) => {
@@ -764,6 +995,12 @@ function Day (date, entries) {
                 const newEntry = new Entry(entryForViewModel, day);
                 day.entries.push(newEntry);
 
+                // Update selection for keybindings
+                if (model.keybindingsEnabled() && model.navigationMode() === 'entry') {
+                    model.selectedEntry(newEntry);
+                    setTimeout(() => model.scrollToEntry(newEntry), 50);
+                }
+
                 // Update day totals
                 day.durationMs += newEntry.raw.timeSpent;
                 day.duration(formatMsToDuration(day.durationMs));
@@ -1234,4 +1471,7 @@ function getMsFromHours(hours) {
 const model = new ViewModel();
 document.addEventListener('DOMContentLoaded', () => {
     ko.applyBindings(model);
+    document.addEventListener('keydown', (e) => {
+        model.handleKeyPress(e);
+    });
 });

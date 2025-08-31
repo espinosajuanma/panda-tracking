@@ -37,30 +37,43 @@
 }
 
 main {
-    min-height: 100vh;
+    min-height: calc(100vh - 120px); /* Adjust based on header/footer height */
 }
+
 #login {
-    max-width: 500px;
-    margin: 50px auto 0 auto;
+    max-width: 400px;
+    margin: 50px auto;
 }
+
 #calendar {
-    height: 300px;
-    width: 250px;
+    min-width: 280px;
 }
+
 #stats {
     width: 100%;
     padding: 20px;
 }
-.readOnly {
-    opacity: .8;
-}
+
 .loading {
     opacity: .5;
     pointer-events: none;
 }
-.btn-group-xs > .btn {
-    --bs-btn-padding-y: .1rem;
-    --bs-btn-padding-x: .3rem;
-    --bs-btn-font-size: .75rem;
-    --bs-btn-border-radius: .2rem;
+
+.selected-day {
+    box-shadow: 0 0 0 3px var(--bs-primary) !important;
+}
+
+.selected-entry {
+    background-color: var(--bs-primary-bg-subtle) !important;
+    border-left: 4px solid var(--bs-primary);
+    padding-left: calc(var(--bs-list-group-item-padding-x) - 4px) !important;
+}
+
+.navigation-mode-indicator {
+    position: fixed;
+    bottom: 1rem;
+    left: 1rem;
+    padding: 0.25rem 0.75rem;
+    z-index: 1050;
+    font-size: 0.8rem;
 }
