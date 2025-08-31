@@ -92,6 +92,12 @@
             gap: 5px;
             font-size: 1.2rem;
         }
+        .btn-group-xs > .btn {
+            --bs-btn-padding-y: .1rem;
+            --bs-btn-padding-x: .3rem;
+            --bs-btn-font-size: .75rem;
+            --bs-btn-border-radius: .2rem;
+        }
     </style>
 </head>
 <body data-bind="attr: { 'data-bs-theme': theme }">
@@ -223,18 +229,24 @@
                         </div>
                         <!-- ENTRIES -->
                         <ul data-bind="foreach: entries, visible: entries().length > 0" class="list-group list-group-flush">
-                            <li data-bind="css: { readOnly: readOnly }" class="list-group-item px-0 d-flex justify-content-between align-items-start">
-                                <div class="me-auto">
-                                    <div class="fw-bold"><span class="me-2" data-bind="attr: { title: task }, css: scopeClasses"></span> <span data-bind="text: project"></span></div>
-                                    <span style="white-space: pre-wrap;" data-bind="text: notes, visible: day.visibleNotes" class="text-muted small"></span>
+                            <li data-bind="css: { readOnly: readOnly }" class="list-group-item px-0">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <div class="fw-bold">
+                                            <span class="me-2" data-bind="attr: { title: task }, css: scopeClasses"></span> <span data-bind="text: project"></span> <span class="text-muted small" data-bind="text: task, visible: scope() !== 'global'"></span>
+                                        </div>
+                                    </div>
+                                    <span data-bind="text: duration" class="badge bg-success rounded-pill"></span>
                                 </div>
-                                <div class="d-flex flex-column align-items-end">
-                                    <span data-bind="text: duration" class="badge bg-success rounded-pill mb-1"></span>
-                                    <div data-bind="hidden: readOnly" class="btn-group btn-group-sm">
-                                        <button data-bind="click: updateTime.bind($data, -1800000)" class="btn btn-outline-secondary" title="Subtract 30m"><i class="bi bi-dash"></i></button>
-                                        <button data-bind="click: updateTime.bind($data, 1800000)" class="btn btn-outline-secondary" title="Add 30m"><i class="bi bi-plus"></i></button>
-                                        <button data-bind="click: edit" class="btn btn-outline-secondary" title="Edit"><i class="bi bi-pencil-square"></i></button>
-                                        <button data-bind="click: remove" class="btn btn-outline-danger" title="Remove"><i class="bi bi-trash"></i></button>
+                                <div class="d-flex justify-content-between align-items-start mt-2">
+                                    <p style="white-space: pre-wrap;" data-bind="text: notes, visible: day.visibleNotes" class="text-muted small mb-0 me-3"></p>
+                                    <div data-bind="hidden: readOnly" class="flex-shrink-0">
+                                        <div class="btn-group btn-group-xs">
+                                            <button data-bind="click: updateTime.bind($data, -1800000)" class="btn btn-outline-secondary" title="Subtract 30m"><i class="bi bi-dash"></i></button>
+                                            <button data-bind="click: updateTime.bind($data, 1800000)" class="btn btn-outline-secondary" title="Add 30m"><i class="bi bi-plus"></i></button>
+                                            <button data-bind="click: edit" class="btn btn-outline-secondary" title="Edit"><i class="bi bi-pencil-square"></i></button>
+                                            <button data-bind="click: remove" class="btn btn-outline-danger" title="Remove"><i class="bi bi-trash"></i></button>
+                                        </div>
                                     </div>
                                 </div>
                             </li>
