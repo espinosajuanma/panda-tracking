@@ -448,7 +448,7 @@ class ViewModel {
             _sortType: 'asc',
             _size: 1000,
         });
-        this.projects([]); // Clear old project data
+        this.projects(projects.map(p => ({ id: p.id, name: p.label })));
  
         const projectChartData = {
             labels: [],
@@ -478,8 +478,6 @@ class ViewModel {
                 .map(w => w.days()).flat()
                 .map(d => d.entries()).flat()
                 .filter(e => e.raw.project.id === project.id);
- 
-            if (projectEntries.length === 0) continue;
  
             const projectScopeStats = {
                 global: 0,
