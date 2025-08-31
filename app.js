@@ -205,6 +205,8 @@ class ViewModel {
         this.entryForRemoval = ko.observable(null);
         this.removeConfirmModal = null;
 
+        this.keybindingsHelpModal = null;
+
         this.submitRemove = async () => {
             const entryToRemove = this.entryForRemoval();
             if (!entryToRemove) return;
@@ -261,6 +263,13 @@ class ViewModel {
                 this.calendar.set({ selectedTheme: newTheme });
             }
         });
+    }
+
+    showKeybindingsHelp = () => {
+        if (!this.keybindingsHelpModal) {
+            this.keybindingsHelpModal = new bootstrap.Modal(document.getElementById('keybindingsHelpModal'));
+        }
+        this.keybindingsHelpModal.show();
     }
 
     activateDayNavigation = () => {
@@ -362,6 +371,12 @@ class ViewModel {
             return;
         }
  
+        if (e.key === 'h') {
+            e.preventDefault();
+            this.showKeybindingsHelp();
+            return;
+        }
+
         const mode = this.navigationMode();
         if (mode === 'day') {
             this.handleDayNavigation(e);
