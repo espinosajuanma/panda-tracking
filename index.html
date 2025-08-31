@@ -49,70 +49,82 @@
         }
     </style>
 </head>
-<body>
-    <main class="pt-2 pb-5 container">
+<body class="bg-light">
+    <main class="pt-4 pb-5 container">
         <h2 class="fw-bold text-center">Time Tracking</h2>
 
         <!-- LOGIN -->
-        <div data-bind="hidden: logged" class="card" id="login">
+        <div data-bind="hidden: logged" class="card shadow-sm" id="login">
             <div class="card-header">
-                <h5 class="card-title">HQ</h5>
+                <h5 class="card-title mb-0">Time Tracking Login</h5>
             </div>
             <div class="card-body">
-                <label for="email">Email</label>
-                <input data-bind="value: email, attr: { disabled: logginIn }" type="email" name="email" class="form-control" id="email">
-                <label for="password">Password</label>
-                <input data-bind="value: pass, attr: { disabled: logginIn }" type="password" name="password" class="form-control" id="password">
-                <button data-bind="attr: { disabled: logginIn }, click: login" class="mt-2 btn btn-primary">Login</button>
+                <div class="mb-3">
+                    <label for="email" class="form-label">Email</label>
+                    <input data-bind="value: email, attr: { disabled: logginIn }" type="email" name="email" class="form-control" id="email" placeholder="your@email.com">
+                </div>
+                <div class="mb-3">
+                    <label for="password" class="form-label">Password</label>
+                    <input data-bind="value: pass, attr: { disabled: logginIn }" type="password" name="password" class="form-control" id="password">
+                </div>
+                <button data-bind="attr: { disabled: logginIn }, click: login" class="mt-2 btn btn-primary w-100">Login</button>
             </div>
         </div>
 
         <!-- DASHBOARD -->
-        <div data-bind="visible: logged, css: { loading: loading }" class="container" id="time-tracking-body">
-            <div class="mb-2 border border-1 rounded d-flex justify-content-start align-items-start">
+        <div data-bind="visible: logged, css: { loading: loading }" id="time-tracking-body">
+            <div class="card shadow-sm mb-4">
+                <div class="card-body d-flex justify-content-start align-items-start">
                 <!-- CALENDAR SELECTOR -->
-                <div id="calendar"></div>
+                <div id="calendar" class="me-4"></div>
                 <!-- STATS -->
-                <div id="stats">
-                    <h5>Stats</h5>
-                    <div>
+                <div id="stats" class="flex-grow-1">
+                    <h5 class="card-title">Monthly Stats</h5>
+                    <hr>
+                    <div class="mb-4">
                         <div id="month-progress">
-                            <h6>Month Progress - <span data-bind="text: monthProgress.total"></span></h6>
-                            <div class="progress-stacked" data-bind="foreach: monthProgress.scopes">
-                                <div class="progress-bar" role="progressbar" data-bind="style: { width: percentage }, css: colorClass, attr: { 'aria-label': scope, title: duration }" data-bs-toggle="tooltip"></div>
+                            <div class="d-flex justify-content-between">
+                                <h6>Month Progress</h6>
+                                <span class="fw-bold" data-bind="text: monthProgress.total"></span>
                             </div>
-                            <div class="d-flex justify-content-center mt-1" data-bind="foreach: monthProgress.scopes">
-                                <span class="mx-2">
-                                    <i class="bi bi-circle-fill" data-bind="css: textColor"></i>
+                            <div class="progress-stacked" data-bind="foreach: monthProgress.scopes">
+                                <div class="progress-bar" role="progressbar" data-bind="style: { width: percentage }, css: colorClass, attr: { 'aria-label': scope, title: name + ': ' + duration }" data-bs-toggle="tooltip"></div>
+                            </div>
+                            <div class="d-flex justify-content-center mt-2 small text-muted" data-bind="foreach: monthProgress.scopes">
+                                <span class="mx-2 d-flex align-items-center">
+                                    <i class="bi bi-circle-fill me-1" data-bind="css: textColor"></i>
                                     <span data-bind="text: name"></span>:
-                                    <b data-bind="text: duration"></b>
+                                    <b class="ms-1" data-bind="text: duration"></b>
                                 </span>
                             </div>
                         </div>
                         <div id="projects">
                             <h6 class="mt-2">Projects</h6>
-                            <div class="group-list" data-bind="foreach: projects">
-                                <li class="list-group-item">
-                                    <span data-bind="text: name"></span> - <b data-bind="text: total"></b>
+                            <div class="list-group list-group-flush" data-bind="foreach: projects">
+                                <div class="list-group-item px-0">
+                                    <div class="d-flex justify-content-between">
+                                        <span data-bind="text: name"></span> <b data-bind="text: total"></b>
+                                    </div>
                                     <div class="progress-stacked mt-1" data-bind="foreach: scopes">
                                         <div class="progress-bar" role="progressbar" data-bind="style: { width: percentage }, css: colorClass, attr: { 'aria-label': scope, title: duration }" data-bs-toggle="tooltip"></div>
                                     </div>
-                                </li>
+                                </div>
                             </div>
                         </div>
                     </div>
-                    <div class="mt-5 d-flex justify-content-between align-items-center">
+                    <div class="mt-4 d-flex justify-content-between align-items-center">
                         <div>
-                            <button data-bind="click: updateDashboard, attr: { disabled: loading }" class="btn btn-outline-primary"><i class="bi bi-arrow-clockwise"></i></button>
+                            <button data-bind="click: updateDashboard, attr: { disabled: loading }" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
                         </div>
                         <div class="d-flex align-items-center">
                             <div style="width: 300px;" class="me-2">
-                                <select class="form-select" data-bind="options: projects, optionsText: 'name', optionsValue: 'id', value: selectedProjectFilter, optionsCaption: 'All Projects'"></select>
+                                <select class="form-select form-select-sm" data-bind="options: projects, optionsText: 'name', optionsValue: 'id', value: selectedProjectFilter, optionsCaption: 'All Projects'"></select>
                             </div>
-                            <button data-bind="click: goToToday, attr: { disabled: loading }" class="btn btn-outline-primary"><i class="bi bi-calendar-event"></i> Today</button>
+                            <button data-bind="click: goToToday, attr: { disabled: loading }" class="btn btn-sm btn-outline-primary"><i class="bi bi-calendar-event"></i> Today</button>
                         </div>
                     </div>
                 </div>
+            </div>
             </div>
 
             <!-- DAYS -->
@@ -120,58 +132,57 @@
                 <h5>Month entries</h5>
                 <!-- ko foreach: weeks -->
                 <!-- ko foreach: days -->
-                 <div data-bind="visible: isVisible, attr: { id: dateStr() }, css: { 'border-primary': isToday(), 'border-warning': isHoliday() && !isLeave(), 'border-danger': isWeekend(), 'border-info': isLeave() }" class="card mt-2">
-                    <div class="card-header">
-                        <h6 class="card-title d-flex justify-content-between align-items-center">
-                            <div>
+                 <div data-bind="visible: isVisible, attr: { id: dateStr() }, css: { 'border-primary': isToday(), 'border-warning': isHoliday() && !isLeave(), 'border-danger': isWeekend(), 'border-info': isLeave() }" class="card shadow-sm mt-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="card-title mb-0">
                                 <span data-bind="visible: isLeave()" title="Leave" data-bs-toggle="tooltip"><i class="bi bi-person-slash text-info"></i> </span>
                                 <span data-bind="visible: isHoliday() && !isLeave(), attr: { title: holidayDetail }" data-bs-toggle="tooltip"><i class="bi bi-calendar-x-fill text-warning"></i> </span>
                                 <span data-bind="visible: isWeekend()" title="Weekend" data-bs-toggle="tooltip"><i class="bi bi-calendar-x-fill text-danger"></i> </span>
                                 <span data-bind="visible: isBussinessDay()"><i class="bi bi-calendar-check-fill text-primary"></i> </span>
                                 <span data-bind="text: title"></span>
-                            </div>
+                        </h6>
                             <div class="d-flex align-items-center">
-                                <button class="btn btn-sm" data-bind="click: toggleLeave, visible: canToggleLeave, attr: { title: isLeave() ? 'Unmark as Leave' : 'Mark as Leave' }">
+                                <button class="btn btn-sm py-0 px-1" data-bind="click: toggleLeave, visible: canToggleLeave, attr: { title: isLeave() ? 'Unmark as Leave' : 'Mark as Leave' }">
                                     <i class="bi bi-person-slash" data-bind="css: { 'text-info': isLeave(), 'text-muted': !isLeave() }"></i>
                                 </button>
-                                <span data-bind="visible: isMissingTime, attr: { title: 'Missing ' + missingDuration() }" data-bs-toggle="tooltip"><i class="bi bi-info-circle-fill text-warning me-1"></i></span>
-                                <span data-bind="visible: duration() !== '0m', text: duration" class="badge bg-primary"></span>
+                                <span data-bind="visible: isMissingTime, attr: { title: 'Missing ' + missingDuration() }" data-bs-toggle="tooltip" class="text-warning me-2"><i class="bi bi-exclamation-triangle-fill"></i></span>
+                                <span data-bind="visible: duration() !== '0m', text: duration" class="badge bg-primary rounded-pill"></span>
                             </div>
-                        </h6>
                     </div>
                     <div class="card-body">
-                        <div data-bind="visible: isBussinessDay()">
-                            <div class="d-flex justify-content-end">
-                                <button data-bind="click: showNotes" class="btn btn-outline-primary btn-sm" type="button" data-bs-toggle="collapse" aria-expanded="false">
-                                    <i data-bind="css: { 'bi-eye': visibleNotes, 'bi-eye-slash': !visibleNotes() }" class="bi bi-eye"></i>
-                                </button>
-                                <button data-bind="click: $root.openNewEntryModal" class="btn btn-outline-primary btn-sm" type="button">
-                                    <i class="bi bi-plus"></i> New Entry
-                                </button>
+                        <div data-bind="if: isBussinessDay()">
+                            <div class="d-flex justify-content-end mb-3">
+                                <div class="btn-group btn-group-sm">
+                                    <button data-bind="click: showNotes" class="btn btn-outline-secondary" type="button" title="Toggle Notes Visibility">
+                                        <i data-bind="css: { 'bi-eye': visibleNotes, 'bi-eye-slash': !visibleNotes() }" class="bi"></i>
+                                    </button>
+                                    <button data-bind="click: $root.openNewEntryModal" class="btn btn-outline-primary" type="button">
+                                        <i class="bi bi-plus-lg"></i> New Entry
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                        <h6>Entries</h6>
                         <!-- ENTRIES -->
-                        <ul data-bind="foreach: entries" class="list-group list-group-flush">
+                        <ul data-bind="foreach: entries, visible: entries().length > 0" class="list-group list-group-flush">
                             <!-- ko if: isVisible -->
-                                <li data-bind="css: { readOnly: readOnly }" class="list-group-item d-flex justify-content-between align-items-start" data-bs-toggle="collapse" data-bs-target="#multiCollapseExample2">
-                                    <div class="ms-2 me-auto">
-                                        <div class="fw-bold"><span class="bi" data-bind="attr: { title: task }, css: scopeClasses"></span> <span data-bind="text: project"></span></div>
-                                        <span style="white-space: pre-wrap;" data-bind="text: notes, visible: $parent.visibleNotes"></span>
+                                <li data-bind="css: { readOnly: readOnly }" class="list-group-item px-0 d-flex justify-content-between align-items-start">
+                                    <div class="me-auto">
+                                        <div class="fw-bold"><span class="me-2" data-bind="attr: { title: task }, css: scopeClasses"></span> <span data-bind="text: project"></span></div>
+                                        <span style="white-space: pre-wrap;" data-bind="text: notes, visible: $parent.visibleNotes" class="text-muted small"></span>
                                     </div>
                                     <div class="d-flex flex-column align-items-end">
-                                        <span data-bind="text: duration" class="badge bg-success"></span>
-                                        <div class="d-flex">
-                                            <button data-bind="click: remove, hidden: readOnly" class="btn btn-sm text-danger" title="Remove"><i class="bi bi-trash"></i></button>
-                                            <button data-bind="click: updateTime.bind($data, -1800000), hidden: readOnly" class="btn btn-sm text-primary" title="Subtract 30m"><i class="bi bi-dash-square"></i></button>
-                                            <button data-bind="click: updateTime.bind($data, 1800000), hidden: readOnly" class="btn btn-sm text-primary" title="Add 30m"><i class="bi bi-plus-square"></i></button>
-                                            <button data-bind="click: edit, hidden: readOnly" class="btn btn-sm text-primary" title="Edit"><i class="bi bi-pencil-square"></i></button>
+                                        <span data-bind="text: duration" class="badge bg-success rounded-pill mb-1"></span>
+                                        <div data-bind="hidden: readOnly" class="btn-group btn-group-sm">
+                                            <button data-bind="click: updateTime.bind($data, -1800000)" class="btn btn-outline-secondary" title="Subtract 30m"><i class="bi bi-dash"></i></button>
+                                            <button data-bind="click: updateTime.bind($data, 1800000)" class="btn btn-outline-secondary" title="Add 30m"><i class="bi bi-plus"></i></button>
+                                            <button data-bind="click: edit" class="btn btn-outline-secondary" title="Edit"><i class="bi bi-pencil-square"></i></button>
+                                            <button data-bind="click: remove" class="btn btn-outline-danger" title="Remove"><i class="bi bi-trash"></i></button>
                                         </div>
                                     </div>
                                  </li>
                             <!-- /ko -->
                         </ul>
-                        <div data-bind="visible: entries().length === 0" class="readOnly">No entries yet</div>
+                        <div data-bind="visible: entries().length === 0" class="text-center text-muted p-3">No entries yet</div>
                     </div>
                  </div>
                 <!-- /ko -->
@@ -189,49 +200,58 @@
                     </div>
                     <!-- ko with: selectedDayForNewEntry -->
                     <div class="modal-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <div class="btn-group-vertical btn-group-sm" role="group" data-bind="attr: { 'aria-label': 'Scope for ' + dateStr() }">
-                                    <input type="radio" class="btn-check" value="global" data-bind="checked: scope, attr: { name: 'scope-type-modal-' + dateStr(), id: 'scope-global-modal-' + dateStr() }" autocomplete="off">
-                                    <label class="btn btn-outline-primary" data-bind="attr: { for: 'scope-global-modal-' + dateStr() }" title="Global"><i class="bi bi-globe-americas"></i></label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Project</label>
+                                    <select data-bind="options: $root.projects, optionsText: 'name', value: project" class="form-select"></select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Scope</label>
+                                    <div class="btn-group w-100" role="group" data-bind="attr: { 'aria-label': 'Scope for ' + dateStr() }">
+                                        <input type="radio" class="btn-check" value="global" data-bind="checked: scope, attr: { name: 'scope-type-modal-' + dateStr(), id: 'scope-global-modal-' + dateStr() }" autocomplete="off" checked>
+                                        <label class="btn btn-outline-primary" data-bind="attr: { for: 'scope-global-modal-' + dateStr() }" title="Global"><i class="bi bi-globe-americas me-1"></i> Global</label>
 
-                                    <input type="radio" class="btn-check" value="task" data-bind="checked: scope, attr: { name: 'scope-type-modal-' + dateStr(), id: 'scope-task-modal-' + dateStr() }" autocomplete="off">
-                                    <label class="btn btn-outline-primary" data-bind="attr: { for: 'scope-task-modal-' + dateStr() }" title="Task"><i class="bi bi-journal-check"></i></label>
+                                        <input type="radio" class="btn-check" value="task" data-bind="checked: scope, attr: { name: 'scope-type-modal-' + dateStr(), id: 'scope-task-modal-' + dateStr() }" autocomplete="off">
+                                        <label class="btn btn-outline-primary" data-bind="attr: { for: 'scope-task-modal-' + dateStr() }" title="Task"><i class="bi bi-journal-check me-1"></i> Task</label>
 
-                                    <input type="radio" class="btn-check" value="supportTicket" data-bind="checked: scope, attr: { name: 'scope-type-modal-' + dateStr(), id: 'scope-support-ticket-modal-' + dateStr() }" autocomplete="off">
-                                    <label class="btn btn-outline-primary" data-bind="attr: { for: 'scope-support-ticket-modal-' + dateStr() }" title="Support Ticket"><i class="bi bi-receipt"></i></label>
+                                        <input type="radio" class="btn-check" value="supportTicket" data-bind="checked: scope, attr: { name: 'scope-type-modal-' + dateStr(), id: 'scope-support-ticket-modal-' + dateStr() }" autocomplete="off">
+                                        <label class="btn btn-outline-primary" data-bind="attr: { for: 'scope-support-ticket-modal-' + dateStr() }" title="Support Ticket"><i class="bi bi-receipt me-1"></i> Ticket</label>
+                                    </div>
+                                </div>
+                                <div data-bind="if: scope() === 'task'" class="mb-3">
+                                    <label class="form-label">Task</label>
+                                    <!-- ko if: tasks().length > 0 -->
+                                    <select data-bind="options: tasks, optionsText: 'name', value: task, optionsCaption: 'Select Task...'" class="form-select"></select>
+                                    <!-- /ko -->
+                                    <!-- ko if: tasks().length === 0 && project() -->
+                                    <div class="form-text">No tasks for this project.</div>
+                                    <!-- /ko -->
+                                </div>
+                                <div data-bind="if: scope() === 'supportTicket'" class="mb-3">
+                                    <label class="form-label">Support Ticket</label>
+                                    <!-- ko if: tickets().length > 0 -->
+                                    <select data-bind="options: tickets, optionsText: 'name', value: ticket, optionsCaption: 'Select Support Ticket...'" class="form-select"></select>
+                                    <!-- /ko -->
+                                    <!-- ko if: tickets().length === 0 && project() -->
+                                    <div class="form-text">No support tickets for this project.</div>
+                                    <!-- /ko -->
                                 </div>
                             </div>
-                            <div class="d-flex flex-column m-3 flex-fill">
-                                <div class="d-flex align-items-center mb-2">
-                                    <div>
-                                        <select data-bind="options: $root.projects, optionsText: 'name', value: project" class="form-select"></select>
-                                    </div>
-                                    <div data-bind="if: scope() === 'task'" class="ms-2">
-                                        <!-- ko if: tasks().length > 0 -->
-                                        <select data-bind="options: tasks, optionsText: 'name', value: task, optionsCaption: 'Select Task...'" class="form-select"></select>
-                                        <!-- /ko -->
-                                        <!-- ko if: tasks().length === 0 && project() -->
-                                        <span class="text-muted small">No tasks for this project.</span>
-                                        <!-- /ko -->
-                                    </div>
-                                    <div data-bind="if: scope() === 'supportTicket'" class="ms-2">
-                                        <!-- ko if: tickets().length > 0 -->
-                                        <select data-bind="options: tickets, optionsText: 'name', value: ticket, optionsCaption: 'Select Support Ticket...'" class="form-select"></select>
-                                        <!-- /ko -->
-                                        <!-- ko if: tickets().length === 0 && project() -->
-                                        <span class="text-muted small">No support tickets for this project.</span>
-                                        <!-- /ko -->
-                                    </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label d-flex justify-content-between" data-bind="attr: { for: 'time-modal-'+dateStr() }">
+                                        <span><i class="bi bi-stopwatch"></i> Duration</span>
+                                        <span class="fw-bold" data-bind="text: time"></span>
+                                    </label>
+                                    <input data-bind="value: timeSpent, attr: { disabled: $root.loading, id: 'time-modal-'+dateStr(), name: 'time-modal' }" type="range" class="form-range" min="1800000" max="28800000" step="1800000">
                                 </div>
-                                <input data-bind="value: timeSpent, attr: { disabled: $root.loading, id: 'time-modal-'+dateStr(), name: 'time-modal' }" type="range" class="form-range" min="1800000" max="28800000" step="1800000">
-                                <label class="d-flex justify-content-between align-items-center" data-bind="attr: { for: 'time-modal-'+dateStr() }">
-                                    <span><i class="bi bi-stopwatch"></i></span>
-                                    <span class="fw-bold" data-bind="text: time"></span>
-                                </label>
+                                <div class="mb-3">
+                                    <label class="form-label">Notes</label>
+                                    <textarea placeholder="What did you work on?" data-bind="value: notes" name="notes" class="form-control" rows="5"></textarea>
+                                </div>
                             </div>
                         </div>
-                        <textarea placeholder="Notes" data-bind="value: notes" name="notes" class="form-control" rows="3"></textarea>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -252,49 +272,58 @@
                     </div>
                     <!-- ko with: selectedEntryForEdit -->
                     <div class="modal-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <div class="btn-group-vertical btn-group-sm" role="group" data-bind="attr: { 'aria-label': 'Scope for ' + id() }">
-                                    <input type="radio" class="btn-check" value="global" data-bind="checked: edit_scope, attr: { name: 'edit-scope-type-modal-' + id(), id: 'edit-scope-global-modal-' + id() }" autocomplete="off">
-                                    <label class="btn btn-outline-primary" data-bind="attr: { for: 'edit-scope-global-modal-' + id() }" title="Global"><i class="bi bi-globe-americas"></i></label>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Project</label>
+                                    <select data-bind="options: $root.projects, optionsText: 'name', value: edit_project" class="form-select"></select>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Scope</label>
+                                    <div class="btn-group w-100" role="group" data-bind="attr: { 'aria-label': 'Scope for ' + id() }">
+                                        <input type="radio" class="btn-check" value="global" data-bind="checked: edit_scope, attr: { name: 'edit-scope-type-modal-' + id(), id: 'edit-scope-global-modal-' + id() }" autocomplete="off">
+                                        <label class="btn btn-outline-primary" data-bind="attr: { for: 'edit-scope-global-modal-' + id() }" title="Global"><i class="bi bi-globe-americas me-1"></i> Global</label>
 
-                                    <input type="radio" class="btn-check" value="task" data-bind="checked: edit_scope, attr: { name: 'edit-scope-type-modal-' + id(), id: 'edit-scope-task-modal-' + id() }" autocomplete="off">
-                                    <label class="btn btn-outline-primary" data-bind="attr: { for: 'edit-scope-task-modal-' + id() }" title="Task"><i class="bi bi-journal-check"></i></label>
+                                        <input type="radio" class="btn-check" value="task" data-bind="checked: edit_scope, attr: { name: 'edit-scope-type-modal-' + id(), id: 'edit-scope-task-modal-' + id() }" autocomplete="off">
+                                        <label class="btn btn-outline-primary" data-bind="attr: { for: 'edit-scope-task-modal-' + id() }" title="Task"><i class="bi bi-journal-check me-1"></i> Task</label>
 
-                                    <input type="radio" class="btn-check" value="supportTicket" data-bind="checked: edit_scope, attr: { name: 'edit-scope-type-modal-' + id(), id: 'edit-scope-support-ticket-modal-' + id() }" autocomplete="off">
-                                    <label class="btn btn-outline-primary" data-bind="attr: { for: 'edit-scope-support-ticket-modal-' + id() }" title="Support Ticket"><i class="bi bi-receipt"></i></label>
+                                        <input type="radio" class="btn-check" value="supportTicket" data-bind="checked: edit_scope, attr: { name: 'edit-scope-type-modal-' + id(), id: 'edit-scope-support-ticket-modal-' + id() }" autocomplete="off">
+                                        <label class="btn btn-outline-primary" data-bind="attr: { for: 'edit-scope-support-ticket-modal-' + id() }" title="Support Ticket"><i class="bi bi-receipt me-1"></i> Ticket</label>
+                                    </div>
+                                </div>
+                                <div data-bind="if: edit_scope() === 'task'" class="mb-3">
+                                    <label class="form-label">Task</label>
+                                    <!-- ko if: edit_tasks().length > 0 -->
+                                    <select data-bind="options: edit_tasks, optionsText: 'name', value: edit_task, optionsCaption: 'Select Task...'" class="form-select"></select>
+                                    <!-- /ko -->
+                                    <!-- ko if: edit_tasks().length === 0 && edit_project() -->
+                                    <div class="form-text">No tasks for this project.</div>
+                                    <!-- /ko -->
+                                </div>
+                                <div data-bind="if: edit_scope() === 'supportTicket'" class="mb-3">
+                                    <label class="form-label">Support Ticket</label>
+                                    <!-- ko if: edit_tickets().length > 0 -->
+                                    <select data-bind="options: edit_tickets, optionsText: 'name', value: edit_ticket, optionsCaption: 'Select Support Ticket...'" class="form-select"></select>
+                                    <!-- /ko -->
+                                    <!-- ko if: edit_tickets().length === 0 && edit_project() -->
+                                    <div class="form-text">No support tickets for this project.</div>
+                                    <!-- /ko -->
                                 </div>
                             </div>
-                            <div class="d-flex flex-column m-3 flex-fill">
-                                <div class="d-flex align-items-center mb-2">
-                                    <div>
-                                        <select data-bind="options: $root.projects, optionsText: 'name', value: edit_project" class="form-select"></select>
-                                    </div>
-                                    <div data-bind="if: edit_scope() === 'task'" class="ms-2">
-                                        <!-- ko if: edit_tasks().length > 0 -->
-                                        <select data-bind="options: edit_tasks, optionsText: 'name', value: edit_task, optionsCaption: 'Select Task...'" class="form-select"></select>
-                                        <!-- /ko -->
-                                        <!-- ko if: edit_tasks().length === 0 && edit_project() -->
-                                        <span class="text-muted small">No tasks for this project.</span>
-                                        <!-- /ko -->
-                                    </div>
-                                    <div data-bind="if: edit_scope() === 'supportTicket'" class="ms-2">
-                                        <!-- ko if: edit_tickets().length > 0 -->
-                                        <select data-bind="options: edit_tickets, optionsText: 'name', value: edit_ticket, optionsCaption: 'Select Support Ticket...'" class="form-select"></select>
-                                        <!-- /ko -->
-                                        <!-- ko if: edit_tickets().length === 0 && edit_project() -->
-                                        <span class="text-muted small">No support tickets for this project.</span>
-                                        <!-- /ko -->
-                                    </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label d-flex justify-content-between" data-bind="attr: { for: 'edit-time-modal-'+id() }">
+                                        <span><i class="bi bi-stopwatch"></i> Duration</span>
+                                        <span class="fw-bold" data-bind="text: edit_time"></span>
+                                    </label>
+                                    <input data-bind="value: edit_timeSpent, attr: { disabled: $root.loading, id: 'edit-time-modal-'+id(), name: 'edit-time-modal' }" type="range" class="form-range" min="1800000" max="28800000" step="1800000">
                                 </div>
-                                <input data-bind="value: edit_timeSpent, attr: { disabled: $root.loading, id: 'edit-time-modal-'+id(), name: 'edit-time-modal' }" type="range" class="form-range" min="1800000" max="28800000" step="1800000">
-                                <label class="d-flex justify-content-between align-items-center" data-bind="attr: { for: 'edit-time-modal-'+id() }">
-                                    <span><i class="bi bi-stopwatch"></i></span>
-                                    <span class="fw-bold" data-bind="text: edit_time"></span>
-                                </label>
+                                <div class="mb-3">
+                                    <label class="form-label">Notes</label>
+                                    <textarea placeholder="What did you work on?" data-bind="value: edit_notes" name="notes" class="form-control" rows="5"></textarea>
+                                </div>
                             </div>
                         </div>
-                        <textarea placeholder="Notes" data-bind="value: edit_notes" name="notes" class="form-control" rows="3"></textarea>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -333,43 +362,14 @@
                 </div>
             </div>
         </div>
-
-        <!-- Remove Confirmation Modal -->
-        <div class="modal fade" id="removeConfirmModal" tabindex="-1" aria-labelledby="removeConfirmModalLabel" aria-hidden="true">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="removeConfirmModalLabel">Confirm Deletion</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <p>Are you sure you want to delete this time entry?</p>
-                        <!-- ko with: entryForRemoval -->
-                        <div class="card bg-light">
-                            <div class="card-body">
-                                <p class="mb-0"><strong>Project:</strong> <span data-bind="text: project"></span></p>
-                                <p class="mb-0"><strong>Duration:</strong> <span data-bind="text: duration"></span></p>
-                                <p class="mb-0"><strong>Notes:</strong> <span style="white-space: pre-wrap;" data-bind="text: notes"></span></p>
-                            </div>
-                        </div>
-                        <!-- /ko -->
-                        <p class="mt-2 text-danger"><i class="bi bi-exclamation-triangle-fill"></i> This action cannot be undone.</p>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="button" class="btn btn-danger" data-bind="click: entryForRemoval() ? entryForRemoval().submitRemove : null">Delete</button>
-                    </div>
-                </div>
-            </div>
-        </div>
     </main>
 
-    <footer class="text-center text-muted py-3">
-        <p>Made it by a tired panda</p>
+    <footer class="text-center text-muted py-4 mt-5 border-top">
+        <p class="mb-0">Made with <i class="bi bi-heart-fill text-danger"></i> by a tired panda</p>
     </footer>
 
     <!-- Toasts -->
-    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1090;">
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 11">
         <!-- ko foreach: toasts -->
         <div class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bind="attr: { id: id }">
             <div class="toast-header">
