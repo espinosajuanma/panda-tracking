@@ -490,6 +490,25 @@ class ViewModel {
             return;
         }
 
+        if (e.key === 'g') {
+            e.preventDefault();
+            if (this.visibleDays().length > 0) {
+                this.selectedDay(this.visibleDays()[0]);
+                this.expandWeekAndScroll(this.selectedDay());
+            }
+            return;
+        }
+
+        if (e.key === 'G') {
+            e.preventDefault();
+            // Navigate and select the last day of the list
+            if (this.visibleDays().length > 0) {
+                this.selectedDay(this.visibleDays()[this.visibleDays().length - 1]);
+                this.expandWeekAndScroll(this.selectedDay());
+            }
+            return;
+        }
+
         const mode = this.navigationMode();
         if (mode === 'day') {
             this.handleDayNavigation(e);
