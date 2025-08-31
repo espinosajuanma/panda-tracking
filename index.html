@@ -16,7 +16,52 @@
 
 
     <script src="./app.js"></script>
+    <script>
+        // Set theme from localStorage to prevent FOUC (Flash of Unstyled Content)
+        (function() {
+            const theme = localStorage.getItem('solutions:timetracking:theme') || 'dark';
+            document.documentElement.setAttribute('data-bs-theme', theme);
+        })();
+    </script>
     <style>
+        [data-bs-theme="dark"] {
+            --bs-body-bg: rgb(15 23 42);
+        }
+
+        [data-bs-theme="dark"] button.btn-outline-primary {
+            --bs-btn-color: #fff;
+            --bs-btn-bg: var(--bs-primary);
+            --bs-btn-border-color: var(--bs-primary);
+            --bs-btn-hover-color: #fff;
+            --bs-btn-hover-bg: #0b5ed7;
+            --bs-btn-hover-border-color: #0a58ca;
+            --bs-btn-active-color: #fff;
+            --bs-btn-active-bg: #0a58ca;
+            --bs-btn-active-border-color: #0a53be;
+        }
+        [data-bs-theme="dark"] button.btn-outline-secondary {
+            --bs-btn-color: #fff;
+            --bs-btn-bg: var(--bs-secondary);
+            --bs-btn-border-color: var(--bs-secondary);
+            --bs-btn-hover-color: #fff;
+            --bs-btn-hover-bg: #5c636a;
+            --bs-btn-hover-border-color: #565e64;
+            --bs-btn-active-color: #fff;
+            --bs-btn-active-bg: #565e64;
+            --bs-btn-active-border-color: #51585e;
+        }
+        [data-bs-theme="dark"] button.btn-outline-danger {
+            --bs-btn-color: #fff;
+            --bs-btn-bg: var(--bs-danger);
+            --bs-btn-border-color: var(--bs-danger);
+            --bs-btn-hover-color: #fff;
+            --bs-btn-hover-bg: #bb2d3b;
+            --bs-btn-hover-border-color: #b02a37;
+            --bs-btn-active-color: #fff;
+            --bs-btn-active-bg: #b02a37;
+            --bs-btn-active-border-color: #a52834;
+        }
+
         main {
             min-height: 100vh;
         }
@@ -49,7 +94,7 @@
         }
     </style>
 </head>
-<body class="bg-light">
+<body data-bind="attr: { 'data-bs-theme': theme }">
     <main class="pt-4 pb-5 container">
         <h2 class="fw-bold text-center">Time Tracking</h2>
 
@@ -376,8 +421,12 @@
         </div>
     </main>
 
-    <footer class="text-center text-muted py-4 mt-5 border-top">
-        <p class="mb-0">Made with <i class="bi bi-heart-fill text-danger"></i> by a tired panda</p>
+    <footer class="text-center text-body-secondary py-4 mt-5 border-top">
+        <p class="mb-1">Made with <i class="bi bi-heart-fill text-danger"></i> by a tired panda</p>
+        <div class="form-check form-switch d-inline-block">
+            <input class="form-check-input" type="checkbox" role="switch" id="themeSwitch" data-bind="checked: isDarkMode">
+            <label class="form-check-label" for="themeSwitch"><i data-bind="css: isDarkMode() ? 'bi-moon-stars-fill' : 'bi-sun-fill'"></i></label>
+        </div>
     </footer>
 
     <!-- Toasts -->

@@ -170,6 +170,21 @@ class ViewModel {
 
         this.entryForRemoval = ko.observable(null);
         this.removeConfirmModal = null;
+
+        // Theme
+        const storedTheme = localStorage.getItem('solutions:timetracking:theme') || 'dark';
+        this.theme = ko.observable(storedTheme);
+        this.isDarkMode = ko.computed({
+            read: () => this.theme() === 'dark',
+            write: (value) => this.theme(value ? 'dark' : 'light')
+        });
+
+        this.theme.subscribe(newTheme => {
+            localStorage.setItem('solutions:timetracking:theme', newTheme);
+            if (this.calendar) {
+                this.calendar.set({ selectedTheme: newTheme });
+            }
+        });
     }
 
     
@@ -249,7 +264,7 @@ class ViewModel {
             type: 'month',
             selectedMonth: this.month(),
             selectedYear: this.year(),
-            selectedTheme: 'light',
+            selectedTheme: this.theme(),
             onClickMonth: async (calendar, event) => {
                 this.month(calendar.context.selectedMonth);
                 await this.updateDashboard();
