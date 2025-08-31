@@ -116,11 +116,28 @@
                         <div>
                             <button data-bind="click: updateDashboard, attr: { disabled: loading }" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
                         </div>
-                        <div class="d-flex align-items-center">
-                            <div style="width: 300px;" class="me-2">
-                                <select class="form-select form-select-sm" data-bind="options: projects, optionsText: 'name', optionsValue: 'id', value: selectedProjectFilter, optionsCaption: 'All Projects'"></select>
+                        <div class="d-flex align-items-center small">
+                            <div class="form-check form-switch me-3">
+                                <input class="form-check-input" type="checkbox" role="switch" id="filterMissingHours" data-bind="checked: filterMissingHours">
+                                <label class="form-check-label" for="filterMissingHours">Missing Hours</label>
                             </div>
-                            <button data-bind="click: goToToday, attr: { disabled: loading }" class="btn btn-sm btn-outline-primary"><i class="bi bi-calendar-event"></i> Today</button>
+                            <div class="form-check form-switch me-3">
+                                <input class="form-check-input" type="checkbox" role="switch" id="filterHideLeaveDays" data-bind="checked: filterHideLeaveDays">
+                                <label class="form-check-label" for="filterHideLeaveDays">Hide Leave</label>
+                            </div>
+                            <div class="form-check form-switch me-3">
+                                <input class="form-check-input" type="checkbox" role="switch" id="filterOnlyToday" data-bind="checked: filterOnlyToday">
+                                <label class="form-check-label" for="filterOnlyToday">Today Only</label>
+                            </div>
+                            <div class="form-check form-switch me-3">
+                                <input class="form-check-input" type="checkbox" role="switch" id="filterOnlyCurrentWeek" data-bind="checked: filterOnlyCurrentWeek">
+                                <label class="form-check-label" for="filterOnlyCurrentWeek">This Week</label>
+                            </div>
+                            <div class="form-check form-switch me-2">
+                                <input class="form-check-input" type="checkbox" role="switch" id="showWeekends" data-bind="checked: showWeekends">
+                                <label class="form-check-label" for="showWeekends">Show Weekends</label>
+                            </div>
+                            <button data-bind="click: goToToday, attr: { disabled: loading }" class="btn btn-sm btn-outline-primary ms-2"><i class="bi bi-calendar-event"></i> Today</button>
                         </div>
                     </div>
                 </div>
@@ -131,7 +148,7 @@
             <div id="entries">
                 <h5>Month entries</h5>
                 <!-- ko foreach: weeks -->
-                <!-- ko foreach: days -->
+                <!-- ko foreach: { data: days, as: 'day' } -->
                  <div data-bind="visible: isVisible, attr: { id: dateStr() }, css: { 'border-primary': isToday(), 'border-warning': isHoliday() && !isLeave(), 'border-danger': isWeekend(), 'border-info': isLeave() }" class="card shadow-sm mt-3">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h6 class="card-title mb-0">
@@ -161,23 +178,21 @@
                         </div>
                         <!-- ENTRIES -->
                         <ul data-bind="foreach: entries, visible: entries().length > 0" class="list-group list-group-flush">
-                            <!-- ko if: isVisible -->
-                                <li data-bind="css: { readOnly: readOnly }" class="list-group-item px-0 d-flex justify-content-between align-items-start">
-                                    <div class="me-auto">
-                                        <div class="fw-bold"><span class="me-2" data-bind="attr: { title: task }, css: scopeClasses"></span> <span data-bind="text: project"></span></div>
-                                        <span style="white-space: pre-wrap;" data-bind="text: notes, visible: $parent.visibleNotes" class="text-muted small"></span>
+                            <li data-bind="css: { readOnly: readOnly }" class="list-group-item px-0 d-flex justify-content-between align-items-start">
+                                <div class="me-auto">
+                                    <div class="fw-bold"><span class="me-2" data-bind="attr: { title: task }, css: scopeClasses"></span> <span data-bind="text: project"></span></div>
+                                    <span style="white-space: pre-wrap;" data-bind="text: notes, visible: day.visibleNotes" class="text-muted small"></span>
+                                </div>
+                                <div class="d-flex flex-column align-items-end">
+                                    <span data-bind="text: duration" class="badge bg-success rounded-pill mb-1"></span>
+                                    <div data-bind="hidden: readOnly" class="btn-group btn-group-sm">
+                                        <button data-bind="click: updateTime.bind($data, -1800000)" class="btn btn-outline-secondary" title="Subtract 30m"><i class="bi bi-dash"></i></button>
+                                        <button data-bind="click: updateTime.bind($data, 1800000)" class="btn btn-outline-secondary" title="Add 30m"><i class="bi bi-plus"></i></button>
+                                        <button data-bind="click: edit" class="btn btn-outline-secondary" title="Edit"><i class="bi bi-pencil-square"></i></button>
+                                        <button data-bind="click: remove" class="btn btn-outline-danger" title="Remove"><i class="bi bi-trash"></i></button>
                                     </div>
-                                    <div class="d-flex flex-column align-items-end">
-                                        <span data-bind="text: duration" class="badge bg-success rounded-pill mb-1"></span>
-                                        <div data-bind="hidden: readOnly" class="btn-group btn-group-sm">
-                                            <button data-bind="click: updateTime.bind($data, -1800000)" class="btn btn-outline-secondary" title="Subtract 30m"><i class="bi bi-dash"></i></button>
-                                            <button data-bind="click: updateTime.bind($data, 1800000)" class="btn btn-outline-secondary" title="Add 30m"><i class="bi bi-plus"></i></button>
-                                            <button data-bind="click: edit" class="btn btn-outline-secondary" title="Edit"><i class="bi bi-pencil-square"></i></button>
-                                            <button data-bind="click: remove" class="btn btn-outline-danger" title="Remove"><i class="bi bi-trash"></i></button>
-                                        </div>
-                                    </div>
-                                 </li>
-                            <!-- /ko -->
+                                </div>
+                            </li>
                         </ul>
                         <div data-bind="visible: entries().length === 0" class="text-center text-muted p-3">No entries yet</div>
                     </div>

@@ -141,17 +141,15 @@ class ViewModel {
 
         // Time Tracking
         this.weeks = ko.observableArray([]);
-        this.days = ko.observableArray([]);
         this.projects = ko.observableArray([]);
         this.showWeekends = ko.observable(false);
-        this.selectedProjectFilter = ko.observable(null);
-        this.showWeekends.subscribe(val => {
-            this.days().forEach(day => {
-                if (day.isWeekend()) {
-                    day.isVisible(val);
-                }
-            });
-        });
+
+        // Filters
+        this.filterMissingHours = ko.observable(false);
+        this.filterHideLeaveDays = ko.observable(true);
+        this.filterOnlyToday = ko.observable(false);
+        this.filterOnlyCurrentWeek = ko.observable(false);
+
         this.monthProgress = {
             scopes: ko.observableArray([]),
             total: ko.observable('0h'),
@@ -460,7 +458,6 @@ function Day (date, entries) {
     let isToday = date.toDateString() === new Date().toDateString();
     let isWeekend = [0, 6].includes(date.getDay());
     let isBussinessDay = ! isWeekend && ! holiday && !isLeave;
-    let isVisible = (isBussinessDay || isHoliday || isLeave) || (isWeekend && model.showWeekends());
 
     let day = {
         title: date.toLocaleDateString(undefined, {
@@ -477,7 +474,6 @@ function Day (date, entries) {
         isWeekend: ko.observable(isWeekend),
         isBussinessDay: ko.observable(isBussinessDay),
         holidayDetail: ko.observable(holiday?.title),
-        isVisible: ko.observable(isVisible),
         entries: ko.observableArray([]),
         durationMs: 0,
         durationBillable: 0,
@@ -645,8 +641,45 @@ function Day (date, entries) {
     day.duration = ko.observable(formatMsToDuration(day.durationMs));
     day.durationBillable = ko.observable(formatMsToDuration(day.durationBillable));
     day.durationNonBillable = ko.observable(formatMsToDuration(day.durationNonBillable));
-    day.missingDuration = ko.observable(day.durationMs < MAX_TIME_SPENT ? formatMsToDuration(MAX_TIME_SPENT - day.durationMs) : null);
-    day.isMissingTime = ko.observable(day.durationMs > 0 && day.durationMs < MAX_TIME_SPENT);
+
+    day.isMissingTime = ko.computed(function() {
+        return day.isBussinessDay() && day.durationMs < MAX_TIME_SPENT;
+    });
+    day.missingDuration = ko.computed(function() {
+        return day.isMissingTime() ? formatMsToDuration(MAX_TIME_SPENT - day.durationMs) : null;
+    });
+
+    day.isVisible = ko.computed(function() {
+        if (model.filterOnlyToday() && !day.isToday()) {
+            return false;
+        }
+        if (model.filterOnlyCurrentWeek()) {
+            const today = new Date();
+            const currentDayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+            const firstDayOfWeek = new Date(today);
+            // Adjust to Monday
+            firstDayOfWeek.setDate(today.getDate() - currentDayOfWeek + (currentDayOfWeek === 0 ? -6 : 1));
+            firstDayOfWeek.setHours(0, 0, 0, 0);
+
+            const lastDayOfWeek = new Date(firstDayOfWeek);
+            lastDayOfWeek.setDate(firstDayOfWeek.getDate() + 6);
+            lastDayOfWeek.setHours(23, 59, 59, 999);
+
+            if (day.date < firstDayOfWeek || day.date > lastDayOfWeek) {
+                return false;
+            }
+        }
+        if (model.filterHideLeaveDays() && day.isLeave()) {
+            return false;
+        }
+        if (model.filterMissingHours() && !day.isMissingTime()) {
+            return false;
+        }
+        if (!model.showWeekends() && day.isWeekend() && !day.isLeave()) {
+            return false;
+        }
+        return true;
+    });
 
     day.canToggleLeave = ko.computed(function() {
         if (day.isWeekend() || day.isHoliday()) {
@@ -836,14 +869,6 @@ function Entry (entry, day) {
             return false;
         }
         return true;
-    });
-
-    self.isVisible = ko.computed(function() {
-        const selectedProjectId = model.selectedProjectFilter();
-        if (!selectedProjectId) {
-            return true;
-        }
-        return self.raw.project.id === selectedProjectId;
     });
 
     self.scopeClasses = ko.computed(function() {
