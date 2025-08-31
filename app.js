@@ -878,6 +878,15 @@ class ViewModel {
                                         label += context.parsed.x.toFixed(1) + 'h';
                                     }
                                     return label;
+                                },
+                                footer: function(tooltipItems) {
+                                    const dataIndex = tooltipItems[0].dataIndex;
+                                    const datasets = tooltipItems[0].chart.data.datasets;
+                                    let total = 0;
+                                    datasets.forEach(dataset => {
+                                        total += dataset.data[dataIndex] || 0;
+                                    });
+                                    return 'Total: ' + total.toFixed(1) + 'h';
                                 }
                             }
                         }
