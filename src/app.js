@@ -497,6 +497,13 @@ class ViewModel {
     }
 
     handleKeyPress = (e) => {
+        // Handle Ctrl+R for full refresh
+        if (e.key === 'r' && (e.ctrlKey || e.metaKey)) {
+            e.preventDefault(); // Prevent browser's default refresh action
+            this.updateDashboard();
+            return;
+        }
+
         const isInputFocused = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
  
         if (isInputFocused) {
@@ -625,6 +632,22 @@ class ViewModel {
             case 't':
                 e.preventDefault();
                 this.goToToday();
+                break;
+            case 'r':
+                e.preventDefault();
+                if (this.selectedDay()) {
+                    const day = this.selectedDay();
+                    this.loading(true);
+                    day.updateDay()
+                        .then(() => this.updateStats())
+                        .catch((err) => {
+                            console.error('Error refreshing day:', err);
+                            this.addToast('Failed to refresh day data.', 'error');
+                        })
+                        .finally(() => this.loading(false));
+                } else {
+                    this.updateDashboard();
+                }
                 break;
         }
     }
