@@ -299,36 +299,58 @@ class ViewModel {
         });
     }
 
-    showKeybindingsHelp = () => {
-        if (!this.keybindingsHelpModal) {
-            this.keybindingsHelpModal = new bootstrap.Modal(document.getElementById('keybindingsHelpModal'));
+    initializeModal = (modalName, elementId, options = {}) => {
+        if (this[modalName]) {
+            return this[modalName];
         }
-        this.keybindingsHelpModal.show();
+
+        const modalElement = document.getElementById(elementId);
+        if (!modalElement) {
+            console.error(`Modal element with ID "${elementId}" not found.`);
+            return null;
+        }
+
+        const modal = new bootstrap.Modal(modalElement);
+        this[modalName] = modal;
+
+        modalElement.addEventListener('hide.bs.modal', () => {
+            // Prevent accessibility warning by blurring the active element before the modal closes.
+            if (document.activeElement) {
+                document.activeElement.blur();
+            }
+            if (options.onHide) {
+                options.onHide();
+            }
+        });
+
+        if (options.onShow) {
+            modalElement.addEventListener('show.bs.modal', options.onShow);
+        }
+
+        return modal;
+    }
+
+    showKeybindingsHelp = () => {
+        const modal = this.initializeModal('keybindingsHelpModal', 'keybindingsHelpModal');
+        if (modal) modal.show();
     }
 
     showPomodoroModal = () => {
         if (!this.originalFavicon) {
             const faviconEl = document.getElementById('runtimeAppFavicon');
-            if (faviconEl) {
-                this.originalFavicon = faviconEl.href;
-            }
+            if (faviconEl) this.originalFavicon = faviconEl.href;
         }
-        if (!this.pomodoroModal) {
-            this.pomodoroModal = new bootstrap.Modal(document.getElementById('pomodoroModal'));
-            const pomodoroModalEl = document.getElementById('pomodoroModal');
-            pomodoroModalEl.addEventListener('show.bs.modal', () => {
-                this.isPomodoroModalVisible(true);
-            });
-            pomodoroModalEl.addEventListener('hide.bs.modal', () => {
-                this.isPomodoroModalVisible(false);
-            });
-        }
+        const modal = this.initializeModal('pomodoroModal', 'pomodoroModal', {
+            onShow: () => this.isPomodoroModalVisible(true),
+            onHide: () => this.isPomodoroModalVisible(false)
+        });
+
         // Reset timer if not running
         if (!this.pomodoroIsRunning()) {
             this.pomodoroRemainingTime(this.pomodoroDurationMinutes() * 60);
             this.pomodoroFinished(false);
         }
-        this.pomodoroModal.show();
+        if (modal) modal.show();
     }
 
     startPomodoro = () => {
@@ -691,26 +713,20 @@ class ViewModel {
 
     openNewEntryModal = (day) => {
         this.selectedDayForNewEntry(day);
-        if (!this.newEntryModal) {
-            this.newEntryModal = new bootstrap.Modal(document.getElementById('newEntryModal'));
-        }
-        this.newEntryModal.show();
+        const modal = this.initializeModal('newEntryModal', 'newEntryModal');
+        if (modal) modal.show();
     }
 
     openEditEntryModal = (entry) => {
         this.selectedEntryForEdit(entry);
-        if (!this.editEntryModal) {
-            this.editEntryModal = new bootstrap.Modal(document.getElementById('editEntryModal'));
-        }
-        this.editEntryModal.show();
+        const modal = this.initializeModal('editEntryModal', 'editEntryModal');
+        if (modal) modal.show();
     }
 
     openRemoveConfirmModal = (entry) => {
         this.entryForRemoval(entry);
-        if (!this.removeConfirmModal) {
-            this.removeConfirmModal = new bootstrap.Modal(document.getElementById('removeConfirmModal'));
-        }
-        this.removeConfirmModal.show();
+        const modal = this.initializeModal('removeConfirmModal', 'removeConfirmModal');
+        if (modal) modal.show();
     }
 
     addToast = (msg, type = 'info', title = null) => {
