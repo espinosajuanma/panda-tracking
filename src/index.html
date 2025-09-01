@@ -245,8 +245,8 @@
         <!-- ko if: keybindingsEnabled -->
         <div class="navigation-mode-indicator bg-secondary-subtle text-secondary-emphasis border rounded-pill shadow-sm" data-bind="if: navigationMode() !== 'none'">
             <i class="bi bi-keyboard-fill me-1"></i>
-            <span data-bind="if: navigationMode() === 'day'">Day Navigation (j/k, t, a, Enter, h)</span>
-            <span data-bind="if: navigationMode() === 'entry'">Entry Navigation (j/k, a, e, r, +/-, Esc, h)</span>
+            <span data-bind="if: navigationMode() === 'day'">Day Navigation (j/k/↓/↑, t, a, Enter, h)</span>
+            <span data-bind="if: navigationMode() === 'entry'">Entry Navigation (j/k/↓/↑, a, e, r, +/-, Esc, h)</span>
         </div>
         <!-- /ko -->
 
@@ -507,7 +507,7 @@
                         <ul class="list-group list-group-flush">
                             <li class="list-group-item d-flex justify-content-between align-items-center">
                                 Navigate between visible days
-                                <span class="badge bg-secondary rounded-pill">j / k</span>
+                                <span class="badge bg-secondary rounded-pill">j / k / ↓ / ↑</span>
                             </li>
                             <li class="list-group-item d-flex justify-content-between align-items-center">
                                 Add new entry for selected day
@@ -535,7 +535,7 @@
                         <ul class="list-group list-group-flush">
                             <li class="list-group-item d-flex justify-content-between align-items-center">
                                 Navigate between entries on the selected day
-                                <span class="badge bg-secondary rounded-pill">j / k</span>
+                                <span class="badge bg-secondary rounded-pill">j / k / ↓ / ↑</span>
                             </li>
                             <li class="list-group-item d-flex justify-content-between align-items-center">
                                 Add new entry for the current day

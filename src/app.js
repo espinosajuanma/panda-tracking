@@ -569,6 +569,7 @@ class ViewModel {
 
         switch (e.key) {
             case 'j':
+            case 'ArrowDown':
                 e.preventDefault();
                 if (currentIndex < visibleDays.length - 1) {
                     const newDay = visibleDays[currentIndex + 1];
@@ -577,6 +578,7 @@ class ViewModel {
                 }
                 break;
             case 'k':
+            case 'ArrowUp':
                 e.preventDefault();
                 if (currentIndex > 0) {
                     const newDay = visibleDays[currentIndex - 1];
@@ -615,13 +617,14 @@ class ViewModel {
         const entries = currentDay.entries();
         let currentIndex = entries.indexOf(this.selectedEntry());
 
-        if (entries.length === 0 && ['j', 'k', 'e', 'r', '+', '-'].includes(e.key)) {
+        if (entries.length === 0 && ['j', 'k', 'ArrowDown', 'ArrowUp', 'e', 'r', '+', '-'].includes(e.key)) {
             e.preventDefault();
             return; // No entries to navigate/act on
         }
 
         switch (e.key) {
             case 'j':
+            case 'ArrowDown':
                 e.preventDefault();
                 if (entries.length > 0) {
                     if (currentIndex === -1) {
@@ -633,6 +636,7 @@ class ViewModel {
                 }
                 break;
             case 'k':
+            case 'ArrowUp':
                 e.preventDefault();
                 if (currentIndex > 0) {
                     this.selectedEntry(entries[currentIndex - 1]);
