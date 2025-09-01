@@ -206,6 +206,13 @@ class ViewModel {
         this.entryForRemoval = ko.observable(null);
         this.removeConfirmModal = null;
 
+        this.entryForCopy = ko.observable(null);
+        this.copyEntryModal = null;
+        this.copyEntryCalendar = null;
+        this.selectedDateForCopy = ko.observable(null);
+
+        this.entryForPaste = ko.observable(null);
+
         this.keybindingsHelpModal = null;
 
         // Pomodoro
@@ -523,7 +530,7 @@ class ViewModel {
             return;
         }
  
-        if (e.key === 'v') {
+        if (e.key === 'v' && !e.ctrlKey && !e.metaKey) {
             e.preventDefault();
             this.keybindingsEnabled(!this.keybindingsEnabled());
             return;
@@ -615,6 +622,16 @@ class ViewModel {
             case 'a':
                 e.preventDefault();
                 this.openNewEntryModal(this.selectedDay());
+                break;
+            case 'v':
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    if (this.entryForPaste() && this.selectedDay()) {
+                        this.pasteEntry();
+                    } else if (!this.entryForPaste()) {
+                        this.addToast('No entry in clipboard to paste.', 'warning');
+                    }
+                }
                 break;
             case 'Enter':
                 e.preventDefault();
@@ -722,6 +739,15 @@ class ViewModel {
                     this.openRemoveConfirmModal(this.selectedEntry());
                 }
                 break;
+            case 'c':
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    if (this.selectedEntry()) {
+                        this.entryForPaste(this.selectedEntry());
+                        this.addToast('Entry copied.', 'success');
+                    }
+                }
+                break;
             case '+':
                 e.preventDefault();
                 if (this.selectedEntry() && !this.selectedEntry().readOnly()) {
@@ -747,6 +773,115 @@ class ViewModel {
         this.selectedEntryForEdit(entry);
         const modal = this.initializeModal('editEntryModal', 'editEntryModal');
         if (modal) modal.show();
+    }
+
+    openCopyEntryModal = (entry) => {
+        this.entryForCopy(entry);
+        this.selectedDateForCopy(null); // Reset selected date
+        const modal = this.initializeModal('copyEntryModal', 'copyEntryModal', {
+            onShow: () => {
+                if (!this.copyEntryCalendar) {
+                    this.copyEntryCalendar = new VanillaCalendarPro.Calendar('#copy-entry-calendar', {
+                        onClickDate: (calendar, event) => {
+                            this.selectedDateForCopy(calendar.context.selectedDates[0]);
+                        },
+                        selectionDatesMode: 'single',
+                        selectedTheme: this.theme(),
+                        disableWeekdays: [0, 6],
+                    });
+                    this.copyEntryCalendar.init();
+                } else {
+                    this.copyEntryCalendar.set({
+                        selectedDates: [],
+                        selectedMonth: new Date().getMonth(),
+                        selectedYear: new Date().getFullYear(),
+                    });
+                }
+            }
+        });
+        if (modal) modal.show();
+    }
+
+    submitCopy = async () => {
+        const entryToCopy = this.entryForCopy();
+        const targetDate = this.selectedDateForCopy();
+
+        if (!entryToCopy || !targetDate) return;
+
+        this.loading(true);
+        try {
+            const payload = {
+                project: entryToCopy.raw.project.id,
+                scope: entryToCopy.scope(),
+                task: entryToCopy.scope() === 'task' ? entryToCopy.raw.task.id : null,
+                ticket: entryToCopy.scope() === 'supportTicket' ? entryToCopy.raw.ticket.id : null,
+                forMe: true,
+                date: targetDate,
+                timeSpent: entryToCopy.raw.timeSpent,
+                notes: entryToCopy.notes(),
+            };
+
+            await this.slingr.put(`/data/${TIME_TRACKING_ENTITY}/logTime`, payload);
+
+            this.addToast(`Entry copied to ${targetDate}`, 'success');
+            this.copyEntryModal.hide();
+
+            const targetDateObj = new Date(targetDate + 'T00:00:00');
+            if (targetDateObj.getMonth() === this.month() && targetDateObj.getFullYear() === this.year()) {
+                const allDays = this.weeks().map(w => w.days()).flat();
+                const targetDay = allDays.find(d => d.dateStr() === targetDate);
+                if (targetDay) {
+                    await targetDay.updateDay();
+                    await this.updateStats();
+                } else {
+                    // Fallback for safety, though it shouldn't be reached if the day is in the current view
+                    await this.updateDashboard();
+                }
+            }
+        } catch (e) {
+            console.error('Error copying entry:', e);
+            this.addToast('Error copying entry.', 'error');
+        } finally {
+            this.loading(false);
+            this.entryForCopy(null);
+            this.selectedDateForCopy(null);
+        }
+    }
+
+    pasteEntry = async () => {
+        const entryToCopy = this.entryForPaste();
+        const targetDay = this.selectedDay();
+
+        if (!entryToCopy || !targetDay) return;
+
+        const targetDate = targetDay.dateStr();
+
+        this.loading(true);
+        try {
+            const payload = {
+                project: entryToCopy.raw.project.id,
+                scope: entryToCopy.scope(),
+                task: entryToCopy.scope() === 'task' ? entryToCopy.raw.task.id : null,
+                ticket: entryToCopy.scope() === 'supportTicket' ? entryToCopy.raw.ticket.id : null,
+                forMe: true,
+                date: targetDate,
+                timeSpent: entryToCopy.raw.timeSpent,
+                notes: entryToCopy.notes(),
+            };
+
+            await this.slingr.put(`/data/${TIME_TRACKING_ENTITY}/logTime`, payload);
+
+            this.addToast(`Entry pasted to ${targetDate}`, 'success');
+
+            await targetDay.updateDay();
+            await this.updateStats();
+
+        } catch (e) {
+            console.error('Error pasting entry:', e);
+            this.addToast('Error pasting entry.', 'error');
+        } finally {
+            this.loading(false);
+        }
     }
 
     openRemoveConfirmModal = (entry) => {
@@ -1765,6 +1900,9 @@ function Entry (entry, day) {
         },
         remove: (entry) => {
             model.openRemoveConfirmModal(entry);
+        },
+        copy: (entry) => {
+            model.openCopyEntryModal(entry);
         },
     };
 

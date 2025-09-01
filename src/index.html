@@ -227,6 +227,7 @@
                                                         <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="More actions"></button>
                                                         <ul class="dropdown-menu dropdown-menu-end">
                                                             <li><button class="dropdown-item" data-bind="click: edit"><i class="bi bi-pencil-square me-2"></i>Edit</button></li>
+                                                            <li><button class="dropdown-item" data-bind="click: copy"><i class="bi bi-copy me-2"></i>Copy</button></li>
                                                             <li><button class="dropdown-item text-danger" data-bind="click: remove"><i class="bi bi-trash me-2"></i>Remove</button></li>
                                                         </ul>
                                                     </div>
@@ -465,6 +466,35 @@
             </div>
         </div>
 
+        <!-- Copy Entry Modal -->
+        <div class="modal fade" id="copyEntryModal" tabindex="-1" aria-labelledby="copyEntryModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="copyEntryModalLabel">Copy Entry</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Select a date to copy the entry to:</p>
+                        <div id="copy-entry-calendar"></div>
+                        <!-- ko with: entryForCopy -->
+                        <div data-bind="css: { 'bg-dark': $root.isDarkMode(), 'bg-light': !$root.isDarkMode() }" class="card bg-light mt-3">
+                            <div class="card-body">
+                                <p class="mb-0"><strong>Project:</strong> <span data-bind="text: project"></span></p>
+                                <p class="mb-0"><strong>Duration:</strong> <span data-bind="text: duration"></span></p>
+                                <p class="mb-0"><strong>Notes:</strong> <span style="white-space: pre-wrap;" data-bind="text: notes"></span></p>
+                            </div>
+                        </div>
+                        <!-- /ko -->
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn btn-primary" data-bind="click: submitCopy, attr: { disabled: !selectedDateForCopy() }">Copy</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Pomodoro Modal -->
         <div class="modal fade" id="pomodoroModal" tabindex="-1" aria-labelledby="pomodoroModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
             <div class="modal-dialog modal-dialog-centered">
@@ -518,6 +548,10 @@
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
                                         Add Entry
                                         <span><kbd>a</kbd></span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Paste Entry
+                                        <span><kbd>Ctrl</kbd>+<kbd>v</kbd></span>
                                     </li>
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
                                         Go to Today
@@ -579,6 +613,10 @@
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
                                         Remove Entry
                                         <span><kbd>r</kbd></span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Copy Entry
+                                        <span><kbd>Ctrl</kbd>+<kbd>c</kbd></span>
                                     </li>
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
                                         Adjust Time (+/- 30m)
