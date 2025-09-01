@@ -1076,7 +1076,7 @@ class ViewModel {
                         const notes = sanitize(entry.notes() || '');
                         const task = sanitize(entry.task() || '');
                         const scopes = { task: 'Task', supportTicket: 'Ticket', global: 'Global' };
-                        const scope = scopes[scope];
+                        const scope = scopes[entry.scope()];
 
                         const rowData = [
                             day.dateStr(),
