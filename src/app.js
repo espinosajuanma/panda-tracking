@@ -676,30 +676,56 @@ class ViewModel {
         const entries = currentDay.entries();
         let currentIndex = entries.indexOf(this.selectedEntry());
 
-        if (entries.length === 0 && ['j', 'k', 'ArrowDown', 'ArrowUp', 'e', 'r', '+', '-'].includes(e.key)) {
+        if (entries.length === 0 && ['e', 'r', '+', '-'].includes(e.key)) {
             e.preventDefault();
-            return; // No entries to navigate/act on
+            return; // No entries to act on
         }
 
         switch (e.key) {
             case 'j':
             case 'ArrowDown':
                 e.preventDefault();
-                if (entries.length > 0) {
-                    if (currentIndex === -1) {
-                        this.selectedEntry(entries[0]);
-                    } else if (currentIndex < entries.length - 1) {
-                        this.selectedEntry(entries[currentIndex + 1]);
-                    }
+                if (entries.length > 0 && currentIndex < entries.length - 1) {
+                    // Navigate to next entry in the same day
+                    this.selectedEntry(entries[currentIndex + 1]);
                     this.scrollToEntry(this.selectedEntry());
+                } else {
+                    // At last entry or no entries, find next day with entries
+                    const visibleDays = this.visibleDays();
+                    const currentDayIndex = visibleDays.indexOf(currentDay);
+                    for (let i = currentDayIndex + 1; i < visibleDays.length; i++) {
+                        const nextDay = visibleDays[i];
+                        if (nextDay.entries().length > 0) {
+                            this.selectedDay(nextDay);
+                            this.selectedEntry(nextDay.entries()[0]);
+                            this.expandWeekAndScroll(nextDay);
+                            this.scrollToEntry(this.selectedEntry());
+                            break; // Exit loop
+                        }
+                    }
                 }
                 break;
             case 'k':
             case 'ArrowUp':
                 e.preventDefault();
-                if (currentIndex > 0) {
+                if (entries.length > 0 && currentIndex > 0) {
+                    // Navigate to previous entry in the same day
                     this.selectedEntry(entries[currentIndex - 1]);
                     this.scrollToEntry(this.selectedEntry());
+                } else {
+                    // At first entry or no entries, find previous day with entries
+                    const visibleDays = this.visibleDays();
+                    const currentDayIndex = visibleDays.indexOf(currentDay);
+                    for (let i = currentDayIndex - 1; i >= 0; i--) {
+                        const prevDay = visibleDays[i];
+                        if (prevDay.entries().length > 0) {
+                            this.selectedDay(prevDay);
+                            this.selectedEntry(prevDay.entries()[prevDay.entries().length - 1]);
+                            this.expandWeekAndScroll(prevDay);
+                            this.scrollToEntry(this.selectedEntry());
+                            break; // Exit loop
+                        }
+                    }
                 }
                 break;
             case 'g':
