@@ -13,8 +13,7 @@
     <link rel="stylesheet" href="./vanilla-calendar.css">
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script> <!-- Select2 needs jQuery -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/knockout/3.5.0/knockout-min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script src="./vanilla-calendar.js"></script>
@@ -224,8 +223,13 @@
                                                 <div class="btn-group btn-group-sm">
                                                     <button data-bind="click: updateTime.bind($data, -1800000)" class="btn btn-outline-secondary" title="Subtract 30m"><i class="bi bi-dash"></i></button>
                                                     <button data-bind="click: updateTime.bind($data, 1800000)" class="btn btn-outline-secondary" title="Add 30m"><i class="bi bi-plus"></i></button>
-                                                    <button data-bind="click: edit" class="btn btn-outline-secondary" title="Edit"><i class="bi bi-pencil-square"></i></button>
-                                                    <button data-bind="click: remove" class="btn btn-outline-danger" title="Remove"><i class="bi bi-trash"></i></button>
+                                                    <div class="btn-group" role="group">
+                                                        <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="More actions"></button>
+                                                        <ul class="dropdown-menu dropdown-menu-end">
+                                                            <li><button class="dropdown-item" data-bind="click: edit"><i class="bi bi-pencil-square me-2"></i>Edit</button></li>
+                                                            <li><button class="dropdown-item text-danger" data-bind="click: remove"><i class="bi bi-trash me-2"></i>Remove</button></li>
+                                                        </ul>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
