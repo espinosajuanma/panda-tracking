@@ -472,8 +472,6 @@ class ViewModel {
             return;
         }
  
-        if (!this.keybindingsEnabled()) return;
-
         const isInputFocused = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
  
         if (isInputFocused) {
@@ -483,6 +481,14 @@ class ViewModel {
             }
             return;
         }
+
+        if (e.key === 'v') {
+            e.preventDefault();
+            this.keybindingsEnabled(!this.keybindingsEnabled());
+            return;
+        }
+
+        if (!this.keybindingsEnabled()) return;
  
         if (e.key === 'h') {
             e.preventDefault();
