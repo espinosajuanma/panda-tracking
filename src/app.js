@@ -1475,12 +1475,17 @@ function Day (date, entries, week) {
         tickets: ko.observableArray([]),
         toggleLeave: async (day) => {
             const dateStr = day.dateStr();
-            if (model.leaveDays.indexOf(dateStr) > -1) {
-                model.leaveDays.remove(dateStr);
-            } else {
-                model.leaveDays.push(dateStr);
+            model.loading(true);
+            try {
+                if (model.leaveDays.indexOf(dateStr) > -1) {
+                    model.leaveDays.remove(dateStr);
+                } else {
+                    model.leaveDays.push(dateStr);
+                }
+                await model.updateStats();
+            } finally {
+                model.loading(false);
             }
-            await model.updateStats();
         },
         logEntry: async (day) => {
             model.loading(true);
