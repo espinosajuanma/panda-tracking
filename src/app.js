@@ -497,14 +497,6 @@ class ViewModel {
     }
 
     handleKeyPress = (e) => {
-        const activeModalElement = document.querySelector('.modal.show');
-        const isModalOpen = !!activeModalElement;
- 
-        if (isModalOpen) {
-            this.handleModalKeys(e, activeModalElement);
-            return;
-        }
- 
         const isInputFocused = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
  
         if (isInputFocused) {
@@ -515,6 +507,15 @@ class ViewModel {
             return;
         }
 
+        const isModalOpen = document.body.classList.contains('modal-open');
+        if (isModalOpen) {
+            const activeModalElement = document.querySelector('.modal.show');
+            if (activeModalElement) {
+                this.handleModalKeys(e, activeModalElement);
+            }
+            return;
+        }
+ 
         if (e.key === 'v') {
             e.preventDefault();
             this.keybindingsEnabled(!this.keybindingsEnabled());
@@ -539,6 +540,7 @@ class ViewModel {
  
     handleModalKeys = (e, modalElement) => {
         switch (e.key) {
+            case 'q':
             case 'Escape':
                 e.preventDefault();
                 const modal = bootstrap.Modal.getInstance(modalElement);
@@ -674,6 +676,7 @@ class ViewModel {
                     this.scrollToEntry(this.selectedEntry());
                 }
                 break;
+            case 'q':
             case 'Escape':
                 e.preventDefault();
                 this.navigationMode('day');
