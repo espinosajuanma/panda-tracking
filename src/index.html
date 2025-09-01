@@ -245,8 +245,8 @@
         <!-- ko if: keybindingsEnabled -->
         <div class="navigation-mode-indicator bg-secondary-subtle text-secondary-emphasis border rounded-pill shadow-sm" data-bind="if: navigationMode() !== 'none'">
             <i class="bi bi-keyboard-fill me-1"></i>
-            <span data-bind="if: navigationMode() === 'day'">Day Navigation (j/k/↓/↑, t, a, Enter, h)</span>
-            <span data-bind="if: navigationMode() === 'entry'">Entry Navigation (j/k/↓/↑, a, e, r, +/-, Esc, h)</span>
+            <span data-bind="text: navigationMode() === 'day' ? 'Day Mode' : 'Entry Mode'"></span>
+            <span class="ms-1">(<kbd>h</kbd> for help)</span>
         </div>
         <!-- /ko -->
 
@@ -503,76 +503,78 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        <h5>Day Navigation</h5>
-                        <ul class="list-group list-group-flush">
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                Navigate between visible days
-                                <span class="badge bg-secondary rounded-pill">j / k / ↓ / ↑</span>
-                            </li>
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                Add new entry for selected day
-                                <span class="badge bg-secondary rounded-pill">a</span>
-                            </li>
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                Go to today
-                                <span class="badge bg-secondary rounded-pill">t</span>
-                            </li>
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                Switch to entry navigation for the selected day
-                                <span class="badge bg-secondary rounded-pill">Enter</span>
-                            </li>
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                Navigate to the first day of the list
-                                <span class="badge bg-secondary rounded-pill">g</span>
-                            </li>
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                Navigate to the last day of the list
-                                <span class="badge bg-secondary rounded-pill">G</span>
-                            </li>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <h5 class="mb-3">Day Navigation</h5>
+                                <ul class="list-group list-group-flush mb-4">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Navigate Days
+                                        <span><kbd>j</kbd> <kbd>k</kbd> or <kbd>↓</kbd> <kbd>↑</kbd></span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Add Entry
+                                        <span><kbd>a</kbd></span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Go to Today
+                                        <span><kbd>t</kbd></span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Go to First/Last Day
+                                        <span><kbd>g</kbd> / <kbd>G</kbd></span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Switch to Entry Mode
+                                        <span><kbd>Enter</kbd></span>
+                                    </li>
+                                </ul>
 
-                        </ul>
-                        <h5 class="mt-4">Entry Navigation</h5>
-                        <ul class="list-group list-group-flush">
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                Navigate between entries on the selected day
-                                <span class="badge bg-secondary rounded-pill">j / k / ↓ / ↑</span>
-                            </li>
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                Add new entry for the current day
-                                <span class="badge bg-secondary rounded-pill">a</span>
-                            </li>
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                Edit selected entry
-                                <span class="badge bg-secondary rounded-pill">e</span>
-                            </li>
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                Remove selected entry
-                                <span class="badge bg-secondary rounded-pill">r</span>
-                            </li>
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                Add/subtract 30min from selected entry
-                                <span class="badge bg-secondary rounded-pill">+ / -</span>
-                            </li>
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                Return to day navigation
-                                <span class="badge bg-secondary rounded-pill">Esc</span>
-                            </li>
-                        </ul>
-                        <h5 class="mt-4">General</h5>
-                        <ul class="list-group list-group-flush">
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                Toggle Vim keybindings on/off
-                                <span class="badge bg-secondary rounded-pill">v</span>
-                            </li>
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                Show this help message
-                                <span class="badge bg-secondary rounded-pill">h</span>
-                            </li>
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                Close modals or unfocus input fields
-                                <span class="badge bg-secondary rounded-pill">Esc</span>
-                            </li>
-                        </ul>
+                                <h5 class="mb-3">General</h5>
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Toggle Keybindings
+                                        <span><kbd>v</kbd></span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Show this Help
+                                        <span><kbd>h</kbd></span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Close Modal / Unfocus
+                                        <span><kbd>Esc</kbd></span>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="col-md-6">
+                                <h5 class="mb-3">Entry Navigation</h5>
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Navigate Entries
+                                        <span><kbd>j</kbd> <kbd>k</kbd> or <kbd>↓</kbd> <kbd>↑</kbd></span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Add Entry
+                                        <span><kbd>a</kbd></span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Edit Entry
+                                        <span><kbd>e</kbd></span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Remove Entry
+                                        <span><kbd>r</kbd></span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Adjust Time (+/- 30m)
+                                        <span><kbd>+</kbd> / <kbd>-</kbd></span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Return to Day Mode
+                                        <span><kbd>Esc</kbd></span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
