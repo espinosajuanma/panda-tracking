@@ -210,6 +210,7 @@ class ViewModel {
 
         // Pomodoro
         this.pomodoroModal = null;
+        this.isPomodoroModalVisible = ko.observable(false);
         this.pomodoroDurationMinutes = ko.observable(50);
         this.pomodoroRemainingTime = ko.observable(50 * 60);
         this.pomodoroTimerId = null;
@@ -314,6 +315,13 @@ class ViewModel {
         }
         if (!this.pomodoroModal) {
             this.pomodoroModal = new bootstrap.Modal(document.getElementById('pomodoroModal'));
+            const pomodoroModalEl = document.getElementById('pomodoroModal');
+            pomodoroModalEl.addEventListener('show.bs.modal', () => {
+                this.isPomodoroModalVisible(true);
+            });
+            pomodoroModalEl.addEventListener('hide.bs.modal', () => {
+                this.isPomodoroModalVisible(false);
+            });
         }
         // Reset timer if not running
         if (!this.pomodoroIsRunning()) {
@@ -337,6 +345,9 @@ class ViewModel {
             if (remaining === 0) {
                 this.pomodoroFinished(true);
                 this.startFaviconBlinking();
+                if (!this.isPomodoroModalVisible()) {
+                    this.pomodoroModal.show();
+                }
             }
         }, 1000);
     }

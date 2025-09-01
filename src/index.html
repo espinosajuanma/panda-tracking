@@ -41,8 +41,9 @@
                         <input class="form-check-input" type="checkbox" role="switch" id="keybindingsSwitch" data-bind="checked: keybindingsEnabled">
                         <label class="form-check-label" for="keybindingsSwitch"><i class="bi bi-keyboard"></i></label>
                     </div>
-                    <button class="btn btn-sm me-3" data-bind="click: showPomodoroModal, css: { 'btn-danger': pomodoroIsRunning(), 'btn-outline-light': !pomodoroIsRunning() }" title="Focus Mode (Pomodoro)">
-                        <i class="bi bi-stopwatch"></i>
+                    <button class="btn btn-sm me-3" data-bind="click: showPomodoroModal, css: { 'btn-warning': pomodoroIsRunning() && !pomodoroFinished(), 'btn-danger': pomodoroFinished(), 'btn-outline-light': !pomodoroIsRunning() && isDarkMode(), 'btn-outline-dark': !pomodoroIsRunning() && !isDarkMode() }" title="Focus Mode (Pomodoro)">
+                        <i class="bi bi-stopwatch" data-bind="css: { 'me-1': pomodoroIsRunning() && !isPomodoroModalVisible() }"></i>
+                        <span data-bind="visible: pomodoroIsRunning() && !isPomodoroModalVisible(), text: pomodoroDisplayTime"></span>
                     </button>
                     <div class="form-check form-switch me-3">
                         <input class="form-check-input" type="checkbox" role="switch" id="themeSwitchNav" data-bind="checked: isDarkMode">
