@@ -49,9 +49,9 @@
                         <label class="form-check-label" for="themeSwitchNav"><i data-bind="css: isDarkMode() ? 'bi-moon-stars-fill' : 'bi-sun-fill'"></i></label>
                     </div>
                     <!-- ko if: logged -->
-                    <span class="navbar-text me-3" data-bind="text: slingr.user?.firstName"></span>
+                    <span class="navbar-text me-3 d-none d-md-inline" data-bind="text: slingr.user?.firstName"></span>
                     <button class="btn btn-sm" data-bind="click: logout, css: { 'btn-outline-light': isDarkMode(), 'btn-outline-dark': !isDarkMode() }">
-                        <i class="bi bi-box-arrow-right"></i> Logout
+                        <i class="bi bi-box-arrow-right"></i> <span class="d-none d-sm-inline">Logout</span>
                     </button>
                     <!-- /ko -->
                 </div>
@@ -94,9 +94,9 @@
                     <h5 class="card-title mb-0">Monthly Overview</h5>
                     <button data-bind="click: updateDashboard, attr: { disabled: loading }" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
                 </div>
-                <div class="card-body d-flex justify-content-start align-items-start">
+                <div class="card-body d-lg-flex justify-content-start align-items-start">
                     <!-- CALENDAR SELECTOR -->
-                    <div id="calendar" class="me-4"></div>
+                    <div id="calendar" class="me-lg-4 mb-4 mb-lg-0"></div>
                     <!-- STATS -->
                     <div id="stats" class="flex-grow-1">
                         <div class="mb-4 row">
@@ -137,31 +137,31 @@
             </div>
 
             <!-- Filters & Actions Toolbar -->
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5>Month entries</h5>
-                <div class="d-flex align-items-center small">
-                    <div class="form-check form-switch me-3">
+            <div class="d-md-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-2 mb-md-0">Month entries</h5>
+                <div class="d-flex align-items-center small flex-wrap justify-content-start justify-content-md-end" style="gap: 1rem;">
+                    <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" role="switch" id="filterMissingHours" data-bind="checked: filterMissingHours">
                         <label class="form-check-label" for="filterMissingHours">Missing Hours</label>
                     </div>
-                    <div class="form-check form-switch me-3">
+                    <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" role="switch" id="filterHideLeaveDays" data-bind="checked: filterHideLeaveDays">
                         <label class="form-check-label" for="filterHideLeaveDays">Hide Leave</label>
                     </div>
-                    <div class="form-check form-switch me-3">
+                    <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" role="switch" id="filterOnlyToday" data-bind="checked: filterOnlyToday">
                         <label class="form-check-label" for="filterOnlyToday">Today Only</label>
                     </div>
-                    <div class="form-check form-switch me-3">
+                    <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" role="switch" id="filterOnlyCurrentWeek" data-bind="checked: filterOnlyCurrentWeek">
                         <label class="form-check-label" for="filterOnlyCurrentWeek">This Week</label>
                     </div>
-                    <div class="form-check form-switch me-2">
+                    <div class="form-check form-switch">
                         <input class="form-check-input" type="checkbox" role="switch" id="showWeekends" data-bind="checked: showWeekends">
                         <label class="form-check-label" for="showWeekends">Show Weekends</label>
                     </div>
-                    <button data-bind="click: goToToday, attr: { disabled: loading }" class="btn btn-sm btn-outline-primary ms-2" title="Go to Today"><i class="bi bi-calendar-event"></i> Today</button>
-                    <button data-bind="click: exportToCsv, attr: { disabled: loading }" class="btn btn-sm btn-outline-success ms-2" title="Export visible entries to CSV"><i class="bi bi-file-earmark-spreadsheet"></i> Export</button>
+                    <button data-bind="click: goToToday, attr: { disabled: loading }" class="btn btn-sm btn-outline-primary" title="Go to Today"><i class="bi bi-calendar-event"></i> Today</button>
+                    <button data-bind="click: exportToCsv, attr: { disabled: loading }" class="btn btn-sm btn-outline-success" title="Export visible entries to CSV"><i class="bi bi-file-earmark-spreadsheet"></i> Export</button>
                 </div>
             </div>
             <!-- DAYS -->
@@ -251,7 +251,7 @@
 
         <!-- New Entry Modal -->
         <div class="modal fade" id="newEntryModal" tabindex="-1" aria-labelledby="newEntryModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-lg">
+            <div class="modal-dialog modal-lg modal-fullscreen-md-down">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="newEntryModalLabel" data-bind="text: selectedDayForNewEntry() ? 'New Entry for ' + selectedDayForNewEntry().title : ''"></h5>
@@ -260,11 +260,11 @@
                     <!-- ko with: selectedDayForNewEntry -->
                     <div class="modal-body">
                         <div class="row mb-3">
-                            <div class="col-md-5">
+                            <div class="col-lg-5 mb-3 mb-lg-0">
                                 <label class="form-label">Project</label>
                                 <select data-bind="options: $root.projects, optionsText: 'name', value: project" class="form-select"></select>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-lg-3 mb-3 mb-lg-0">
                                 <label class="form-label">Scope</label>
                                 <div class="btn-group w-100" role="group" data-bind="attr: { 'aria-label': 'Scope for ' + dateStr() }">
                                     <input type="radio" class="btn-check" value="global" data-bind="checked: scope, attr: { name: 'scope-type-modal-' + dateStr(), id: 'scope-global-modal-' + dateStr() }" autocomplete="off" checked>
@@ -277,12 +277,18 @@
                                     <label class="btn btn-outline-primary" data-bind="attr: { for: 'scope-support-ticket-modal-' + dateStr() }" title="Support Ticket"><i class="bi bi-receipt me-1"></i></label>
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-lg-4">
                                 <label class="form-label"><i class="bi bi-stopwatch"></i> Duration</label>
                                 <div class="input-group">
-                                    <button class="btn btn-outline-secondary" type="button" data-bind="click: updateTimeSpentInModal.bind($data, -1800000), attr: { disabled: $root.loading() }">-30m</button>
+                                    <button class="btn btn-outline-secondary" type="button" data-bind="click: updateTimeSpentInModal.bind($data, -1800000), attr: { disabled: $root.loading() }">
+                                        <span class="d-none d-sm-inline">-30m</span>
+                                        <span class="d-inline d-sm-none">-</span>
+                                    </button>
                                     <input type="text" class="form-control text-center fw-bold" data-bind="value: time, event: { change: updateTimeFromInput }, attr: { disabled: $root.loading() }">
-                                    <button class="btn btn-outline-secondary" type="button" data-bind="click: updateTimeSpentInModal.bind($data, 1800000), attr: { disabled: $root.loading() }">+30m</button>
+                                    <button class="btn btn-outline-secondary" type="button" data-bind="click: updateTimeSpentInModal.bind($data, 1800000), attr: { disabled: $root.loading() }">
+                                        <span class="d-none d-sm-inline">+30m</span>
+                                        <span class="d-inline d-sm-none">+</span>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -336,7 +342,7 @@
 
         <!-- Edit Entry Modal -->
         <div class="modal fade" id="editEntryModal" tabindex="-1" aria-labelledby="editEntryModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-lg">
+            <div class="modal-dialog modal-lg modal-fullscreen-md-down">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="editEntryModalLabel" data-bind="text: selectedEntryForEdit() ? 'Edit Entry for ' + selectedEntryForEdit().day.title : ''"></h5>
@@ -345,11 +351,11 @@
                     <!-- ko with: selectedEntryForEdit -->
                     <div class="modal-body">
                         <div class="row mb-3">
-                            <div class="col-md-5">
+                            <div class="col-lg-5 mb-3 mb-lg-0">
                                 <label class="form-label">Project</label>
                                 <select data-bind="options: $root.projects, optionsText: 'name', value: edit_project" class="form-select"></select>
                             </div>
-                            <div class="col-md-3">
+                            <div class="col-lg-3 mb-3 mb-lg-0">
                                 <label class="form-label">Scope</label>
                                 <div class="btn-group w-100" role="group" data-bind="attr: { 'aria-label': 'Scope for ' + id() }">
                                     <input type="radio" class="btn-check" value="global" data-bind="checked: edit_scope, attr: { name: 'edit-scope-type-modal-' + id(), id: 'edit-scope-global-modal-' + id() }" autocomplete="off">
@@ -362,12 +368,18 @@
                                     <label class="btn btn-outline-primary" data-bind="attr: { for: 'edit-scope-support-ticket-modal-' + id() }" title="Support Ticket"><i class="bi bi-receipt me-1"></i></label>
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-lg-4">
                                 <label class="form-label"><i class="bi bi-stopwatch"></i> Duration</label>
                                 <div class="input-group">
-                                    <button class="btn btn-outline-secondary" type="button" data-bind="click: updateEditTimeSpent.bind($data, -1800000), attr: { disabled: $root.loading() }">-30m</button>
+                                    <button class="btn btn-outline-secondary" type="button" data-bind="click: updateEditTimeSpent.bind($data, -1800000), attr: { disabled: $root.loading() }">
+                                        <span class="d-none d-sm-inline">-30m</span>
+                                        <span class="d-inline d-sm-none">-</span>
+                                    </button>
                                     <input type="text" class="form-control text-center fw-bold" data-bind="value: edit_time, event: { change: updateEditTimeFromInput }, attr: { disabled: $root.loading() }">
-                                    <button class="btn btn-outline-secondary" type="button" data-bind="click: updateEditTimeSpent.bind($data, 1800000), attr: { disabled: $root.loading() }">+30m</button>
+                                    <button class="btn btn-outline-secondary" type="button" data-bind="click: updateEditTimeSpent.bind($data, 1800000), attr: { disabled: $root.loading() }">
+                                        <span class="d-none d-sm-inline">+30m</span>
+                                        <span class="d-inline d-sm-none">+</span>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -483,7 +495,7 @@
 
         <!-- Keybindings Help Modal -->
         <div class="modal fade" id="keybindingsHelpModal" tabindex="-1" aria-labelledby="keybindingsHelpModalLabel" aria-hidden="true">
-            <div class="modal-dialog modal-lg">
+            <div class="modal-dialog modal-lg modal-fullscreen-md-down">
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title" id="keybindingsHelpModalLabel"><i class="bi bi-keyboard-fill me-2"></i>Keybindings Help</h5>
