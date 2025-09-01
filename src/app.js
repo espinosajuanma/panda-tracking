@@ -507,25 +507,6 @@ class ViewModel {
             return;
         }
 
-        if (e.key === 'g') {
-            e.preventDefault();
-            if (this.visibleDays().length > 0) {
-                this.selectedDay(this.visibleDays()[0]);
-                this.expandWeekAndScroll(this.selectedDay());
-            }
-            return;
-        }
-
-        if (e.key === 'G') {
-            e.preventDefault();
-            // Navigate and select the last day of the list
-            if (this.visibleDays().length > 0) {
-                this.selectedDay(this.visibleDays()[this.visibleDays().length - 1]);
-                this.expandWeekAndScroll(this.selectedDay());
-            }
-            return;
-        }
-
         const mode = this.navigationMode();
         if (mode === 'day') {
             this.handleDayNavigation(e);
@@ -586,6 +567,20 @@ class ViewModel {
                     this.expandWeekAndScroll(newDay);
                 }
                 break;
+            case 'g':
+                e.preventDefault();
+                if (visibleDays.length > 0) {
+                    this.selectedDay(visibleDays[0]);
+                    this.expandWeekAndScroll(this.selectedDay());
+                }
+                break;
+            case 'G':
+                e.preventDefault();
+                if (visibleDays.length > 0) {
+                    this.selectedDay(visibleDays[visibleDays.length - 1]);
+                    this.expandWeekAndScroll(this.selectedDay());
+                }
+                break;
             case 'a':
                 e.preventDefault();
                 this.openNewEntryModal(this.selectedDay());
@@ -640,6 +635,20 @@ class ViewModel {
                 e.preventDefault();
                 if (currentIndex > 0) {
                     this.selectedEntry(entries[currentIndex - 1]);
+                    this.scrollToEntry(this.selectedEntry());
+                }
+                break;
+            case 'g':
+                e.preventDefault();
+                if (entries.length > 0) {
+                    this.selectedEntry(entries[0]);
+                    this.scrollToEntry(this.selectedEntry());
+                }
+                break;
+            case 'G':
+                e.preventDefault();
+                if (entries.length > 0) {
+                    this.selectedEntry(entries[entries.length - 1]);
                     this.scrollToEntry(this.selectedEntry());
                 }
                 break;
