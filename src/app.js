@@ -211,6 +211,12 @@ class ViewModel {
         this.copyEntryCalendar = null;
         this.selectedDateForCopy = ko.observable(null);
 
+        this.entryForMove = ko.observable(null);
+        this.moveEntryModal = null;
+        this.moveEntryCalendar = null;
+        this.selectedDateForMove = ko.observable(null);
+
+        this.entryForCut = ko.observable(null);
         this.entryForPaste = ko.observable(null);
 
         this.keybindingsHelpModal = null;
@@ -626,10 +632,12 @@ class ViewModel {
             case 'v':
                 if (e.ctrlKey || e.metaKey) {
                     e.preventDefault();
-                    if (this.entryForPaste() && this.selectedDay()) {
+                    if (this.entryForCut() && this.selectedDay()) {
+                        this.movePastedEntry();
+                    } else if (this.entryForPaste() && this.selectedDay()) {
                         this.pasteEntry();
-                    } else if (!this.entryForPaste()) {
-                        this.addToast('No entry in clipboard to paste.', 'warning');
+                    } else if (!this.entryForPaste() && !this.entryForCut()) {
+                        this.addToast('Nothing in clipboard to paste.', 'warning');
                     }
                 }
                 break;
@@ -753,6 +761,18 @@ class ViewModel {
                 e.preventDefault();
                 this.openNewEntryModal(currentDay);
                 break;
+            case 'v':
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    if (this.entryForCut() && this.selectedDay()) {
+                        this.movePastedEntry();
+                    } else if (this.entryForPaste() && this.selectedDay()) {
+                        this.pasteEntry();
+                    } else if (!this.entryForPaste() && !this.entryForCut()) {
+                        this.addToast('Nothing in clipboard to paste.', 'warning');
+                    }
+                }
+                break;
             case 'e':
                 e.preventDefault();
                 if (this.selectedEntry()) {
@@ -770,7 +790,18 @@ class ViewModel {
                     e.preventDefault();
                     if (this.selectedEntry()) {
                         this.entryForPaste(this.selectedEntry());
+                        this.entryForCut(null);
                         this.addToast('Entry copied.', 'success');
+                    }
+                }
+                break;
+            case 'x':
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    if (this.selectedEntry()) {
+                        this.entryForCut(this.selectedEntry());
+                        this.entryForPaste(null);
+                        this.addToast('Entry cut. Press Ctrl+V on a day to paste.', 'success');
                     }
                 }
                 break;
@@ -801,6 +832,33 @@ class ViewModel {
         if (modal) modal.show();
     }
 
+    openMoveEntryModal = (entry) => {
+        this.entryForMove(entry);
+        this.selectedDateForMove(null); // Reset selected date
+        const modal = this.initializeModal('moveEntryModal', 'moveEntryModal', {
+            onShow: () => {
+                if (!this.moveEntryCalendar) {
+                    this.moveEntryCalendar = new VanillaCalendarPro.Calendar('#move-entry-calendar', {
+                        onClickDate: (calendar, event) => {
+                            this.selectedDateForMove(calendar.context.selectedDates[0]);
+                        },
+                        selectionDatesMode: 'single',
+                        selectedTheme: this.theme(),
+                        disableWeekdays: [0, 6],
+                    });
+                    this.moveEntryCalendar.init();
+                } else {
+                    this.moveEntryCalendar.set({
+                        selectedDates: [],
+                        selectedMonth: new Date().getMonth(),
+                        selectedYear: new Date().getFullYear(),
+                    });
+                }
+            }
+        });
+        if (modal) modal.show();
+    }
+
     openCopyEntryModal = (entry) => {
         this.entryForCopy(entry);
         this.selectedDateForCopy(null); // Reset selected date
@@ -826,6 +884,56 @@ class ViewModel {
             }
         });
         if (modal) modal.show();
+    }
+
+    submitMove = async () => {
+        const entryToMove = this.entryForMove();
+        const targetDate = this.selectedDateForMove();
+
+        if (!entryToMove || !targetDate) return;
+
+        const originalDate = entryToMove.day.dateStr();
+        if (originalDate === targetDate) {
+            this.addToast('Entry is already on this day.', 'info');
+            this.moveEntryModal.hide();
+            return;
+        }
+
+        this.loading(true);
+        try {
+            const payload = { ...entryToMove.raw, date: targetDate };
+            await this.slingr.put(`/data/${TIME_TRACKING_ENTITY}/${entryToMove.id()}`, payload);
+
+            this.addToast(`Entry moved to ${targetDate}`, 'success');
+            this.moveEntryModal.hide();
+
+            // Remove from old day
+            const originalDay = entryToMove.day;
+            originalDay.entries.remove(entryToMove);
+            originalDay.durationMs -= entryToMove.raw.timeSpent;
+            originalDay.duration(formatMsToDuration(originalDay.durationMs));
+            originalDay.durationBillableMs -= entryToMove.raw.timeSpent;
+            originalDay.durationBillable(formatMsToDuration(originalDay.durationBillableMs));
+
+            // Refresh new day if visible
+            const targetDateObj = new Date(targetDate + 'T00:00:00');
+            if (targetDateObj.getMonth() === this.month() && targetDateObj.getFullYear() === this.year()) {
+                const allDays = this.weeks().map(w => w.days()).flat();
+                const targetDay = allDays.find(d => d.dateStr() === targetDate);
+                if (targetDay) {
+                    await targetDay.updateDay();
+                }
+            }
+
+            await this.updateStats();
+        } catch (e) {
+            console.error('Error moving entry:', e);
+            this.addToast('Error moving entry.', 'error');
+        } finally {
+            this.loading(false);
+            this.entryForMove(null);
+            this.selectedDateForMove(null);
+        }
     }
 
     submitCopy = async () => {
@@ -871,6 +979,50 @@ class ViewModel {
             this.loading(false);
             this.entryForCopy(null);
             this.selectedDateForCopy(null);
+        }
+    }
+
+    movePastedEntry = async () => {
+        const entryToMove = this.entryForCut();
+        const targetDay = this.selectedDay();
+
+        if (!entryToMove || !targetDay) return;
+
+        const targetDate = targetDay.dateStr();
+        const originalDay = entryToMove.day;
+
+        if (originalDay.dateStr() === targetDate) {
+            this.addToast('Entry is already on this day.', 'info');
+            this.entryForCut(null);
+            return;
+        }
+
+        this.loading(true);
+        try {
+            const payload = { ...entryToMove.raw, date: targetDate };
+            await this.slingr.put(`/data/${TIME_TRACKING_ENTITY}/${entryToMove.id()}`, payload);
+
+            this.addToast(`Entry moved to ${targetDate}`, 'success');
+
+            // Remove from old day
+            originalDay.entries.remove(entryToMove);
+            originalDay.durationMs -= entryToMove.raw.timeSpent;
+            originalDay.duration(formatMsToDuration(originalDay.durationMs));
+            originalDay.durationBillableMs -= entryToMove.raw.timeSpent;
+            originalDay.durationBillable(formatMsToDuration(originalDay.durationBillableMs));
+
+            // Refresh new day
+            await targetDay.updateDay();
+
+            await this.updateStats();
+
+            this.entryForCut(null);
+
+        } catch (e) {
+            console.error('Error moving entry:', e);
+            this.addToast('Error moving entry.', 'error');
+        } finally {
+            this.loading(false);
         }
     }
 
@@ -1934,6 +2086,9 @@ function Entry (entry, day) {
         },
         copy: (entry) => {
             model.openCopyEntryModal(entry);
+        },
+        move: (entry) => {
+            model.openMoveEntryModal(entry);
         },
     };
 

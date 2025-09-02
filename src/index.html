@@ -228,6 +228,7 @@
                                                         <ul class="dropdown-menu dropdown-menu-end">
                                                             <li><button class="dropdown-item" data-bind="click: edit"><i class="bi bi-pencil-square me-2"></i>Edit</button></li>
                                                             <li><button class="dropdown-item" data-bind="click: copy"><i class="bi bi-copy me-2"></i>Copy</button></li>
+                                                            <li><button class="dropdown-item" data-bind="click: move"><i class="bi bi-box-arrow-right me-2"></i>Move</button></li>
                                                             <li><button class="dropdown-item text-danger" data-bind="click: remove"><i class="bi bi-trash me-2"></i>Remove</button></li>
                                                         </ul>
                                                     </div>
@@ -495,6 +496,35 @@
             </div>
         </div>
 
+        <!-- Move Entry Modal -->
+        <div class="modal fade" id="moveEntryModal" tabindex="-1" aria-labelledby="moveEntryModalLabel" aria-hidden="true">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="moveEntryModalLabel">Move Entry</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p>Select a date to move the entry to:</p>
+                        <div id="move-entry-calendar"></div>
+                        <!-- ko with: entryForMove -->
+                        <div data-bind="css: { 'bg-dark': $root.isDarkMode(), 'bg-light': !$root.isDarkMode() }" class="card bg-light mt-3">
+                            <div class="card-body">
+                                <p class="mb-0"><strong>Project:</strong> <span data-bind="text: project"></span></p>
+                                <p class="mb-0"><strong>Duration:</strong> <span data-bind="text: duration"></span></p>
+                                <p class="mb-0"><strong>Notes:</strong> <span style="white-space: pre-wrap;" data-bind="text: notes"></span></p>
+                            </div>
+                        </div>
+                        <!-- /ko -->
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-bind="attr: { disabled: loading }">Cancel</button>
+                        <button type="button" class="btn btn-primary" data-bind="click: submitMove, attr: { disabled: !selectedDateForMove() || loading() }">Move</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Pomodoro Modal -->
         <div class="modal fade" id="pomodoroModal" tabindex="-1" aria-labelledby="pomodoroModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
             <div class="modal-dialog modal-dialog-centered">
@@ -539,44 +569,8 @@
                     <div class="modal-body">
                         <div class="row">
                             <div class="col-md-6">
-                                <h5 class="mb-3">Day Navigation</h5>
-                                <ul class="list-group list-group-flush mb-4">
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        Navigate Days
-                                        <span><kbd>j</kbd> <kbd>k</kbd> or <kbd>↓</kbd> <kbd>↑</kbd></span>
-                                    </li>
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        Add Entry
-                                        <span><kbd>a</kbd></span>
-                                    </li>
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        Paste Entry
-                                        <span><kbd>Ctrl</kbd>+<kbd>v</kbd></span>
-                                    </li>
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        Go to Today
-                                        <span><kbd>t</kbd></span>
-                                    </li>
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        Refresh Data
-                                        <span><kbd>r</kbd></span>
-                                    </li>
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        Go to First/Last Day
-                                        <span><kbd>g</kbd> / <kbd>G</kbd></span>
-                                    </li>
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        Switch to Entry Mode
-                                        <span><kbd>Enter</kbd></span>
-                                    </li>
-                                </ul>
-
                                 <h5 class="mb-3">General</h5>
-                                <ul class="list-group list-group-flush">
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        Full Refresh
-                                        <span><kbd>Ctrl</kbd>+<kbd>r</kbd></span>
-                                    </li>
+                                <ul class="list-group list-group-flush mb-4">
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
                                         Toggle Keybindings
                                         <span><kbd>v</kbd></span>
@@ -587,44 +581,103 @@
                                     </li>
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
                                         Close Modal / Unfocus
-                                        <span><kbd>Esc</kbd> / <kbd>q</kbd></span>
+                                        <span><kbd>Esc</kbd> or <kbd>q</kbd></span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Full Page Refresh
+                                        <span><kbd>Ctrl</kbd>+<kbd>r</kbd></span>
+                                    </li>
+                                </ul>
+
+                                <h5 class="mb-3">Navigation</h5>
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Move Selection
+                                        <span><kbd>j</kbd> <kbd>k</kbd> or <kbd>↓</kbd> <kbd>↑</kbd></span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Go to First/Last Item
+                                        <span><kbd>g</kbd> / <kbd>G</kbd></span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Go to Today
+                                        <span class="text-end">
+                                            <span class="badge bg-secondary-subtle text-secondary-emphasis me-2">Day Mode</span>
+                                            <kbd>t</kbd>
+                                        </span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Switch to Entry Mode
+                                        <span class="text-end">
+                                            <span class="badge bg-secondary-subtle text-secondary-emphasis me-2">Day Mode</span>
+                                            <kbd>Enter</kbd>
+                                        </span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Return to Day Mode
+                                        <span class="text-end">
+                                            <span class="badge bg-secondary-subtle text-secondary-emphasis me-2">Entry Mode</span>
+                                            <span><kbd>Esc</kbd> or <kbd>q</kbd></span>
+                                        </span>
                                     </li>
                                 </ul>
                             </div>
                             <div class="col-md-6">
-                                <h5 class="mb-3">Entry Navigation</h5>
-                                <ul class="list-group list-group-flush">
+                                <h5 class="mb-3">Actions</h5>
+                                <ul class="list-group list-group-flush mb-4">
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        Navigate Entries
-                                        <span><kbd>j</kbd> <kbd>k</kbd> or <kbd>↓</kbd> <kbd>↑</kbd></span>
-                                    </li>
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        Go to First/Last Entry
-                                        <span><kbd>g</kbd> / <kbd>G</kbd></span>
-                                    </li>
-                                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        Add Entry
+                                        Add New Entry
                                         <span><kbd>a</kbd></span>
                                     </li>
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        Edit Entry
-                                        <span><kbd>e</kbd></span>
+                                        Edit Selected Entry
+                                        <span class="text-end">
+                                            <span class="badge bg-secondary-subtle text-secondary-emphasis me-2">Entry Mode</span>
+                                            <kbd>e</kbd>
+                                        </span>
                                     </li>
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        Remove Entry
-                                        <span><kbd>r</kbd></span>
+                                        Remove Selected Entry
+                                        <span class="text-end">
+                                            <span class="badge bg-secondary-subtle text-secondary-emphasis me-2">Entry Mode</span>
+                                            <kbd>r</kbd>
+                                        </span>
                                     </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Adjust Entry Time (+/- 30m)
+                                        <span class="text-end">
+                                            <span class="badge bg-secondary-subtle text-secondary-emphasis me-2">Entry Mode</span>
+                                            <span><kbd>+</kbd> / <kbd>-</kbd></span>
+                                        </span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Refresh Day Data
+                                        <span class="text-end">
+                                            <span class="badge bg-secondary-subtle text-secondary-emphasis me-2">Day Mode</span>
+                                            <kbd>r</kbd>
+                                        </span>
+                                    </li>
+                                </ul>
+
+                                <h5 class="mb-3">Clipboard</h5>
+                                <ul class="list-group list-group-flush">
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
                                         Copy Entry
-                                        <span><kbd>Ctrl</kbd>+<kbd>c</kbd></span>
+                                        <span class="text-end">
+                                            <span class="badge bg-secondary-subtle text-secondary-emphasis me-2">Entry Mode</span>
+                                            <span><kbd>Ctrl</kbd>+<kbd>c</kbd></span>
+                                        </span>
                                     </li>
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        Adjust Time (+/- 30m)
-                                        <span><kbd>+</kbd> / <kbd>-</kbd></span>
+                                        Cut Entry
+                                        <span class="text-end">
+                                            <span class="badge bg-secondary-subtle text-secondary-emphasis me-2">Entry Mode</span>
+                                            <span><kbd>Ctrl</kbd>+<kbd>x</kbd></span>
+                                        </span>
                                     </li>
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        Return to Day Mode
-                                        <span><kbd>Esc</kbd> / <kbd>q</kbd></span>
+                                        Paste Entry
+                                        <span><kbd>Ctrl</kbd>+<kbd>v</kbd></span>
                                     </li>
                                 </ul>
                             </div>
