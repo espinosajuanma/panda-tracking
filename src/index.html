@@ -502,6 +502,7 @@
                         <!-- ko with: entryForRemoval -->
                         <div data-bind="css: { 'bg-dark': $root.isDarkMode(), 'bg-light': !$root.isDarkMode() }" class="card bg-light">
                             <div class="card-body">
+                                <p class="mb-0"><strong>Date:</strong> <span data-bind="text: day.title"></span></p>
                                 <p class="mb-0"><strong>Project:</strong> <span data-bind="text: project"></span></p>
                                 <p class="mb-0"><strong>Duration:</strong> <span data-bind="text: duration"></span></p>
                                 <p class="mb-0"><strong>Notes:</strong> <span style="white-space: pre-wrap;" data-bind="text: notes"></span></p>
