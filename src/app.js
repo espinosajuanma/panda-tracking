@@ -215,6 +215,8 @@ class ViewModel {
         this.selectedEntryForEdit = ko.observable(null);
         this.editEntryModal = null;
 
+        this.newTodoModal = null;
+
         this.entryForRemoval = ko.observable(null);
         this.removeConfirmModal = null;
 
@@ -838,6 +840,12 @@ class ViewModel {
         if (modal) modal.show();
     }
 
+    openNewTodoModal = (day) => {
+        this.selectedDayForNewEntry(day);
+        const modal = this.initializeModal('newTodoModal', 'newTodoModal');
+        if (modal) modal.show();
+    }
+
     openEditEntryModal = (entry) => {
         this.selectedEntryForEdit(entry);
         const modal = this.initializeModal('editEntryModal', 'editEntryModal');
@@ -1222,7 +1230,7 @@ class ViewModel {
     updateStats = async () => {
         let totalMonthMs = this.weeks().map(w => w.days()).flat().filter(d => d.isBussinessDay()).length * 8 * 60 * 60 * 1000;
         if (totalMonthMs === 0) totalMonthMs = 1; // Avoid division by zero
-        let entries = this.weeks().map(w => w.days()).flat().map(d => d.entries()).flat();
+        let entries = this.weeks().map(w => w.days()).flat().map(d => d.entries()).flat().filter(e => !e.isTodo());
  
         const scopeStats = {
             global: { timeSpent: 0, color: 'rgb(13, 110, 253)', name: 'Global' },
@@ -1357,7 +1365,8 @@ class ViewModel {
             let projectEntries = this.weeks()
                 .map(w => w.days()).flat()
                 .map(d => d.entries()).flat()
-                .filter(e => e.raw.project.id === project.id);
+                .filter(e => e.raw.project.id === project.id)
+                .filter(e => !e.isTodo());
  
             const projectScopeStats = {
                 global: 0,
@@ -1659,6 +1668,38 @@ function Day (date, entries, week) {
                 this.time(formatMsToDuration(this.timeSpent()));
             }
         },
+        logTodo: async (day) => {
+            model.loading(true);
+            try {
+                // Ensure project is selected before logging
+                if (!day.project()) {
+                    model.addToast('Please select a project.', 'error');
+                    model.loading(false);
+                    return;
+                }
+
+                await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/logTime`, {
+                    project: day.project().id,
+                    scope: 'global',
+                    forMe: true,
+                    date: day.dateStr(),
+                    timeSpent: 0,
+                    notes: day.notes(),
+                });
+
+                await day.updateDay();
+
+                day.notes('');
+
+                model.newTodoModal.hide();
+                await model.updateStats();
+                model.addToast('To-Do item added.', 'success');
+            } catch(e) {
+                console.error(e);
+                model.addToast('Error logging To-Do.', 'error');
+            }
+            model.loading(false);
+        },
         taskId: ko.observable(null),
         ticketId: ko.observable(null),
         tasks: ko.observableArray([]),
@@ -1748,6 +1789,16 @@ function Day (date, entries, week) {
     });
     day.isBussinessDay = ko.computed(function() {
         return !day.isWeekend() && !day.isHoliday() && !day.isLeave();
+    });
+
+    day.isTodoLoggable = ko.computed(function() {
+        if (!day.project()) {
+            return false;
+        }
+        if (day.notes().trim() === '') {
+            return false;
+        }
+        return true;
     });
 
 
@@ -2093,6 +2144,13 @@ function Entry (entry, day) {
             }
             model.loading(false);
         },
+        confirmTodo: async function() {
+            // Open the edit modal to confirm the To-Do
+            await this.initializeEditForm();
+            // Pre-fill with 1 hour
+            this.edit_timeSpent(1 * 60 * 60 * 1000);
+            model.openEditEntryModal(this);
+        },
         remove: (entry) => {
             model.openRemoveConfirmModal(entry);
         },
@@ -2103,6 +2161,10 @@ function Entry (entry, day) {
             model.openMoveEntryModal(entry);
         },
     };
+
+    self.isTodo = ko.computed(function() {
+        return self.timeSpent() === 0;
+    });
 
     self.scopeColorClass = ko.computed(function() {
         switch(self.scope()) {
@@ -2147,6 +2209,9 @@ function Entry (entry, day) {
     });
 
     self.scopeClasses = ko.computed(function() {
+        if (self.isTodo()) {
+            return 'bi-check2-square text-secondary';
+        }
         let iconClass = '';
         let colorClass = '';
         switch(self.scope()) {

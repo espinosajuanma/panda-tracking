@@ -194,6 +194,9 @@
                                         <i class="bi bi-person-slash" data-bind="css: { 'text-info': isLeave(), 'text-muted': !isLeave() }"></i>
                                     </button>
                                     <!-- ko if: isBussinessDay -->
+                                    <button data-bind="click: $root.openNewTodoModal" class="btn btn-sm btn-outline-secondary ms-2" type="button" title="New To-Do">
+                                        <i class="bi bi-check2-square"></i>
+                                    </button>
                                     <button data-bind="click: $root.openNewEntryModal" class="btn btn-sm btn-primary ms-2" type="button" title="New Entry">
                                         <i class="bi bi-plus-lg"></i>
                                     </button>
@@ -203,7 +206,8 @@
                             <div class="card-body">
                                 <!-- ENTRIES -->
                                 <ul data-bind="foreach: entries, visible: entries().length > 0" class="list-group list-group-flush">
-                                    <li data-bind="css: { readOnly: readOnly, 'selected-entry': $data === $root.selectedEntry() }, attr: { id: 'entry-' + id() }" class="list-group-item px-0">
+                                    <li data-bind="css: { readOnly: readOnly, 'selected-entry': $data === $root.selectedEntry(), 'todo-entry': isTodo() }, attr: { id: 'entry-' + id() }" class="list-group-item px-0">
+                                        <!-- ko ifnot: isTodo -->
                                         <div class="d-flex justify-content-between align-items-center">
                                             <div>
                                                 <div class="fw-bold">
@@ -228,13 +232,32 @@
                                                         <ul class="dropdown-menu dropdown-menu-end">
                                                             <li><button class="dropdown-item" data-bind="click: edit"><i class="bi bi-pencil-square me-2"></i>Edit</button></li>
                                                             <li><button class="dropdown-item" data-bind="click: copy"><i class="bi bi-copy me-2"></i>Copy</button></li>
-                                                            <li><button class="dropdown-item" data-bind="click: move"><i class="bi bi-box-arrow-right me-2"></i>Move</button></li>
+                                                            <li><button class="dropdown-item" data-bind="click: move"><i class="bi bi-calendar-event me-2"></i>Move</button></li>
                                                             <li><button class="dropdown-item text-danger" data-bind="click: remove"><i class="bi bi-trash me-2"></i>Remove</button></li>
                                                         </ul>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
+                                        <!-- /ko -->
+                                        <!-- ko if: isTodo -->
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <div class="fw-bold">
+                                                    <span class="me-2" data-bind="css: scopeClasses"></span>
+                                                    <span data-bind="text: project"></span>
+                                                </div>
+                                                <p style="white-space: pre-wrap;" data-bind="text: notes" class="text-muted small mb-0 mt-1"></p>
+                                            </div>
+                                            <div class="flex-shrink-0">
+                                                <div class="btn-group btn-group-sm">
+                                                    <button data-bind="click: confirmTodo" class="btn btn-success" title="Confirm"><i class="bi bi-check-lg me-1"></i></button>
+                                                    <button data-bind="click: move" class="btn btn-secondary" title="Reschedule"><i class="bi bi-calendar-event me-1"></i></button>
+                                                    <button data-bind="click: remove" class="btn btn-danger" title="Discard"><i class="bi bi-trash me-1"></i></button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <!-- /ko -->
                                     </li>
                                 </ul>
                                 <div data-bind="visible: entries().length === 0" class="text-center text-muted p-3">No entries yet</div>
@@ -432,6 +455,34 @@
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-bind="attr: { disabled: $root.loading() }">Close</button>
                         <button type="button" class="btn btn-primary" data-bind="click: submitEdit, attr: { disabled: !isEditLoggable() || $root.loading() }">Save Changes</button>
+                    </div>
+                    <!-- /ko -->
+                </div>
+            </div>
+        </div>
+
+        <!-- New To-Do Modal -->
+        <div class="modal fade" id="newTodoModal" tabindex="-1" aria-labelledby="newTodoModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-fullscreen-md-down">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="newTodoModalLabel" data-bind="text: selectedDayForNewEntry() ? 'New To-Do for ' + selectedDayForNewEntry().title : ''"></h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <!-- ko with: selectedDayForNewEntry -->
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Project</label>
+                            <select data-bind="options: $root.projects, optionsText: 'name', value: project" class="form-select"></select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea placeholder="What needs to be done?" data-bind="value: notes" name="notes" class="form-control" rows="5"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-bind="attr: { disabled: $root.loading() }">Close</button>
+                        <button type="button" class="btn btn-primary" data-bind="click: logTodo, attr: { disabled: !isTodoLoggable() || $root.loading() }">Log To-Do</button>
                     </div>
                     <!-- /ko -->
                 </div>
