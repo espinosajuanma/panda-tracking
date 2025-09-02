@@ -670,6 +670,12 @@ class ViewModel {
                 break;
             case 't':
                 e.preventDefault();
+                if (this.selectedDay()) {
+                    this.openNewTodoModal(this.selectedDay());
+                }
+                break;
+            case 'T':
+                e.preventDefault();
                 this.goToToday();
                 break;
             case 'r':
