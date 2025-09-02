@@ -69,11 +69,11 @@
             <form data-bind="submit: login">
                 <div class="card-body">
                     <div class="mb-3">
-                        <label for="email" class="form-label">Email</label>
+                        <label for="email" class="form-label">Email <span class="text-danger">*</span></label>
                         <input data-bind="value: email, attr: { disabled: logginIn }" type="email" name="email" class="form-control" id="email" placeholder="your@email.com" required>
                     </div>
                     <div class="mb-3">
-                        <label for="password" class="form-label">Password</label>
+                        <label for="password" class="form-label">Password <span class="text-danger">*</span></label>
                         <input data-bind="value: pass, attr: { disabled: logginIn }" type="password" name="password" class="form-control" id="password" required>
                     </div>
                     <button data-bind="attr: { disabled: logginIn }" type="submit" class="mt-2 btn btn-primary w-100">Login</button>
@@ -291,7 +291,7 @@
                     <div class="modal-body">
                         <div class="row mb-3">
                             <div class="col-lg-5 mb-3 mb-lg-0">
-                                <label class="form-label">Project</label>
+                                <label class="form-label">Project <span class="text-danger">*</span></label>
                                 <select data-bind="options: $root.projects, optionsText: 'name', value: project" class="form-select"></select>
                             </div>
                             <div class="col-lg-3 mb-3 mb-lg-0">
@@ -308,7 +308,7 @@
                                 </div>
                             </div>
                             <div class="col-lg-4">
-                                <label class="form-label"><i class="bi bi-stopwatch"></i> Duration</label>
+                                <label class="form-label"><i class="bi bi-stopwatch"></i> Duration <span class="text-danger">*</span></label>
                                 <div class="input-group">
                                     <button class="btn btn-outline-secondary" type="button" data-bind="click: updateTimeSpentInModal.bind($data, -1800000), attr: { disabled: $root.loading() }">
                                         <span class="d-none d-sm-inline">-30m</span>
@@ -324,7 +324,7 @@
                         </div>
                         <div class="mb-3" data-bind="if: scope() !== 'global'">
                             <div data-bind="if: scope() === 'task'">
-                                <label class="form-label">Task</label>
+                                <label class="form-label">Task <span class="text-danger">*</span></label>
                                 <!-- ko if: tasks().length > 0 -->
                                 <select data-bind="
                                     options: tasks,
@@ -340,7 +340,7 @@
                                 <!-- /ko -->
                             </div>
                             <div data-bind="if: scope() === 'supportTicket'">
-                                <label class="form-label">Support Ticket</label>
+                                <label class="form-label">Support Ticket <span class="text-danger">*</span></label>
                                 <!-- ko if: tickets().length > 0 -->
                                 <select data-bind="
                                     options: tickets,
@@ -357,7 +357,7 @@
                             </div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Notes</label>
+                            <label class="form-label">Notes <span class="text-danger">*</span></label>
                             <textarea placeholder="What did you work on?" data-bind="value: notes" name="notes" class="form-control" rows="5"></textarea>
                         </div>
                     </div>
@@ -382,7 +382,7 @@
                     <div class="modal-body">
                         <div class="row mb-3">
                             <div class="col-lg-5 mb-3 mb-lg-0">
-                                <label class="form-label">Project</label>
+                                <label class="form-label">Project <span class="text-danger">*</span></label>
                                 <select data-bind="options: $root.projects, optionsText: 'name', value: edit_project" class="form-select"></select>
                             </div>
                             <div class="col-lg-3 mb-3 mb-lg-0">
@@ -399,7 +399,7 @@
                                 </div>
                             </div>
                             <div class="col-lg-4">
-                                <label class="form-label"><i class="bi bi-stopwatch"></i> Duration</label>
+                                <label class="form-label"><i class="bi bi-stopwatch"></i> Duration <span class="text-danger">*</span></label>
                                 <div class="input-group">
                                     <button class="btn btn-outline-secondary" type="button" data-bind="click: updateEditTimeSpent.bind($data, -1800000), attr: { disabled: $root.loading() }">
                                         <span class="d-none d-sm-inline">-30m</span>
@@ -415,7 +415,7 @@
                         </div>
                         <div class="mb-3" data-bind="if: edit_scope() !== 'global'">
                             <div data-bind="if: edit_scope() === 'task'">
-                                <label class="form-label">Task</label>
+                                <label class="form-label">Task <span class="text-danger">*</span></label>
                                 <!-- ko if: edit_tasks().length > 0 -->
                                 <select data-bind="
                                     options: edit_tasks,
@@ -431,7 +431,7 @@
                                 <!-- /ko -->
                             </div>
                             <div data-bind="if: edit_scope() === 'supportTicket'">
-                                <label class="form-label">Support Ticket</label>
+                                <label class="form-label">Support Ticket <span class="text-danger">*</span></label>
                                 <!-- ko if: edit_tickets().length > 0 -->
                                 <select data-bind="
                                     options: edit_tickets,
@@ -448,7 +448,7 @@
                             </div>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Notes</label>
+                            <label class="form-label">Notes <span class="text-danger">*</span></label>
                             <textarea placeholder="What did you work on?" data-bind="value: edit_notes" name="notes" class="form-control" rows="5"></textarea>
                         </div>
                     </div>
@@ -472,11 +472,11 @@
                     <!-- ko with: selectedDayForNewEntry -->
                     <div class="modal-body">
                         <div class="mb-3">
-                            <label class="form-label">Project</label>
+                            <label class="form-label">Project <span class="text-danger">*</span></label>
                             <select data-bind="options: $root.projects, optionsText: 'name', value: project" class="form-select"></select>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">Notes</label>
+                            <label class="form-label">Notes <span class="text-danger">*</span></label>
                             <textarea placeholder="What needs to be done?" data-bind="value: notes" name="notes" class="form-control" rows="5"></textarea>
                         </div>
                     </div>
