@@ -151,6 +151,18 @@ class ViewModel {
         this.filterOnlyToday = ko.observable(false);
         this.filterOnlyCurrentWeek = ko.observable(false);
 
+        this.isCurrentMonth = ko.computed(() => {
+            const today = new Date();
+            return this.month() === today.getMonth() && this.year() === today.getFullYear();
+        });
+
+        this.isCurrentMonth.subscribe(isCurrent => {
+            if (!isCurrent) {
+                this.filterOnlyToday(false);
+                this.filterOnlyCurrentWeek(false);
+            }
+        });
+
         // Keybindings
         const storedKeybindings = localStorage.getItem('solutions:timetracking:keybindingsEnabled');
         this.keybindingsEnabled = ko.observable(storedKeybindings ? JSON.parse(storedKeybindings) : false);
