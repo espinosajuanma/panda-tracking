@@ -550,6 +550,12 @@ class ViewModel {
             return;
         }
  
+        if (e.key === 'p' && !e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            this.showPomodoroModal();
+            return;
+        }
+
         if (e.key === 'v' && !e.ctrlKey && !e.metaKey) {
             e.preventDefault();
             this.keybindingsEnabled(!this.keybindingsEnabled());
@@ -574,6 +580,24 @@ class ViewModel {
  
     handleModalKeys = (e, modalElement) => {
         switch (e.key) {
+            case 'h':
+                if (modalElement.id === 'pomodoroModal') {
+                    e.preventDefault();
+                    this.pomodoroModal.hide();
+                }
+                break;
+            case 'r':
+                if (modalElement.id === 'pomodoroModal' && this.pomodoroIsRunning()) {
+                    e.preventDefault();
+                    this.restartPomodoro();
+                }
+                break;
+            case 's':
+                if (modalElement.id === 'pomodoroModal' && this.pomodoroIsRunning()) {
+                    e.preventDefault();
+                    this.stopPomodoro();
+                }
+                break;
             case 'q':
             case 'Escape':
                 e.preventDefault();
@@ -583,6 +607,14 @@ class ViewModel {
                 }
                 break;
             case 'Enter':
+                if (modalElement.id === 'pomodoroModal' && !this.pomodoroIsRunning()) {
+                    e.preventDefault();
+                    const startButton = modalElement.querySelector('.modal-footer .btn-success');
+                    if (startButton && !startButton.disabled) {
+                        startButton.click();
+                    }
+                    return;
+                }
                 // Allow default behavior for Enter in textareas (new line), unless Ctrl/Meta is pressed.
                 if (document.activeElement.tagName === 'TEXTAREA' && !e.ctrlKey && !e.metaKey) {
                     return;
