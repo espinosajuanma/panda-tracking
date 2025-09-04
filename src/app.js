@@ -280,10 +280,10 @@ class ViewModel {
                 day.entries.remove(entryToRemove);
 
                 // Update day totals
-                day.durationMs -= entryToRemove.raw.timeSpent;
-                day.duration(formatMsToDuration(day.durationMs));
-                day.durationBillableMs -= entryToRemove.raw.timeSpent;
-                day.durationBillable(formatMsToDuration(day.durationBillableMs));
+                day.durationMs(day.durationMs() - entryToRemove.raw.timeSpent);
+                day.duration(formatMsToDuration(day.durationMs()));
+                day.durationBillableMs(day.durationBillableMs() - entryToRemove.raw.timeSpent);
+                day.durationBillable(formatMsToDuration(day.durationBillableMs()));
 
                 // Update selection for keybindings
                 if (this.keybindingsEnabled() && this.navigationMode() === 'entry') {
@@ -968,10 +968,10 @@ class ViewModel {
             // Remove from old day
             const originalDay = entryToMove.day;
             originalDay.entries.remove(entryToMove);
-            originalDay.durationMs -= entryToMove.raw.timeSpent;
-            originalDay.duration(formatMsToDuration(originalDay.durationMs));
-            originalDay.durationBillableMs -= entryToMove.raw.timeSpent;
-            originalDay.durationBillable(formatMsToDuration(originalDay.durationBillableMs));
+            originalDay.durationMs(originalDay.durationMs() - entryToMove.raw.timeSpent);
+            originalDay.duration(formatMsToDuration(originalDay.durationMs()));
+            originalDay.durationBillableMs(originalDay.durationBillableMs() - entryToMove.raw.timeSpent);
+            originalDay.durationBillable(formatMsToDuration(originalDay.durationBillableMs()));
 
             // Refresh new day if visible
             const targetDateObj = new Date(targetDate + 'T00:00:00');
@@ -1064,10 +1064,10 @@ class ViewModel {
 
             // Remove from old day
             originalDay.entries.remove(entryToMove);
-            originalDay.durationMs -= entryToMove.raw.timeSpent;
-            originalDay.duration(formatMsToDuration(originalDay.durationMs));
-            originalDay.durationBillableMs -= entryToMove.raw.timeSpent;
-            originalDay.durationBillable(formatMsToDuration(originalDay.durationBillableMs));
+            originalDay.durationMs(originalDay.durationMs() - entryToMove.raw.timeSpent);
+            originalDay.duration(formatMsToDuration(originalDay.durationMs()));
+            originalDay.durationBillableMs(originalDay.durationBillableMs() - entryToMove.raw.timeSpent);
+            originalDay.durationBillable(formatMsToDuration(originalDay.durationBillableMs()));
 
             // Refresh new day
             await targetDay.updateDay();
@@ -1652,8 +1652,8 @@ function Day (date, entries, week) {
         week: week,
         holidayDetail: ko.observable(holiday?.title),
         entries: ko.observableArray([]),
-        durationMs: 0,
-        durationBillableMs: 0,
+        durationMs: ko.observable(0),
+        durationBillableMs: ko.observable(0),
         durationNonBillable: 0,
         visibleNotes: ko.observable(true),
         // Form
@@ -1673,17 +1673,17 @@ function Day (date, entries, week) {
             let { items: entries } = await model.slingr.get(`/data/${TIME_TRACKING_ENTITY}`, query);
 
             this.entries.removeAll();
-            this.durationMs = 0;
-            this.durationBillableMs = 0;
+            this.durationMs(0);
+            this.durationBillableMs(0);
 
             for (let entry of entries) {
                 let entryDate = new Entry(entry, this);
-                this.durationMs += entryDate.raw.timeSpent;
-                this.durationBillableMs += entry.timeSpent;
+                this.durationMs(this.durationMs() + entryDate.raw.timeSpent);
+                this.durationBillableMs(this.durationBillableMs() + entry.timeSpent);
                 this.entries.push(entryDate);
             }
-            this.duration(formatMsToDuration(this.durationMs));
-            this.durationBillable(formatMsToDuration(this.durationBillableMs));
+            this.duration(formatMsToDuration(this.durationMs()));
+            this.durationBillable(formatMsToDuration(this.durationBillableMs()));
         },
         updateTimeSpentInModal: function(amount) {
             let current = this.timeSpent();
@@ -1924,19 +1924,19 @@ function Day (date, entries, week) {
         if (entry.date !== dateStr) continue;
         let entryDate = new Entry(entry, day);
 
-        day.durationMs += entryDate.raw.timeSpent;
-        day.durationBillableMs += entry.timeSpent;
+        day.durationMs(day.durationMs() + entryDate.raw.timeSpent);
+        day.durationBillableMs(day.durationBillableMs() + entry.timeSpent);
         day.entries.push(entryDate);
     }
-    day.duration = ko.observable(formatMsToDuration(day.durationMs));
-    day.durationBillable = ko.observable(formatMsToDuration(day.durationBillableMs));
+    day.duration = ko.observable(formatMsToDuration(day.durationMs()));
+    day.durationBillable = ko.observable(formatMsToDuration(day.durationBillableMs()));
     day.durationNonBillable = ko.observable(formatMsToDuration(day.durationNonBillable));
 
     day.isMissingTime = ko.computed(function() {
-        return day.isBussinessDay() && day.durationMs < MAX_TIME_SPENT;
+        return day.isBussinessDay() && day.durationMs() < MAX_TIME_SPENT;
     });
     day.missingDuration = ko.computed(function() {
-        return day.isMissingTime() ? formatMsToDuration(MAX_TIME_SPENT - day.durationMs) : null;
+        return day.isMissingTime() ? formatMsToDuration(MAX_TIME_SPENT - day.durationMs()) : null;
     });
 
     day.isVisible = ko.computed(function() {
@@ -1982,15 +1982,15 @@ function Day (date, entries, week) {
     });
 
     day.durationPercentage = ko.computed(function() {
-        if (!day.isBussinessDay() || day.durationMs <= 0) {
+        if (!day.isBussinessDay() || day.durationMs() <= 0) {
             return 0;
         }
-        const percentage = (day.durationMs / MAX_TIME_SPENT) * 100;
+        const percentage = (day.durationMs() / MAX_TIME_SPENT) * 100;
         return Math.min(percentage, 100);
     });
 
     day.durationClass = ko.computed(function() {
-        const percentage = (day.durationMs / MAX_TIME_SPENT) * 100;
+        const percentage = (day.durationMs() / MAX_TIME_SPENT) * 100;
         if (percentage < 100) return 'bg-warning';
         if (percentage >= 100 && percentage < 110) return 'bg-success';
         return 'bg-danger'; // over 110%
@@ -2034,10 +2034,10 @@ function Entry (entry, day) {
                 this.duration(formatMsToDuration(updatedEntryData.timeSpent));
 
                 // Update day totals
-                day.durationMs = day.durationMs - oldTime + updatedEntryData.timeSpent;
-                day.duration(formatMsToDuration(day.durationMs));
-                day.durationBillableMs = day.durationBillableMs - oldTime + updatedEntryData.timeSpent;
-                day.durationBillable(formatMsToDuration(day.durationBillableMs));
+                day.durationMs(day.durationMs() - oldTime + updatedEntryData.timeSpent);
+                day.duration(formatMsToDuration(day.durationMs()));
+                day.durationBillableMs(day.durationBillableMs() - oldTime + updatedEntryData.timeSpent);
+                day.durationBillable(formatMsToDuration(day.durationBillableMs()));
 
                 await model.updateStats();
             } catch (e) {
@@ -2168,10 +2168,10 @@ function Entry (entry, day) {
                 self.notes(updatedEntryData.notes);
 
                 // Update day totals
-                day.durationMs = day.durationMs - oldTime + updatedEntryData.timeSpent;
-                day.duration(formatMsToDuration(day.durationMs));
-                day.durationBillableMs = day.durationBillableMs - oldTime + updatedEntryData.timeSpent;
-                day.durationBillable(formatMsToDuration(day.durationBillableMs));
+                day.durationMs(day.durationMs() - oldTime + updatedEntryData.timeSpent);
+                day.duration(formatMsToDuration(day.durationMs()));
+                day.durationBillableMs(day.durationBillableMs() - oldTime + updatedEntryData.timeSpent);
+                day.durationBillable(formatMsToDuration(day.durationBillableMs()));
 
                 model.editEntryModal.hide();
                 await model.updateStats();
