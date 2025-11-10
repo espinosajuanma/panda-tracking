@@ -43,8 +43,8 @@ You'll need `git` to clone the repository. To run a simple local server, you can
 1. Clone and install dependencies
 
 ```bash
-git clone git@github.com:espinosajuanma/solutions-time-tracking.git
-cd solutions-time-tracking
+git clone git@github.com:espinosajuanma/panda-tracking.git
+cd panda-tracking
 npm install
 ```
 
