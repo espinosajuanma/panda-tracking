@@ -1,5 +1,9 @@
 const TIME_TRACKING_ENTITY = 'timeTracking';
 
+class AuthError extends Error {
+    constructor(message) { super(message); this.name = 'AuthError'; }
+}
+
 class Slingr {
     constructor(app, env, token) {
         this.url = `https://${app}.slingrs.io/${env}/runtime/api`;
@@ -50,7 +54,9 @@ class Slingr {
         }
         let res = await fetch(url, opts);
         if (! res.ok) {
-            throw new Error(`[${res.status}] ${res.statusText}`);
+            const error = new Error(`[${res.status}] ${res.statusText}`);
+            if (res.status === 401) throw new AuthError(error.message);
+            throw error;
         }
         return await res.json();
     }
@@ -1199,9 +1205,17 @@ class ViewModel {
 
     updateDashboard = async () => {
         this.loading(true);
-        await this.updateHolidays();
-        await this.updateTimeTracking();
-        this.loading(false);
+        try {
+            await this.updateHolidays();
+            await this.updateTimeTracking();
+        } catch (e) {
+            if (e instanceof AuthError) {
+                this.logout();
+                this.addToast('Your session expired. Please log in again.', 'warning');
+            }
+        } finally {
+            this.loading(false);
+        }
     }
 
     goToToday = async () => {
