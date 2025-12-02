@@ -164,10 +164,15 @@
                     <button data-bind="click: exportToCsv, attr: { disabled: loading }" class="btn btn-sm btn-outline-success" title="Export visible entries to CSV"><i class="bi bi-file-earmark-spreadsheet"></i> Export</button>
                 </div>
             </div>
-            <div class="d-md-flex justify-content-between align-items-center mb-3">
-                <div class="input-group input-group-sm">
-                    <span class="input-group-text"><i class="bi bi-search"></i></span>
-                    <input type="text" class="form-control" placeholder="Filter by notes (e.g. 'bug, fix, #urgent')" data-bind="textInput: filterByNotes">
+            <div class="row mb-3 g-2">
+                <div class="col-md-6">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control" placeholder="Filter by notes (e.g. 'bug, fix, #urgent')" data-bind="textInput: filterByNotes">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <select class="form-select form-select-sm" data-bind="options: projects, optionsText: 'name', optionsValue: 'id', value: filterByProject, optionsCaption: 'All Projects'"></select>
                 </div>
             </div>
             <!-- DAYS -->
