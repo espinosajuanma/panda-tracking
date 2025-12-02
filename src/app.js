@@ -1770,6 +1770,17 @@ function Day (date, entries, week) {
         taskId: ko.observable(null),
         ticketId: ko.observable(null),
         tasks: ko.observableArray([]),
+        taskStatusFilter: ko.observable('all'),
+        taskStatusOptions: [
+            { value: 'all', text: 'All' },
+            { value: 'new', text: 'New' },
+            { value: 'toDo', text: 'To Do' },
+            { value: 'inProgress', text: 'In Progress' },
+            { value: 'inReview', text: 'In Review' },
+            { value: 'completed', text: 'Completed' },
+            { value: 'staging', text: 'Staging' },
+            { value: 'released', text: 'Released' }
+        ],
         tickets: ko.observableArray([]),
         toggleLeave: async (day) => {
             const dateStr = day.dateStr();
@@ -1953,12 +1964,16 @@ function Day (date, entries, week) {
                 entity = 'support.tickets';
                 sort = { _sortField: 'draftTimestamp', _sortType: 'desc' }
             }
-            const { items } = await model.slingr.get(`/data/${entity}`, {
+            let params = {
                 project: project.id,
                 _size: 1000,
                 ...sort,
                 _fields: 'id,label,number',
-            });
+            };
+            if (scope === 'task' && day.taskStatusFilter() !== 'all') {
+                params.status = day.taskStatusFilter();
+            }
+            const { items } = await model.slingr.get(`/data/${entity}`, params);
             obs(items.map(t => ({ id: t.id, name: t.label })));
         } catch (e) {
             console.error('Error loading scope options', e);
@@ -1972,6 +1987,9 @@ function Day (date, entries, week) {
     day.scope.subscribe(async () => {
         day.taskId(null);
         day.ticketId(null);
+        await loadScopeOptions();
+    });
+    day.taskStatusFilter.subscribe(async () => {
         await loadScopeOptions();
     });
 
@@ -2114,6 +2132,18 @@ function Entry (entry, day) {
         edit_time: ko.observable(''),
         edit_tasks: ko.observableArray([]),
         edit_tickets: ko.observableArray([]),
+        edit_taskStatusFilter: ko.observable('all'),
+        edit_taskStatusOptions: [
+            { value: 'all', text: 'All' },
+            { value: 'new', text: 'New' },
+            { value: 'toDo', text: 'To Do' },
+            { value: 'inProgress', text: 'In Progress' },
+            { value: 'inReview', text: 'In Review' },
+            { value: 'completed', text: 'Completed' },
+            { value: 'staging', text: 'Staging' },
+            { value: 'released', text: 'Released' }
+        ],
+
         updateEditTimeSpent: function(amount) {
             let current = this.edit_timeSpent();
             let newValue = current + amount;
@@ -2185,10 +2215,15 @@ function Entry (entry, day) {
                     sort = { _sortField: 'draftTimestamp', _sortType: 'desc' };
                 }
                 if (!entity) return;
-
-                const { items } = await model.slingr.get(`/data/${entity}`, {
+                
+                let params = {
                     project: project.id, _size: 1000, ...sort, _fields: 'id,label,number',
-                });
+                };
+                if (scope === 'task' && self.edit_taskStatusFilter() !== 'all') {
+                    params.status = self.edit_taskStatusFilter();
+                }
+
+                const { items } = await model.slingr.get(`/data/${entity}`, params);
                 obs(items.map(t => ({ id: t.id, name: t.label })));
             } catch (e) {
                 console.error('Error loading scope options', e);
@@ -2297,6 +2332,10 @@ function Entry (entry, day) {
         if (isInitializing) return;
         self.edit_taskId(null);
         self.edit_ticketId(null);
+        await self.loadEditScopeOptions();
+    });
+    self.edit_taskStatusFilter.subscribe(async () => {
+        if (isInitializing) return;
         await self.loadEditScopeOptions();
     });
 

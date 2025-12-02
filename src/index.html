@@ -336,15 +336,25 @@
                         <div class="mb-3" data-bind="if: scope() !== 'global'">
                             <div data-bind="if: scope() === 'task'">
                                 <label class="form-label">Task <span class="text-danger">*</span></label>
+                                <div class="row g-2 mb-2">
+                                    <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Task status filter">
+                                        <!-- ko foreach: taskStatusOptions -->
+                                        <input type="radio" class="btn-check" data-bind="value: value, checked: $parent.taskStatusFilter, attr: { name: 'taskStatusFilter-' + $parent.dateStr(), id: 'status-' + value + '-' + $parent.dateStr() }">
+                                        <label class="btn btn-outline-secondary" data-bind="text: text, attr: { for: 'status-' + value + '-' + $parent.dateStr() }"></label>
+                                        <!-- /ko -->
+                                    </div>
+                                </div>
                                 <!-- ko if: tasks().length > 0 -->
-                                <select data-bind="
-                                    options: tasks,
-                                    optionsText: 'name',
-                                    optionsValue: 'id',
-                                    value: taskId,
-                                    optionsCaption: 'Select Task...',
-                                    select2: { theme: 'bootstrap-5', dropdownParent: $('#newEntryModal'), width: '100%' }"
-                                    class="form-select"></select>
+                                <div data-bind="if: tasks().length > 0">
+                                    <select data-bind="
+                                        options: tasks,
+                                        optionsText: 'name',
+                                        optionsValue: 'id',
+                                        value: taskId,
+                                        optionsCaption: 'Select Task...',
+                                        select2: { theme: 'bootstrap-5', dropdownParent: $('#newEntryModal'), width: '100%' }"
+                                        class="form-select"></select>
+                                </div>
                                 <!-- /ko -->
                                 <!-- ko if: tasks().length === 0 && project() -->
                                 <div class="form-text">No tasks for this project.</div>
@@ -428,15 +438,25 @@
                         <div class="mb-3" data-bind="if: edit_scope() !== 'global'">
                             <div data-bind="if: edit_scope() === 'task'">
                                 <label class="form-label">Task <span class="text-danger">*</span></label>
+                                <div class="row g-2 mb-2">
+                                    <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Task status filter">
+                                        <!-- ko foreach: edit_taskStatusOptions -->
+                                        <input type="radio" class="btn-check" data-bind="value: value, checked: $parent.edit_taskStatusFilter, attr: { name: 'edit_taskStatusFilter-' + $parent.id(), id: 'edit-status-' + value + '-' + $parent.id() }">
+                                        <label class="btn btn-outline-secondary" data-bind="text: text, attr: { for: 'edit-status-' + value + '-' + $parent.id() }"></label>
+                                        <!-- /ko -->
+                                    </div>
+                                </div>
                                 <!-- ko if: edit_tasks().length > 0 -->
-                                <select data-bind="
-                                    options: edit_tasks,
-                                    optionsText: 'name',
-                                    optionsValue: 'id',
-                                    value: edit_taskId,
-                                    optionsCaption: 'Select Task...',
-                                    select2: { theme: 'bootstrap-5', dropdownParent: $('#editEntryModal'), width: '100%' }"
-                                    class="form-select"></select>
+                                <div data-bind="if: edit_tasks().length > 0">
+                                    <select data-bind="
+                                        options: edit_tasks,
+                                        optionsText: 'name',
+                                        optionsValue: 'id',
+                                        value: edit_taskId,
+                                        optionsCaption: 'Select Task...',
+                                        select2: { theme: 'bootstrap-5', dropdownParent: $('#editEntryModal'), width: '100%' }"
+                                        class="form-select"></select>
+                                </div>
                                 <!-- /ko -->
                                 <!-- ko if: edit_tasks().length === 0 && edit_project() -->
                                 <div class="form-text">No tasks for this project.</div>
