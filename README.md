@@ -1,46 +1,62 @@
 # Panda Tracking App
 
-A personal time tracking application built to simplify logging work hours, with a focus on speed and usability.
+A fast, independent frontend for our internal time tracking system. Built for power users who want speed, data hygiene, and keyboard-centric navigation.
 
-> I got tired of having to go to the ~HQ~ solutions app to track my time at work. So I built my own.
+> "I got tired of the limited UI in the official app. I wanted to audit my entries, fix mistakes quickly, and track time without touching the mouse. So I built this."
 
-## Features
+## Why use this?
 
-- **Dashboard Overview**: At-a-glance view of your monthly progress with
-  interactive charts for time spent per scope (Global, Task, Ticket) and per project.
-- **Interactive Calendar**: Easily navigate through months and years. Holidays
-  and leave days are clearly marked.
-- **Detailed Time Entries**: Log time against projects, tasks, or support
-  tickets.
-- **Quick Edits**: Add or subtract 30-minute chunks from entries with a single
-  click, or edit all details in a modal.
-- **Leave Day Management**: Mark days as 'leave' to exclude them from work hour
-  calculations.
-- **Focus Mode (Pomodoro)**: A built-in configurable Pomodoro timer (defaults to
-  50 minutes) to help you stay focused. The browser tab blinks and shows the countdown to keep you aware.
-- **Vim-like Keybindings**: Navigate through days and entries, and perform
-  actions without touching your mouse. Press `h` for a help modal.
-- **Customizable Filters**:
-    - Show/hide weekends.
-    - Filter by days with missing hours.
-    - Show only today's or this week's entries.
-    - Hide leave days.
-- **Dark/Light Theme**: Switch between themes to suit your preference. The
-  setting is saved locally.
-- **Responsive Design**: Works on different screen sizes.
+This app connects directly to the official Solitions REST API but offers a significantly faster interface. It allows for bulk auditing, quick keyboard navigation, and unique features like "To-Do" entries that the official app doesn't support.
+
+## Key Features
+
+### 🚀 Productivity & Speed
+
+- **Vim-like Keybindings**: Navigate the calendar and entries without the mouse.
+  - `h`/`j`/`k`/`l` or Arrows to navigate days.
+  - `c` and `v` to **Copy and Paste** entries across days.
+  - `m` to **Move** an entry to a different day.
+  - `n` to create a New entry.
+  - `Del` to remove entries.
+- **Smart "To-Do" Hacking**: Create entries with `0ms` duration. They act as a to-do list right inside your calendar. When you are ready, just add time to them.
+- **Quick Edits**: Adjust time in 30-minute chunks with one click, or edit descriptions instantly.
+
+### 📊 Data Hygiene & Stats
+
+- **Smart Tagging (Hashtags)**: Add hashtags (e.g., `#api`, `#meeting`) to your entry descriptions.
+- **Missing Hours Notice**: Instantly see which days are under the expected working hours so you can fix them before the month ends.
+- **Advanced Filtering**: 
+  - Filter by **Project**.
+  - Filter by **Hashtag/Label**.
+  - Filter by **Missing Hours**.
+- **Live Stats**: Real-time calculation of daily hours, monthly progress, and project breakdown.
+
+### 🎨 UI & UX
+
+- **Focus Mode (Pomodoro)**: Integrated timer (default 50m) with browser tab notifications/blinking to keep you on track.
+- **Dark/Light Mode**: Toggles automatically or manually, saved to local storage.
+- **Visual Feedback**:
+  - Interactive Calendar with clear markers for holidays and leave days.
+  - Charts for viewing time distribution by Scope and Project.
+
+## Tech Stack
+
+- **Core**: JavaScript (ES6+), HTML5, CSS3
+- **Architecture**: Knockout.js (MVVM pattern)
+- **UI Framework**: Bootstrap 5
+- **Visualization**: Chart.js
+- **Components**: Vanilla-Calendar-Pro, Select2
 
 ## Getting Started
 
 ### Prerequisites
 
-You'll need `git` to clone the repository. To run a simple local server, you can use Node.js.
-
 - Git
-- Node.js
+- Node.js (for running the local dev server)
 
-### Installation & Running
+### Installation
 
-1. Clone and install dependencies
+1. Clone the repository:
 
 ```bash
 git clone git@github.com:espinosajuanma/panda-tracking.git
@@ -48,22 +64,14 @@ cd panda-tracking
 npm install
 ```
 
-2. Run the application
+2. Run the application:
 
 ```bash
 npm run start
 ```
 
-This will automatically open the application in your default browser.
+3. **Authentication**: The app requires your API token from the main time tracking system. You will be prompted to enter this on first load.
 
-## Tech Stack
+## Keyboard Shortcuts Cheat Sheet
 
-- HTML5, CSS3, JavaScript (ES6+)
-- Bootstrap 5 for styling and components.
-- Knockout.js for the MVVM architecture.
-- Chart.js for data visualization.
-- Vanilla-Calendar-Pro for the interactive calendar.
-- Select2 for enhanced select boxes.
-
-
-
+Press `h` in the app to see the full list.
