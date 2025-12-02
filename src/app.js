@@ -157,6 +157,7 @@ class ViewModel {
         this.filterOnlyToday = ko.observable(false);
         this.filterOnlyCurrentWeek = ko.observable(false);
         this.filterByNotes = ko.observable('');
+        this.filterByProject = ko.observable(null);
 
         this.isCurrentMonth = ko.computed(() => {
             const today = new Date();
@@ -698,10 +699,10 @@ class ViewModel {
                 e.preventDefault();
                 if (this.selectedDay()) {
                     this.navigationMode('entry');
-                    if (this.selectedDay().entries().length > 0) {
-                        const firstEntry = this.selectedDay().entries()[0];
+                    if (this.selectedDay().filteredEntries().length > 0) {
+                        const firstEntry = this.selectedDay().filteredEntries()[0];
                         this.selectedEntry(firstEntry);
-                        setTimeout(() => this.scrollToEntry(firstEntry), 50);
+                        this.scrollToEntry(firstEntry);
                     } else {
                         this.selectedEntry(null);
                     }
@@ -740,7 +741,7 @@ class ViewModel {
         const currentDay = this.selectedDay();
         if (!currentDay) return;
 
-        const entries = currentDay.entries();
+        const entries = currentDay.filteredEntries();
         let currentIndex = entries.indexOf(this.selectedEntry());
 
         if (entries.length === 0 && ['e', 'r', '+', '-'].includes(e.key)) {
@@ -762,9 +763,9 @@ class ViewModel {
                     const currentDayIndex = visibleDays.indexOf(currentDay);
                     for (let i = currentDayIndex + 1; i < visibleDays.length; i++) {
                         const nextDay = visibleDays[i];
-                        if (nextDay.entries().length > 0) {
+                        if (nextDay.filteredEntries().length > 0) {
                             this.selectedDay(nextDay);
-                            this.selectedEntry(nextDay.entries()[0]);
+                            this.selectedEntry(nextDay.filteredEntries()[0]);
                             this.expandWeekAndScroll(nextDay);
                             this.scrollToEntry(this.selectedEntry());
                             break; // Exit loop
@@ -785,9 +786,9 @@ class ViewModel {
                     const currentDayIndex = visibleDays.indexOf(currentDay);
                     for (let i = currentDayIndex - 1; i >= 0; i--) {
                         const prevDay = visibleDays[i];
-                        if (prevDay.entries().length > 0) {
+                        if (prevDay.filteredEntries().length > 0) {
                             this.selectedDay(prevDay);
-                            this.selectedEntry(prevDay.entries()[prevDay.entries().length - 1]);
+                            this.selectedEntry(prevDay.filteredEntries()[prevDay.filteredEntries().length - 1]);
                             this.expandWeekAndScroll(prevDay);
                             this.scrollToEntry(this.selectedEntry());
                             break; // Exit loop
@@ -1885,19 +1886,27 @@ function Day (date, entries, week) {
     });
 
     day.filteredEntries = ko.computed(function() {
+        let entries = day.entries();
+
+        // Filter by project
+        const projectId = model.filterByProject();
+        if (projectId) {
+            entries = entries.filter(entry => entry.raw.project.id === projectId);
+        }
+
+        // Filter by notes
         const filterText = model.filterByNotes().trim().toLowerCase();
         if (!filterText) {
-            return day.entries();
+            return entries;
         }
 
         const filterTerms = filterText.split(',').map(term => term.trim()).filter(term => term);
         if (filterTerms.length === 0) {
-            return day.entries();
+            return entries;
         }
 
-        return day.entries().filter(entry => {
+        return entries.filter(entry => {
             const notes = (entry.notes() || '').toLowerCase();
-            // entry must contain all terms
             return filterTerms.some(term => notes.includes(term));
         });
     });
