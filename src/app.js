@@ -156,6 +156,7 @@ class ViewModel {
         this.filterHideLeaveDays = ko.observable(true);
         this.filterOnlyToday = ko.observable(false);
         this.filterOnlyCurrentWeek = ko.observable(false);
+        this.filterByNotes = ko.observable('');
 
         this.isCurrentMonth = ko.computed(() => {
             const today = new Date();
@@ -1528,9 +1529,9 @@ class ViewModel {
             this.weeks().forEach(week => {
                 if (!week.isVisible()) return;
                 week.days().forEach(day => {
-                    if (!day.isVisible()) return;
-                    day.entries().forEach(entry => {
-                        const sanitize = (str) => str.replace(/"/g, '""').replace(/\r?\n/g, ' ');
+                    if (!day.isVisible() || day.filteredEntries().length === 0) return;
+                    day.filteredEntries().forEach(entry => {
+                        const sanitize = (str) => (str || '').replace(/"/g, '""').replace(/\r?\n/g, ' ');
                         const notes = sanitize(entry.notes() || '');
                         const task = sanitize(entry.task() || '');
                         const scopes = { task: 'Task', supportTicket: 'Ticket', global: 'Global' };
@@ -1632,6 +1633,19 @@ function Week(week, entries) {
 
     let days = week.days.map(d => new Day(d, entries, self));
     self.days = ko.observableArray(days);
+
+    self.filteredDays = ko.computed(function() {
+        return self.days().filter(day => {
+            if (!day.isVisible()) {
+                return false;
+            }
+            // If notes filter is active, only show day if it has matching entries
+            if (model.filterByNotes().trim() !== '') {
+                return day.filteredEntries().length > 0;
+            }
+            return true;
+        });
+    });
 
     self.toggleCollapse = function() {
         self.isCollapsed(!self.isCollapsed());
@@ -1868,6 +1882,24 @@ function Day (date, entries, week) {
             return false;
         }
         return true;
+    });
+
+    day.filteredEntries = ko.computed(function() {
+        const filterText = model.filterByNotes().trim().toLowerCase();
+        if (!filterText) {
+            return day.entries();
+        }
+
+        const filterTerms = filterText.split(',').map(term => term.trim()).filter(term => term);
+        if (filterTerms.length === 0) {
+            return day.entries();
+        }
+
+        return day.entries().filter(entry => {
+            const notes = (entry.notes() || '').toLowerCase();
+            // entry must contain all terms
+            return filterTerms.some(term => notes.includes(term));
+        });
     });
 
     // Set default project if available
@@ -2213,6 +2245,19 @@ function Entry (entry, day) {
             model.openMoveEntryModal(entry);
         },
     };
+
+    self.labels = ko.computed(function() {
+        const notesText = self.notes() || '';
+        const matches = notesText.match(/#\w+/g) || [];
+        return matches.map(label => label.substring(1));
+    });
+
+    self.formattedNotes = ko.computed(function() {
+        const notesText = self.notes() || '';
+        return notesText.replace(/#(\w+)/g, (match, word) => {
+            return `<span class="badge bg-secondary text-dark me-1">#${word}</span>`;
+        });
+    });
 
     self.isTodo = ko.computed(function() {
         return self.timeSpent() === 0;

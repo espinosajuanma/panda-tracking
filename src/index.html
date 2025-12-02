@@ -164,6 +164,12 @@
                     <button data-bind="click: exportToCsv, attr: { disabled: loading }" class="btn btn-sm btn-outline-success" title="Export visible entries to CSV"><i class="bi bi-file-earmark-spreadsheet"></i> Export</button>
                 </div>
             </div>
+            <div class="d-md-flex justify-content-between align-items-center mb-3">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" class="form-control" placeholder="Filter by notes (e.g. 'bug, fix, #urgent')" data-bind="textInput: filterByNotes">
+                </div>
+            </div>
             <!-- DAYS -->
             <div id="entries">
                 <!-- ko foreach: { data: weeks, as: 'week' } -->
@@ -176,8 +182,8 @@
                         <i class="bi" data-bind="css: { 'bi-chevron-down': !week.isCollapsed(), 'bi-chevron-up': week.isCollapsed() }"></i>
                     </h5>
                     <div class="collapse show" data-bind="attr: { id: week.id }">
-                        <!-- ko foreach: { data: week.days, as: 'day' } -->
-                        <div data-bind="visible: isVisible, attr: { id: dateStr(), tabindex: $root.keybindingsEnabled() ? 0 : null }, css: { 'border-primary': isToday(), 'border-warning': isHoliday() && !isLeave(), 'border-danger': isWeekend(), 'border-info': isLeave(), 'selected-day': $data === $root.selectedDay() }" class="card shadow-sm mt-3" style="outline: none;">
+                        <!-- ko foreach: { data: week.filteredDays, as: 'day' } -->
+                        <div data-bind="attr: { id: dateStr(), tabindex: $root.keybindingsEnabled() ? 0 : null }, css: { 'border-primary': isToday(), 'border-warning': isHoliday() && !isLeave(), 'border-danger': isWeekend(), 'border-info': isLeave(), 'selected-day': $data === $root.selectedDay() }" class="card shadow-sm mt-3" style="outline: none;">
                             <div class="card-header d-flex justify-content-between align-items-center">
                                 <h6 class="card-title mb-0">
                                         <span data-bind="visible: isLeave()" title="Leave" data-bs-toggle="tooltip"><i class="bi bi-person-slash text-info"></i> </span>
@@ -205,7 +211,7 @@
                             </div>
                             <div class="card-body">
                                 <!-- ENTRIES -->
-                                <ul data-bind="foreach: entries, visible: entries().length > 0" class="list-group list-group-flush">
+                                <ul data-bind="foreach: filteredEntries, visible: filteredEntries().length > 0" class="list-group list-group-flush">
                                     <li data-bind="css: { readOnly: readOnly, 'selected-entry': $data === $root.selectedEntry(), 'todo-entry': isTodo() }, attr: { id: 'entry-' + id() }" class="list-group-item px-0">
                                         <!-- ko ifnot: isTodo -->
                                         <div class="d-flex justify-content-between align-items-center">
@@ -222,7 +228,7 @@
                                             </div>
                                         </div>
                                         <div class="d-flex justify-content-between align-items-start mt-2">
-                                            <p style="white-space: pre-wrap;" data-bind="text: notes" class="text-muted small mb-0 me-3"></p>
+                                            <p style="white-space: pre-wrap;" data-bind="html: formattedNotes" class="text-muted small mb-0 me-3"></p>
                                             <div data-bind="hidden: readOnly" class="flex-shrink-0">
                                                 <div class="btn-group btn-group-sm">
                                                     <button data-bind="click: updateTime.bind($data, -1800000)" class="btn btn-outline-secondary" title="Subtract 30m"><i class="bi bi-dash"></i></button>
@@ -260,7 +266,7 @@
                                         <!-- /ko -->
                                     </li>
                                 </ul>
-                                <div data-bind="visible: entries().length === 0" class="text-center text-muted p-3">No entries yet</div>
+                                <div data-bind="visible: filteredEntries().length === 0" class="text-center text-muted p-3">No entries yet</div>
                             </div>
                         </div>
                         <!-- /ko -->
@@ -359,6 +365,7 @@
                         <div class="mb-3">
                             <label class="form-label">Notes <span class="text-danger">*</span></label>
                             <textarea placeholder="What did you work on?" data-bind="value: notes" name="notes" class="form-control" rows="5"></textarea>
+                            <div class="form-text">Use <code>#hashtags</code> to display them as labels.</div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -450,6 +457,7 @@
                         <div class="mb-3">
                             <label class="form-label">Notes <span class="text-danger">*</span></label>
                             <textarea placeholder="What did you work on?" data-bind="value: edit_notes" name="notes" class="form-control" rows="5"></textarea>
+                            <div class="form-text">Use <code>#hashtags</code> to display them as labels.</div>
                         </div>
                     </div>
                     <div class="modal-footer">
