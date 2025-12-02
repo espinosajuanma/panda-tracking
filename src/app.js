@@ -1529,9 +1529,9 @@ class ViewModel {
             this.weeks().forEach(week => {
                 if (!week.isVisible()) return;
                 week.days().forEach(day => {
-                    if (!day.isVisible()) return;
-                    day.entries().forEach(entry => {
-                        const sanitize = (str) => str.replace(/"/g, '""').replace(/\r?\n/g, ' ');
+                    if (!day.isVisible() || day.filteredEntries().length === 0) return;
+                    day.filteredEntries().forEach(entry => {
+                        const sanitize = (str) => (str || '').replace(/"/g, '""').replace(/\r?\n/g, ' ');
                         const notes = sanitize(entry.notes() || '');
                         const task = sanitize(entry.task() || '');
                         const scopes = { task: 'Task', supportTicket: 'Ticket', global: 'Global' };
