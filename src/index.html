@@ -106,9 +106,6 @@
                                         <h6>Month Progress</h6>
                                         <div>
                                             <span class="fw-bold" data-bind="text: monthProgress.total"></span>
-                                            <span class="text-warning small ms-1" data-bind="if: monthProgress.missing() > 0">
-                                                (<i class="bi bi-exclamation-triangle-fill"></i> <span data-bind="text: formatMsToDuration(monthProgress.missing())"></span> missing)
-                                            </span>
                                         </div>
                                     </div>
                                     <div style="position: relative; height:150px; width: 150px; margin: auto;">
@@ -134,6 +131,17 @@
                         </div>
                     </div>
                 </div>
+                <!-- ko if: monthProgress.missing() > 0 -->
+                <div class="card-footer alert-warning">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-exclamation-triangle-fill me-3 fs-4 text-warning"></i>
+                        <div>
+                            <h6 class="alert-heading mb-0">Action Needed: <span data-bind="text: formatMsToDuration(monthProgress.missing())"></span> Missing</h6>
+                            <small>You have unlogged hours. Use the "Missing Hours" filter to find them.</small>
+                        </div>
+                    </div>
+                </div>
+                <!-- /ko -->
             </div>
 
             <!-- Filters & Actions Toolbar -->
