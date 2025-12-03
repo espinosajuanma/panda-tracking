@@ -148,28 +148,36 @@
             <!-- Filters & Actions Toolbar -->
             <div class="d-md-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-2 mb-md-0">Month entries</h5>
-                <div class="d-flex align-items-center small flex-wrap justify-content-start justify-content-md-end" style="gap: 1rem;">
-                    <div class="form-check form-switch">
+                <div class="d-flex align-items-center flex-wrap justify-content-start justify-content-md-end" style="gap: 0.5rem;">
+                    <div class="form-check form-switch mx-2">
                         <input class="form-check-input" type="checkbox" role="switch" id="filterMissingHours" data-bind="checked: filterMissingHours">
-                        <label class="form-check-label" for="filterMissingHours">Missing Hours</label>
+                        <label class="form-check-label small" for="filterMissingHours">Missing Hours</label>
                     </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" role="switch" id="filterHideLeaveDays" data-bind="checked: filterHideLeaveDays">
-                        <label class="form-check-label" for="filterHideLeaveDays">Hide Leaves</label>
+                    
+                    <div class="dropdown btn-group-sm">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-sliders"></i> View Options
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end p-2" style="min-width: 200px;">
+                            <li class="form-check form-switch mx-2">
+                                <input class="form-check-input" type="checkbox" role="switch" id="filterOnlyToday" data-bind="checked: filterOnlyToday">
+                                <label class="form-check-label small" for="filterOnlyToday">Today Only</label>
+                            </li>
+                            <li class="form-check form-switch mx-2">
+                                <input class="form-check-input" type="checkbox" role="switch" id="filterOnlyCurrentWeek" data-bind="checked: filterOnlyCurrentWeek">
+                                <label class="form-check-label small" for="filterOnlyCurrentWeek">This Week</label>
+                            </li>
+                            <li class="form-check form-switch mx-2">
+                                <input class="form-check-input" type="checkbox" role="switch" id="filterHideLeaveDays" data-bind="checked: filterHideLeaveDays">
+                                <label class="form-check-label small" for="filterHideLeaveDays">Hide Leaves</label>
+                            </li>
+                            <li class="form-check form-switch mx-2">
+                                <input class="form-check-input" type="checkbox" role="switch" id="showWeekends" data-bind="checked: showWeekends">
+                                <label class="form-check-label small" for="showWeekends">Show Weekends</label>
+                            </li>
+                        </ul>
                     </div>
-                    <div class="form-check form-switch" data-bind="visible: isCurrentMonth">
-                        <input class="form-check-input" type="checkbox" role="switch" id="filterOnlyToday" data-bind="checked: filterOnlyToday">
-                        <label class="form-check-label" for="filterOnlyToday">Today Only</label>
-                    </div>
-                    <div class="form-check form-switch" data-bind="visible: isCurrentMonth">
-                        <input class="form-check-input" type="checkbox" role="switch" id="filterOnlyCurrentWeek" data-bind="checked: filterOnlyCurrentWeek">
-                        <label class="form-check-label" for="filterOnlyCurrentWeek">This Week</label>
-                    </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" role="switch" id="showWeekends" data-bind="checked: showWeekends">
-                        <label class="form-check-label" for="showWeekends">Show Weekends</label>
-                    </div>
-                    <button data-bind="click: goToToday, attr: { disabled: loading }" class="btn btn-sm btn-outline-primary" title="Go to Today"><i class="bi bi-calendar-event"></i> Today</button>
+                    <button data-bind="click: goToToday, attr: { disabled: loading }" class="btn btn-sm btn-outline-primary" title="Jump to today's date"><i class="bi bi-calendar-event"></i> Go to Today</button>
                     <button data-bind="click: exportToCsv, attr: { disabled: loading }" class="btn btn-sm btn-outline-success" title="Export visible entries to CSV"><i class="bi bi-file-earmark-spreadsheet"></i> Export</button>
                 </div>
             </div>
