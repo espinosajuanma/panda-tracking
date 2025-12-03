@@ -4,7 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panda Tracking</title>
-    <link id="runtimeAppFavicon" rel="shortcut icon" type="image/png" href="https://storage.googleapis.com/static.slingrs.io/platform/apps/favicon.ico"/>
+    <meta name="robots" content="noindex, nofollow">
+    <link id="runtimeAppFavicon" rel="shortcut icon" type="image/png" href="/img/hourglass-done.png"/>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" />
@@ -32,7 +33,7 @@
         <nav class="navbar navbar-expand-lg mb-4 shadow-sm" data-bind="css: { 'navbar-dark bg-dark': isDarkMode(), 'navbar-light bg-light border-bottom': !isDarkMode() }">
             <div class="container">
                 <a class="navbar-brand fw-bold" href="#">
-                    <img src="https://storage.googleapis.com/static.slingrs.io/platform/apps/favicon.ico" alt="Logo" width="24" height="24" class="d-inline-block align-text-top me-2">
+                    <img src="/img/hourglass-done.png" alt="Logo" width="24" height="24" class="d-inline-block align-text-top me-2">
                     Panda Tracking
                 </a>
                 <div class="d-flex align-items-center">
@@ -106,9 +107,6 @@
                                         <h6>Month Progress</h6>
                                         <div>
                                             <span class="fw-bold" data-bind="text: monthProgress.total"></span>
-                                            <span class="text-warning small ms-1" data-bind="if: monthProgress.missing() > 0">
-                                                (<i class="bi bi-exclamation-triangle-fill"></i> <span data-bind="text: formatMsToDuration(monthProgress.missing())"></span> missing)
-                                            </span>
                                         </div>
                                     </div>
                                     <div style="position: relative; height:150px; width: 150px; margin: auto;">
@@ -134,33 +132,52 @@
                         </div>
                     </div>
                 </div>
+                <!-- ko if: monthProgress.missing() > 0 -->
+                <div class="card-footer alert-warning">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-exclamation-triangle-fill me-3 fs-4 text-warning"></i>
+                        <div>
+                            <h6 class="alert-heading mb-0">Action Needed: <span data-bind="text: formatMsToDuration(monthProgress.missing())"></span> Missing</h6>
+                            <small>You have unlogged hours. Use the "Missing Hours" filter to find them.</small>
+                        </div>
+                    </div>
+                </div>
+                <!-- /ko -->
             </div>
 
             <!-- Filters & Actions Toolbar -->
             <div class="d-md-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-2 mb-md-0">Month entries</h5>
-                <div class="d-flex align-items-center small flex-wrap justify-content-start justify-content-md-end" style="gap: 1rem;">
-                    <div class="form-check form-switch">
+                <div class="d-flex align-items-center flex-wrap justify-content-start justify-content-md-end" style="gap: 0.5rem;">
+                    <div class="form-check form-switch mx-2">
                         <input class="form-check-input" type="checkbox" role="switch" id="filterMissingHours" data-bind="checked: filterMissingHours">
-                        <label class="form-check-label" for="filterMissingHours">Missing Hours</label>
+                        <label class="form-check-label small" for="filterMissingHours">Missing Hours</label>
                     </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" role="switch" id="filterHideLeaveDays" data-bind="checked: filterHideLeaveDays">
-                        <label class="form-check-label" for="filterHideLeaveDays">Hide Leaves</label>
+                    
+                    <div class="dropdown btn-group-sm">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-sliders"></i> View Options
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end p-2" style="min-width: 200px;">
+                            <li class="form-check form-switch mx-2">
+                                <input class="form-check-input" type="checkbox" role="switch" id="filterOnlyToday" data-bind="checked: filterOnlyToday">
+                                <label class="form-check-label small" for="filterOnlyToday">Today Only</label>
+                            </li>
+                            <li class="form-check form-switch mx-2">
+                                <input class="form-check-input" type="checkbox" role="switch" id="filterOnlyCurrentWeek" data-bind="checked: filterOnlyCurrentWeek">
+                                <label class="form-check-label small" for="filterOnlyCurrentWeek">This Week</label>
+                            </li>
+                            <li class="form-check form-switch mx-2">
+                                <input class="form-check-input" type="checkbox" role="switch" id="filterHideLeaveDays" data-bind="checked: filterHideLeaveDays">
+                                <label class="form-check-label small" for="filterHideLeaveDays">Hide Leaves</label>
+                            </li>
+                            <li class="form-check form-switch mx-2">
+                                <input class="form-check-input" type="checkbox" role="switch" id="showWeekends" data-bind="checked: showWeekends">
+                                <label class="form-check-label small" for="showWeekends">Show Weekends</label>
+                            </li>
+                        </ul>
                     </div>
-                    <div class="form-check form-switch" data-bind="visible: isCurrentMonth">
-                        <input class="form-check-input" type="checkbox" role="switch" id="filterOnlyToday" data-bind="checked: filterOnlyToday">
-                        <label class="form-check-label" for="filterOnlyToday">Today Only</label>
-                    </div>
-                    <div class="form-check form-switch" data-bind="visible: isCurrentMonth">
-                        <input class="form-check-input" type="checkbox" role="switch" id="filterOnlyCurrentWeek" data-bind="checked: filterOnlyCurrentWeek">
-                        <label class="form-check-label" for="filterOnlyCurrentWeek">This Week</label>
-                    </div>
-                    <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" role="switch" id="showWeekends" data-bind="checked: showWeekends">
-                        <label class="form-check-label" for="showWeekends">Show Weekends</label>
-                    </div>
-                    <button data-bind="click: goToToday, attr: { disabled: loading }" class="btn btn-sm btn-outline-primary" title="Go to Today"><i class="bi bi-calendar-event"></i> Today</button>
+                    <button data-bind="click: goToToday, attr: { disabled: loading }" class="btn btn-sm btn-outline-primary" title="Jump to today's date"><i class="bi bi-calendar-event"></i> Go to Today</button>
                     <button data-bind="click: exportToCsv, attr: { disabled: loading }" class="btn btn-sm btn-outline-success" title="Export visible entries to CSV"><i class="bi bi-file-earmark-spreadsheet"></i> Export</button>
                 </div>
             </div>
@@ -828,7 +845,7 @@
                 <i class="bi bi-github"></i> Contribute
             </a>
             <span class="mx-2">|</span>
-            <a href="https://slingrhq.slack.com/team/U02B3FSLNLR" target="_blank" class="text-body-secondary">
+            <a href="https://slingrhq.slack.com/archives/C0A11LQ5Z3N" target="_blank" class="text-body-secondary">
                 <i class="bi bi-slack"></i> Contact
             </a>
         </p>
