@@ -1864,6 +1864,12 @@ function Day (date, entries, week) {
         }
     }
 
+    day.fillMissingHours = function() {
+        day.timeSpent(MAX_TIME_SPENT - day.durationMs());
+        day.notes('-');
+        model.openNewEntryModal(day);
+    }
+
     day.isToday = ko.observable(isToday);
     day.isHoliday = ko.observable(isHoliday);
     day.isWeekend = ko.observable(isWeekend);
@@ -2014,7 +2020,7 @@ function Day (date, entries, week) {
     day.durationNonBillable = ko.observable(formatMsToDuration(day.durationNonBillable));
 
     day.isMissingTime = ko.computed(function() {
-        return day.isBussinessDay() && day.durationMs() < MAX_TIME_SPENT;
+        return day.isBussinessDay() && day.durationMs() > 0 && day.durationMs() < MAX_TIME_SPENT;
     });
     day.missingDuration = ko.computed(function() {
         return day.isMissingTime() ? formatMsToDuration(MAX_TIME_SPENT - day.durationMs()) : null;
