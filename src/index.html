@@ -181,15 +181,36 @@
                     <button data-bind="click: exportToCsv, attr: { disabled: loading }" class="btn btn-sm btn-outline-success" title="Export visible entries to CSV"><i class="bi bi-file-earmark-spreadsheet"></i> Export</button>
                 </div>
             </div>
-            <div class="row mb-3 g-2">
-                <div class="col-md-6">
+            <div class="row mb-3 g-3 align-items-end">
+                <div class="col-md-4">
                     <div class="input-group input-group-sm">
                         <span class="input-group-text"><i class="bi bi-search"></i></span>
                         <input type="text" class="form-control" placeholder="Filter by notes (e.g. 'bug, fix, #urgent')" data-bind="textInput: filterByNotes">
                     </div>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-4">
                     <select class="form-select form-select-sm" data-bind="options: projects, optionsText: 'name', optionsValue: 'id', value: filterByProject, optionsCaption: 'All Projects'"></select>
+                </div>
+                <div class="col-md-4">
+                    <div class="d-flex gap-3 justify-content-start justify-content-md-end">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" data-bind="checked: filterByScope.global" id="scopeGlobal">
+                            <label class="form-check-label small" for="scopeGlobal">
+                                Global
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" data-bind="checked: filterByScope.task" id="scopeTask">
+                            <label class="form-check-label small" for="scopeTask">
+                                Task
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" data-bind="checked: filterByScope.supportTicket" id="scopeTicket">
+                            <label class="form-check-label small" for="scopeTicket">
+                                Ticket
+                            </label>
+                    </div>
                 </div>
             </div>
             <!-- DAYS -->

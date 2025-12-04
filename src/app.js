@@ -158,6 +158,11 @@ class ViewModel {
         this.filterOnlyCurrentWeek = ko.observable(false);
         this.filterByNotes = ko.observable('');
         this.filterByProject = ko.observable(null);
+        this.filterByScope = {
+            global: ko.observable(true),
+            task: ko.observable(true),
+            supportTicket: ko.observable(true),
+        };
 
         this.isCurrentMonth = ko.computed(() => {
             const today = new Date();
@@ -1899,27 +1904,30 @@ function Day (date, entries, week) {
     day.filteredEntries = ko.computed(function() {
         let entries = day.entries();
 
+        // Filter by scope
+        const scopeFilters = model.filterByScope;
+        if (!scopeFilters.global() || !scopeFilters.task() || !scopeFilters.supportTicket()) {
+            entries = entries.filter(entry => {
+                const scope = entry.scope(); // 'global', 'task', 'supportTicket'
+                return scopeFilters[scope] && scopeFilters[scope]();
+            });
+        }
+
         // Filter by project
         const projectId = model.filterByProject();
         if (projectId) {
             entries = entries.filter(entry => entry.raw.project.id === projectId);
         }
 
-        // Filter by notes
         const filterText = model.filterByNotes().trim().toLowerCase();
-        if (!filterText) {
-            return entries;
+        if (filterText) {
+            const filterTerms = filterText.split(',').map(term => term.trim()).filter(term => term);
+            entries = entries.filter(entry => {
+                const notes = (entry.notes() || '').toLowerCase();
+                return filterTerms.some(term => notes.includes(term));
+            });
         }
-
-        const filterTerms = filterText.split(',').map(term => term.trim()).filter(term => term);
-        if (filterTerms.length === 0) {
-            return entries;
-        }
-
-        return entries.filter(entry => {
-            const notes = (entry.notes() || '').toLowerCase();
-            return filterTerms.some(term => notes.includes(term));
-        });
+        return entries;
     });
 
     // Set default project if available
