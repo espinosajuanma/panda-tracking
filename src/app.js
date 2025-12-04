@@ -160,6 +160,19 @@ class ViewModel {
         this.filterByProject = ko.observable(null);
         this.filterByScope = {
             global: ko.observable(true),
+        };
+
+        // Default project
+        this.defaultProject = ko.observable(null);
+        this.defaultProject.subscribe(val => {
+            if (val) {
+                localStorage.setItem('solutions:timetracking:defaultProject', val);
+                this.addToast('Default project saved.', 'success');
+            } 
+        });
+
+        this.filterByScope = {
+            global: ko.observable(true),
             task: ko.observable(true),
             supportTicket: ko.observable(true),
         };
@@ -1396,6 +1409,12 @@ class ViewModel {
             _size: 1000,
         });
         this.projects(projects.map(p => ({ id: p.id, name: p.label })));
+
+        // Set default project if it's not set and there is one in localStorage
+        if (!this.defaultProject()) {
+            const storedDefaultProject = localStorage.getItem('solutions:timetracking:defaultProject');
+            if (storedDefaultProject) this.defaultProject(storedDefaultProject);
+        }
  
         const projectChartData = {
             labels: [],
@@ -1938,10 +1957,13 @@ function Day (date, entries, week) {
 
     // Set default project if available
     ko.computed(() => {
-        if (day.project() === null && model.projects().length > 0) {
-            const defaultProject = model.projects().find(p => p.name === 'Collaborative Work Solutions');
-            if (defaultProject) {
-                day.project(defaultProject);
+        if (day.project() === null && model.projects().length > 0 && model.defaultProject()) {
+            const defaultProjectId = model.defaultProject();
+            if (defaultProjectId) {
+                const defaultProject = model.projects().find(p => p.id === defaultProjectId);
+                if (defaultProject) {
+                    day.project(defaultProject);
+                }
             }
         }
     });

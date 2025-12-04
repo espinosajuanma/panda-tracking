@@ -158,7 +158,17 @@
                         <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                             <i class="bi bi-sliders"></i> View Options
                         </button>
-                        <ul class="dropdown-menu dropdown-menu-end p-2" style="min-width: 200px;">
+                        <div class="dropdown-menu dropdown-menu-end p-3" style="min-width: 250px;">
+                            <div class="mb-3">
+                                <label for="defaultProject" class="form-label small">Default Project</label>
+                                <select id="defaultProject" class="form-select form-select-sm" 
+                                        data-bind="options: projects, 
+                                                   optionsText: 'name', 
+                                                   optionsValue: 'id', 
+                                                   value: defaultProject, 
+                                                   optionsCaption: 'Choose...'">
+                                </select>
+                            </div>
                             <li class="form-check form-switch mx-2">
                                 <input class="form-check-input" type="checkbox" role="switch" id="filterOnlyToday" data-bind="checked: filterOnlyToday">
                                 <label class="form-check-label small" for="filterOnlyToday">Today Only</label>
@@ -175,7 +185,7 @@
                                 <input class="form-check-input" type="checkbox" role="switch" id="showWeekends" data-bind="checked: showWeekends">
                                 <label class="form-check-label small" for="showWeekends">Show Weekends</label>
                             </li>
-                        </ul>
+                        </div>
                     </div>
                     <button data-bind="click: goToToday, attr: { disabled: loading }" class="btn btn-sm btn-outline-primary" title="Jump to today's date"><i class="bi bi-calendar-event"></i> Go to Today</button>
                     <button data-bind="click: exportToCsv, attr: { disabled: loading }" class="btn btn-sm btn-outline-success" title="Export visible entries to CSV"><i class="bi bi-file-earmark-spreadsheet"></i> Export</button>
