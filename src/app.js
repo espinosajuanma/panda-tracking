@@ -116,6 +116,14 @@ class ViewModel {
             .finally(e => {
                 this.logginIn(false);
             });
+
+            const storedHours = localStorage.getItem('solutions:timetracking:dailyWorkHours');
+            this.dailyWorkHours = ko.observable(storedHours ? parseInt(storedHours, 10) : 8);
+            // Subscribe to changes so it saves and updates the dashboard automatically
+            this.dailyWorkHours.subscribe(val => {
+                localStorage.setItem('solutions:timetracking:dailyWorkHours', val);
+                this.updateDashboard();
+            });
         }
 
         // Dashboard
@@ -1300,7 +1308,7 @@ class ViewModel {
     }
 
     updateStats = async () => {
-        let totalMonthMs = this.weeks().map(w => w.days()).flat().filter(d => d.isBussinessDay()).length * 8 * 60 * 60 * 1000;
+        let totalMonthMs = this.weeks().map(w => w.days()).flat().filter(d => d.isBussinessDay()).length * this.dailyWorkHours() * 60 * 60 * 1000;
         if (totalMonthMs === 0) totalMonthMs = 1; // Avoid division by zero
         let entries = this.weeks().map(w => w.days()).flat().map(d => d.entries()).flat().filter(e => !e.isTodo());
  
@@ -1684,7 +1692,7 @@ function Week(week, entries) {
 }
 
 function Day (date, entries, week) {
-    const MAX_TIME_SPENT = 8 * 60 * 60 * 1000;
+    const getMaxTimeSpent = () => model.dailyWorkHours() * 60 * 60 * 1000;
     let dateStr = getDateString(date);
     let holiday = model.holidays().find(h => h.day === dateStr);
     let isLeave = model.leaveDays().includes(dateStr);
@@ -1741,7 +1749,7 @@ function Day (date, entries, week) {
         updateTimeSpentInModal: function(amount) {
             let current = this.timeSpent();
             let newValue = current + amount;
-            if (newValue >= 1800000 && newValue <= 28800000) { // 30m to 8h
+            if (newValue >= 1800000 && newValue <= getMaxTimeSpent()) { // 30m to dynamic max
                 this.timeSpent(newValue);
             }
         },
@@ -1749,7 +1757,7 @@ function Day (date, entries, week) {
             const ms = parseDurationToMs(this.time());
             if (ms > 0) {
                 const roundedMs = Math.round(ms / 1800000) * 1800000;
-                const clampedMs = Math.max(1800000, Math.min(roundedMs, 28800000));
+                const clampedMs = Math.max(1800000, Math.min(roundedMs, getMaxTimeSpent()));
                 if (this.timeSpent() !== clampedMs) {
                     this.timeSpent(clampedMs);
                 } else {
@@ -1884,7 +1892,7 @@ function Day (date, entries, week) {
     }
 
     day.fillMissingHours = function() {
-        day.timeSpent(MAX_TIME_SPENT - day.durationMs());
+        day.timeSpent(getMaxTimeSpent() - day.durationMs());
         day.notes('-');
         model.openNewEntryModal(day);
     }
@@ -2042,10 +2050,10 @@ function Day (date, entries, week) {
     day.durationNonBillable = ko.observable(formatMsToDuration(day.durationNonBillable));
 
     day.isMissingTime = ko.computed(function() {
-        return day.isBussinessDay() && day.durationMs() > 0 && day.durationMs() < MAX_TIME_SPENT;
+        return day.isBussinessDay() && day.durationMs() > 0 && day.durationMs() < getMaxTimeSpent();
     });
     day.missingDuration = ko.computed(function() {
-        return day.isMissingTime() ? formatMsToDuration(MAX_TIME_SPENT - day.durationMs()) : null;
+        return day.isMissingTime() ? formatMsToDuration(getMaxTimeSpent() - day.durationMs()) : null;
     });
 
     day.isVisible = ko.computed(function() {
@@ -2094,12 +2102,12 @@ function Day (date, entries, week) {
         if (!day.isBussinessDay() || day.durationMs() <= 0) {
             return 0;
         }
-        const percentage = (day.durationMs() / MAX_TIME_SPENT) * 100;
+        const percentage = (day.durationMs() / getMaxTimeSpent()) * 100;
         return Math.min(percentage, 100);
     });
 
     day.durationClass = ko.computed(function() {
-        const percentage = (day.durationMs() / MAX_TIME_SPENT) * 100;
+        const percentage = (day.durationMs() / getMaxTimeSpent()) * 100;
         if (percentage < 100) return 'bg-warning';
         if (percentage >= 100 && percentage < 110) return 'bg-success';
         return 'bg-danger'; // over 110%
@@ -2183,7 +2191,7 @@ function Entry (entry, day) {
         updateEditTimeSpent: function(amount) {
             let current = this.edit_timeSpent();
             let newValue = current + amount;
-            if (newValue >= 1800000 && newValue <= 28800000) { // 30m to 8h
+            if (newValue >= 1800000 && newValue <= model.dailyWorkHours() * 60 * 60 * 1000) {
                 this.edit_timeSpent(newValue);
             }
         },
@@ -2191,7 +2199,7 @@ function Entry (entry, day) {
             const ms = parseDurationToMs(this.edit_time());
             if (ms > 0) {
                 const roundedMs = Math.round(ms / 1800000) * 1800000;
-                const clampedMs = Math.max(1800000, Math.min(roundedMs, 28800000));
+                const clampedMs = Math.max(1800000, Math.min(roundedMs, model.dailyWorkHours() * 60 * 60 * 1000));
                 if (this.edit_timeSpent() !== clampedMs) {
                     this.edit_timeSpent(clampedMs);
                 } else {

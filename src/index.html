@@ -169,6 +169,13 @@
                                                    optionsCaption: 'Choose...'">
                                 </select>
                             </div>
+                            <div class="mb-3">
+                                <label for="dailyWorkHours" class="form-label small">Daily Work Hours</label>
+                                <select id="dailyWorkHours" class="form-select form-select-sm" data-bind="value: dailyWorkHours">
+                                    <option value="8">8 Hours (Full-time)</option>
+                                    <option value="4">4 Hours (Part-time)</option>
+                                </select>
+                            </div>
                             <li class="form-check form-switch mx-2">
                                 <input class="form-check-input" type="checkbox" role="switch" id="filterOnlyToday" data-bind="checked: filterOnlyToday">
                                 <label class="form-check-label small" for="filterOnlyToday">Today Only</label>
