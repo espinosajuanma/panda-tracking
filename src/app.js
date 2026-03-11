@@ -358,6 +358,9 @@ class ViewModel {
                 this.calendar.set({ selectedTheme: newTheme });
             }
         });
+
+        this.weekDay = ko.observable(new Date().getDay());
+        this.date = ko.observable(new Date().toLocaleDateString('en-US', { dateStyle: "medium" }));
     }
 
     initializeModal = (modalName, elementId, options = {}) => {
