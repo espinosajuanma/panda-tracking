@@ -195,6 +195,7 @@
                         </div>
                     </div>
                     <button data-bind="click: goToToday, attr: { disabled: loading }" class="btn btn-sm btn-outline-primary" title="Jump to today's date"><i class="bi bi-calendar-event"></i> Go to Today</button>
+                    <button class="btn btn-sm btn-outline-warning" type="button" data-bs-toggle="offcanvas" data-bs-target="#todo-list" aria-controls="offcanvasExample"><i class="bi bi-list-check"></i> To Do List</button>
                     <button data-bind="click: exportToCsv, attr: { disabled: loading }" class="btn btn-sm btn-outline-success" title="Export visible entries to CSV"><i class="bi bi-file-earmark-spreadsheet"></i> Export</button>
                 </div>
             </div>
@@ -698,6 +699,43 @@
                         <!-- /ko -->
                     </div>
                 </div>
+            </div>
+        </div>
+
+        <div class="offcanvas offcanvas-end" style="width: 50rem;" tabindex="-1" id="todo-list" aria-labelledby="todoCanvas">
+            <div class="offcanvas-header">
+                <h5 class="offcanvas-title" id="todo-list-canvas">To Do List</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+            </div>
+            <div class="offcanvas-body">
+                <ul class="list-group list-group-flush">
+                <!-- ko foreach: { data: weeks, as: 'week' } -->
+                <!-- ko foreach: { data: week.filteredDays, as: 'day' } -->
+                <!-- ko foreach: filteredEntries() -->
+                    <!-- ko if: isTodo -->
+                    <li data-bind="css: { readOnly: readOnly, 'selected-entry': $data === $root.selectedEntry(), 'todo-entry': isTodo() }, attr: { id: 'entry-' + id() }" class="list-group-item px-0">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <div class="fw-bold">
+                                    <span class="me-2" data-bind="css: scopeClasses"></span>
+                                    <span data-bind="text: project"></span>
+                                </div>
+                                <p style="white-space: pre-wrap;" data-bind="text: notes" class="text-muted small mb-0 mt-1"></p>
+                            </div>
+                            <div class="flex-shrink-0">
+                                <div class="btn-group btn-group-sm">
+                                    <button data-bind="click: confirmTodo" class="btn btn-success" title="Confirm"><i class="bi bi-check-lg me-1"></i></button>
+                                    <button data-bind="click: move" class="btn btn-secondary" title="Reschedule"><i class="bi bi-calendar-event me-1"></i></button>
+                                    <button data-bind="click: remove" class="btn btn-danger" title="Discard"><i class="bi bi-trash me-1"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    <!-- /ko -->
+                <!-- /ko -->
+                <!-- /ko -->
+                <!-- /ko -->
+                </ul>
             </div>
         </div>
 
