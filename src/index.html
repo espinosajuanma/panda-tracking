@@ -32,10 +32,15 @@
     <header>
         <nav class="navbar navbar-expand-lg mb-4 shadow-sm" data-bind="css: { 'navbar-dark bg-dark': isDarkMode(), 'navbar-light bg-light border-bottom': !isDarkMode() }">
             <div class="container">
-                <a class="navbar-brand fw-bold" href="#">
-                    <img src="/img/hourglass-done.png" alt="Logo" width="24" height="24" class="d-inline-block align-text-top me-2">
-                    Panda Tracking
-                </a>
+                <div class="d-flex align-items-center">
+                    <a class="navbar-brand fw-bold" href="#">
+                        <img src="/img/hourglass-done.png" alt="Logo" width="24" height="24" class="d-inline-block align-text-top me-2">
+                        Panda Tracking
+                    </a>
+                    <a style="margin-right: 1rem;" class="btn btn-sm btn-outline-light" href="https://panda-dailies.netlify.app" target="_blank">
+                        📆 Dailies <span class="badge bg-danger badge-sm">New</span>
+                    </a>
+                </div>
                 <div class="d-flex align-items-center">
                     <div class="form-check form-switch me-3" title="Toggle Vim Keybindings">
                         <input class="form-check-input" type="checkbox" role="switch" id="keybindingsSwitch" data-bind="checked: keybindingsEnabled">
@@ -49,6 +54,7 @@
                         <input class="form-check-input" type="checkbox" role="switch" id="themeSwitchNav" data-bind="checked: isDarkMode">
                         <label class="form-check-label" for="themeSwitchNav"><i data-bind="css: isDarkMode() ? 'bi-moon-stars-fill' : 'bi-sun-fill'"></i></label>
                     </div>
+
                     <!-- ko if: logged -->
                     <span class="navbar-text me-3 d-none d-md-inline" data-bind="text: slingr.user?.firstName"></span>
                     <button class="btn btn-sm" data-bind="click: logout, css: { 'btn-outline-light': isDarkMode(), 'btn-outline-dark': !isDarkMode() }">
