@@ -1313,6 +1313,8 @@ class ViewModel {
     updateStats = async () => {
         let totalMonthMs = this.weeks().map(w => w.days()).flat().filter(d => d.isBussinessDay()).length * this.dailyWorkHours() * 60 * 60 * 1000;
         if (totalMonthMs === 0) totalMonthMs = 1; // Avoid division by zero
+        const todayStr = getDateString(new Date());
+        let expectedMtdMs = this.weeks().map(w => w.days()).flat().filter(d => d.isBussinessDay() && d.dateStr() <= todayStr).length * this.dailyWorkHours() * 60 * 60 * 1000;
         let entries = this.weeks().map(w => w.days()).flat().map(d => d.entries()).flat().filter(e => !e.isTodo());
  
         const scopeStats = {
@@ -1322,12 +1324,17 @@ class ViewModel {
         };
  
         let totalTimeSpent = 0;
+        let totalTimeSpentMtd = 0;
         for (const entry of entries) {
             const scope = entry.scope();
             if (scopeStats[scope]) {
                 scopeStats[scope].timeSpent += entry.raw.timeSpent;
             }
             totalTimeSpent += entry.raw.timeSpent;
+
+            if (entry.day.dateStr() <= todayStr) {
+                totalTimeSpentMtd += entry.raw.timeSpent;
+            }
         }
  
         const scopeProgress = [];
@@ -1365,7 +1372,7 @@ class ViewModel {
         this.monthProgress.scopes(scopeProgress);
         this.monthProgress.total(formatMsToDuration(totalTimeSpent));
 
-        const missingMs = totalMonthMs - totalTimeSpent;
+        const missingMs = expectedMtdMs - totalTimeSpentMtd;
         this.monthProgress.missing(missingMs > 0 ? missingMs : 0);
  
         this.updateMonthScopeChart(chartData);
@@ -2053,7 +2060,8 @@ function Day (date, entries, week) {
     day.durationNonBillable = ko.observable(formatMsToDuration(day.durationNonBillable));
 
     day.isMissingTime = ko.computed(function() {
-        return day.isBussinessDay() && day.durationMs() > 0 && day.durationMs() < getMaxTimeSpent();
+        const todayStr = getDateString(new Date());
+        return day.isBussinessDay() && day.dateStr() <= todayStr && day.durationMs() < getMaxTimeSpent();
     });
     day.missingDuration = ko.computed(function() {
         return day.isMissingTime() ? formatMsToDuration(getMaxTimeSpent() - day.durationMs()) : null;
