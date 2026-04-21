@@ -2060,7 +2060,8 @@ function Day (date, entries, week) {
     day.durationNonBillable = ko.observable(formatMsToDuration(day.durationNonBillable));
 
     day.isMissingTime = ko.computed(function() {
-        return day.isBussinessDay() && day.durationMs() > 0 && day.durationMs() < getMaxTimeSpent();
+        const todayStr = getDateString(new Date());
+        return day.isBussinessDay() && day.dateStr() <= todayStr && day.durationMs() < getMaxTimeSpent();
     });
     day.missingDuration = ko.computed(function() {
         return day.isMissingTime() ? formatMsToDuration(getMaxTimeSpent() - day.durationMs()) : null;
