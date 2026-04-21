@@ -1824,6 +1824,7 @@ function Day (date, entries, week) {
             { value: 'released', text: 'Released' }
         ],
         tickets: ko.observableArray([]),
+        onlyAssignedToMe: ko.observable(true),
         toggleLeave: async (day) => {
             const dateStr = day.dateStr();
             model.loading(true);
@@ -2024,6 +2025,13 @@ function Day (date, entries, week) {
                 ...sort,
                 _fields: 'id,label,number',
             };
+            if (day.onlyAssignedToMe()) {
+                if (entity === 'dev.tasks') {
+                    params.assignees = model.slingr.user.id;
+                } else if (entity === 'support.tickets') {
+                    params.assignee = model.slingr.user.id;
+                }
+            }
             if (scope === 'task' && day.taskStatusFilter() !== 'all') {
                 params.status = day.taskStatusFilter();
             }
@@ -2044,6 +2052,11 @@ function Day (date, entries, week) {
         await loadScopeOptions();
     });
     day.taskStatusFilter.subscribe(async () => {
+        await loadScopeOptions();
+    });
+    day.onlyAssignedToMe.subscribe(async () => {
+        day.taskId(null);
+        day.ticketId(null);
         await loadScopeOptions();
     });
 
@@ -2198,6 +2211,7 @@ function Entry (entry, day) {
             { value: 'staging', text: 'Staging' },
             { value: 'released', text: 'Released' }
         ],
+        edit_onlyAssignedToMe: ko.observable(false),
 
         updateEditTimeSpent: function(amount) {
             let current = this.edit_timeSpent();
@@ -2274,6 +2288,13 @@ function Entry (entry, day) {
                 let params = {
                     project: project.id, _size: 1000, ...sort, _fields: 'id,label,number',
                 };
+                if (self.edit_onlyAssignedToMe()) {
+                    if (entity === 'dev.tasks') {
+                        params.assignees = model.slingr.user.id;
+                    } else if (entity === 'support.tickets') {
+                        params.assignee = model.slingr.user.id;
+                    }
+                }
                 if (scope === 'task' && self.edit_taskStatusFilter() !== 'all') {
                     params.status = self.edit_taskStatusFilter();
                 }
@@ -2391,6 +2412,13 @@ function Entry (entry, day) {
     });
     self.edit_taskStatusFilter.subscribe(async () => {
         if (isInitializing) return;
+        await self.loadEditScopeOptions();
+    });
+
+    self.edit_onlyAssignedToMe.subscribe(async () => {
+        if (isInitializing) return;
+        self.edit_taskId(null);
+        self.edit_ticketId(null);
         await self.loadEditScopeOptions();
     });
 
