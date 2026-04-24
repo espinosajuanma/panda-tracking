@@ -91,8 +91,18 @@ class ViewModel {
         this.logged.subscribe(val => {
             if (val) {
                 this.addToast('Logged in');
-                this.initCalendar();
+                setTimeout(() => {
+                    this.initCalendar();
+                }, 50);
             }
+        });
+
+        const storedHours = localStorage.getItem('solutions:timetracking:dailyWorkHours');
+        this.dailyWorkHours = ko.observable(storedHours ? parseInt(storedHours, 10) : 8);
+        // Subscribe to changes so it saves and updates the dashboard automatically
+        this.dailyWorkHours.subscribe(val => {
+            localStorage.setItem('solutions:timetracking:dailyWorkHours', val);
+            this.updateDashboard();
         });
 
         let token = localStorage.getItem('solutions:timetracking:token');
@@ -115,14 +125,6 @@ class ViewModel {
             })
             .finally(e => {
                 this.logginIn(false);
-            });
-
-            const storedHours = localStorage.getItem('solutions:timetracking:dailyWorkHours');
-            this.dailyWorkHours = ko.observable(storedHours ? parseInt(storedHours, 10) : 8);
-            // Subscribe to changes so it saves and updates the dashboard automatically
-            this.dailyWorkHours.subscribe(val => {
-                localStorage.setItem('solutions:timetracking:dailyWorkHours', val);
-                this.updateDashboard();
             });
         }
 
@@ -1243,6 +1245,9 @@ class ViewModel {
             if (e instanceof AuthError) {
                 this.logout();
                 this.addToast('Your session expired. Please log in again.', 'warning');
+            } else {
+                console.error('Error fetching dashboard data:', e);
+                //this.addToast('Failed to load dashboard data. Press Ctrl+R to refresh.', 'error');
             }
         } finally {
             this.loading(false);
