@@ -95,6 +95,12 @@ class ViewModel {
             }
         });
 
+        this.dailyWorkHours = ko.observable(parseInt(localStorage.getItem('solutions:timetracking:dailyWorkHours'), 10) || 8);
+        this.dailyWorkHours.subscribe(val => {
+            localStorage.setItem('solutions:timetracking:dailyWorkHours', val);
+            this.updateDashboard();
+        });
+
         let token = localStorage.getItem('solutions:timetracking:token');
         if (token) {
             console.log('Using token', token);
@@ -117,13 +123,6 @@ class ViewModel {
                 this.logginIn(false);
             });
 
-            const storedHours = localStorage.getItem('solutions:timetracking:dailyWorkHours');
-            this.dailyWorkHours = ko.observable(storedHours ? parseInt(storedHours, 10) : 8);
-            // Subscribe to changes so it saves and updates the dashboard automatically
-            this.dailyWorkHours.subscribe(val => {
-                localStorage.setItem('solutions:timetracking:dailyWorkHours', val);
-                this.updateDashboard();
-            });
         }
 
         // Dashboard
@@ -158,6 +157,12 @@ class ViewModel {
         this.weeks = ko.observableArray([]);
         this.projects = ko.observableArray([]);
         this.showWeekends = ko.observable(false);
+        this.activeView = ko.observable('daily');
+        this.matrixModalTitle = ko.observable('Entries');
+        this.matrixModalEntries = ko.observableArray([]);
+        this.matrixModalDay = ko.observable(null);
+        this.matrixModalProject = ko.observable(null);
+        this.projectDayEntriesModal = null;
 
         // Filters
         this.filterMissingHours = ko.observable(false);
@@ -206,6 +211,57 @@ class ViewModel {
 
         this.visibleDays = ko.computed(() => {
             return this.weeks().map(w => w.days()).flat().filter(d => d.isVisible());
+        });
+
+        this.monthlyMatrixRows = ko.computed(() => {
+            const projects = this.projects();
+            if (!projects.length) {
+                return [];
+            }
+
+            return this.weeks().map(w => w.days()).flat().filter(day => {
+                if (!day.isVisible()) {
+                    return false;
+                }
+
+                const hasActiveFilters = this.filterMissingHours() || this.filterByNotes().trim() || this.filterByProject() || !this.filterByScope.global() || !this.filterByScope.task() || !this.filterByScope.supportTicket();
+                if (!hasActiveFilters) {
+                    return true;
+                }
+
+                return day.filteredEntries().length > 0;
+            }).map(day => {
+                const cells = projects.map(project => {
+                    const matchingEntries = day.filteredEntries().filter(entry => !entry.isTodo() && entry.raw?.project?.id === project.id);
+                    const ms = matchingEntries.reduce((sum, entry) => sum + entry.raw.timeSpent, 0);
+                    return {
+                        project,
+                        value: ms > 0 ? formatMsToHours(ms) : '0h',
+                        ms,
+                        cellClass: this.getMatrixCellClass(ms, day),
+                        tooltip: `${project.name}: ${ms > 0 ? formatMsToHours(ms) : '0h'}`,
+                    };
+                });
+
+                const totalMs = cells.reduce((sum, cell) => sum + cell.ms, 0);
+                const maxMs = this.dailyWorkHours() * 60 * 60 * 1000;
+                const totalProgressVisible = day.isBussinessDay() && totalMs > 0;
+                const totalPercentage = totalProgressVisible ? Math.min((totalMs / maxMs) * 100, 100) : 0;
+                const totalProgressClass = totalMs <= 0 ? '' : totalMs < maxMs ? 'bg-warning' : totalMs === maxMs ? 'bg-success' : 'bg-danger';
+
+                return {
+                    day,
+                    dayLabel: this.formatMatrixDayLabel(day),
+                    cells,
+                    totalMs,
+                    totalLabel: formatMsToHours(totalMs),
+                    totalCellClass: this.getMatrixCellClass(totalMs, day),
+                    totalPercentage,
+                    totalProgressVisible,
+                    totalProgressClass,
+                    rowClass: this.getMatrixRowClass(day),
+                };
+            });
         });
 
         this.keybindingsEnabled.subscribe(val => {
@@ -909,6 +965,81 @@ class ViewModel {
         }
     }
 
+    setView = (view) => {
+        this.activeView(view);
+    }
+
+    getMatrixCellClass = (ms, day) => {
+        if (!day || day.isLeave() || day.isHoliday()) {
+            return 'text-muted';
+        }
+        if (ms <= 0) {
+            return 'text-muted';
+        }
+
+        return 'text-success';
+    }
+
+    getMatrixRowClass = (day) => {
+        if (!day || day.isLeave() || day.isHoliday()) {
+            return 'table-secondary';
+        }
+        if (day.isWeekend()) {
+            return 'table-light';
+        }
+        return '';
+    }
+
+    formatMatrixDayLabel = (day) => {
+        const date = day.date;
+        const weekday = date.toLocaleDateString(undefined, { weekday: 'short' });
+        const dayOfMonth = date.getDate();
+        const ordinal = dayOfMonth % 10 === 1 && dayOfMonth !== 11 ? 'st' : dayOfMonth % 10 === 2 && dayOfMonth !== 12 ? 'nd' : dayOfMonth % 10 === 3 && dayOfMonth !== 13 ? 'rd' : 'th';
+        return `${dayOfMonth}${ordinal} (${weekday})`;
+    }
+
+    openProjectDayEntries = (day, project = null) => {
+        this.matrixModalDay(day);
+        this.matrixModalProject(project);
+
+        const filteredEntries = day.filteredEntries().filter(entry => !entry.isTodo() && (!project || entry.raw?.project?.id === project.id));
+        this.matrixModalEntries(filteredEntries);
+
+        const projectLabel = project ? ` - ${project.name}` : '';
+        this.matrixModalTitle(`${day.title}${projectLabel}`);
+
+        this.projectDayEntriesModal = this.initializeModal('projectDayEntriesModal', 'projectDayEntriesModal');
+        if (this.projectDayEntriesModal) this.projectDayEntriesModal.show();
+    }
+
+    openMatrixDayForEntry = (day, project = null) => {
+        if (project) {
+            const matchedProject = this.projects().find(p => p.id === project.id);
+            if (matchedProject) {
+                day.project(matchedProject);
+            }
+        }
+        this.openNewEntryModal(day);
+    }
+
+    addEntryFromMatrixModal = () => {
+        const day = this.matrixModalDay();
+        if (!day) return;
+
+        const project = this.matrixModalProject();
+        if (project) {
+            const matchedProject = this.projects().find(p => p.id === project.id);
+            if (matchedProject) {
+                day.project(matchedProject);
+            }
+        }
+
+        if (this.projectDayEntriesModal) {
+            this.projectDayEntriesModal.hide();
+        }
+        this.openNewEntryModal(day);
+    }
+
     openNewEntryModal = (day) => {
         this.selectedDayForNewEntry(day);
         const modal = this.initializeModal('newEntryModal', 'newEntryModal');
@@ -1426,7 +1557,11 @@ class ViewModel {
             _sortType: 'asc',
             _size: 1000,
         });
-        this.projects(projects.map(p => ({ id: p.id, name: p.label })));
+        this.projects(projects.map(p => ({
+            id: p.id,
+            name: p.label,
+            shortName: p.label.length > 15 ? `${p.label.slice(0, 15)}…` : p.label,
+        })));
 
         // Set default project if it's not set and there is one in localStorage
         if (!this.defaultProject()) {

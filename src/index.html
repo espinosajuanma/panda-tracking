@@ -29,6 +29,62 @@
     </script>
 </head>
 <body data-bind="attr: { 'data-bs-theme': theme }">
+    <script type="text/html" id="entry-template">
+        <li class="list-group-item px-0" data-bind="css: { readOnly: readOnly, 'selected-entry': $data === $root.selectedEntry(), 'todo-entry': isTodo() }, attr: { id: 'entry-' + id() }">
+            <!-- ko ifnot: isTodo -->
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="fw-bold">
+                        <span class="me-2" data-bind="attr: { title: task }, css: scopeClasses"></span>
+                        <span data-bind="text: project"></span>
+                        <span class="text-muted small" data-bind="text: task, visible: scope() !== 'global'"></span>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center">
+                    <i class="bi bi-stopwatch me-1"></i>
+                    <strong data-bind="text: duration"></strong>
+                </div>
+            </div>
+            <div class="d-flex justify-content-between align-items-start mt-2">
+                <p style="white-space: pre-wrap;" data-bind="html: formattedNotes" class="text-muted small mb-0 me-3"></p>
+                <div data-bind="hidden: readOnly" class="flex-shrink-0">
+                    <div class="btn-group btn-group-sm">
+                        <button data-bind="click: updateTime.bind($data, -1800000)" class="btn btn-outline-secondary" title="Subtract 30m"><i class="bi bi-dash"></i></button>
+                        <button data-bind="click: updateTime.bind($data, 1800000)" class="btn btn-outline-secondary" title="Add 30m"><i class="bi bi-plus"></i></button>
+                        <div class="btn-group" role="group">
+                            <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="More actions"></button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><button class="dropdown-item" data-bind="click: edit"><i class="bi bi-pencil-square me-2"></i>Edit</button></li>
+                                <li><button class="dropdown-item" data-bind="click: copy"><i class="bi bi-copy me-2"></i>Copy</button></li>
+                                <li><button class="dropdown-item" data-bind="click: move"><i class="bi bi-calendar-event me-2"></i>Move</button></li>
+                                <li><button class="dropdown-item text-danger" data-bind="click: remove"><i class="bi bi-trash me-2"></i>Remove</button></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- /ko -->
+            <!-- ko if: isTodo -->
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="fw-bold">
+                        <span class="me-2" data-bind="css: scopeClasses"></span>
+                        <span data-bind="text: project"></span>
+                    </div>
+                    <p style="white-space: pre-wrap;" data-bind="text: notes" class="text-muted small mb-0 mt-1"></p>
+                </div>
+                <div class="flex-shrink-0">
+                    <div class="btn-group btn-group-sm">
+                        <button data-bind="click: confirmTodo" class="btn btn-success" title="Confirm"><i class="bi bi-check-lg me-1"></i></button>
+                        <button data-bind="click: move" class="btn btn-secondary" title="Reschedule"><i class="bi bi-calendar-event me-1"></i></button>
+                        <button data-bind="click: remove" class="btn btn-danger" title="Discard"><i class="bi bi-trash me-1"></i></button>
+                    </div>
+                </div>
+            </div>
+            <!-- /ko -->
+        </li>
+    </script>
+
     <header>
         <nav class="navbar navbar-expand-lg mb-4 shadow-sm" data-bind="css: { 'navbar-dark bg-dark': isDarkMode(), 'navbar-light bg-light border-bottom': !isDarkMode() }">
             <div class="container">
@@ -238,6 +294,16 @@
                     </div>
                 </div>
             </div>
+            <ul class="nav nav-tabs mb-3" role="tablist">
+                <li class="nav-item">
+                    <button class="nav-link" type="button" data-bind="click: setView.bind($data, 'daily'), css: { active: activeView() === 'daily' }">Daily view</button>
+                </li>
+                <li class="nav-item">
+                    <button class="nav-link" type="button" data-bind="click: setView.bind($data, 'matrix'), css: { active: activeView() === 'matrix' }">Project matrix</button>
+                </li>
+            </ul>
+
+            <div data-bind="visible: activeView() === 'daily'">
             <!-- DAYS -->
             <div id="entries">
                 <!-- ko foreach: { data: weeks, as: 'week' } -->
@@ -283,59 +349,7 @@
                             <div class="card-body">
                                 <!-- ENTRIES -->
                                 <ul data-bind="foreach: filteredEntries, visible: filteredEntries().length > 0" class="list-group list-group-flush">
-                                    <li data-bind="css: { readOnly: readOnly, 'selected-entry': $data === $root.selectedEntry(), 'todo-entry': isTodo() }, attr: { id: 'entry-' + id() }" class="list-group-item px-0">
-                                        <!-- ko ifnot: isTodo -->
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <div>
-                                                <div class="fw-bold">
-                                                    <span class="me-2" data-bind="attr: { title: task }, css: scopeClasses"></span>
-                                                    <span data-bind="text: project"></span>
-                                                    <span class="text-muted small" data-bind="text: task, visible: scope() !== 'global'"></span>
-                                                </div>
-                                            </div>
-                                            <div class="d-flex align-items-center">
-                                                <i class="bi bi-stopwatch me-1"></i>
-                                                <strong data-bind="text: duration"></strong>
-                                            </div>
-                                        </div>
-                                        <div class="d-flex justify-content-between align-items-start mt-2">
-                                            <p style="white-space: pre-wrap;" data-bind="html: formattedNotes" class="text-muted small mb-0 me-3"></p>
-                                            <div data-bind="hidden: readOnly" class="flex-shrink-0">
-                                                <div class="btn-group btn-group-sm">
-                                                    <button data-bind="click: updateTime.bind($data, -1800000)" class="btn btn-outline-secondary" title="Subtract 30m"><i class="bi bi-dash"></i></button>
-                                                    <button data-bind="click: updateTime.bind($data, 1800000)" class="btn btn-outline-secondary" title="Add 30m"><i class="bi bi-plus"></i></button>
-                                                    <div class="btn-group" role="group">
-                                                        <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="More actions"></button>
-                                                        <ul class="dropdown-menu dropdown-menu-end">
-                                                            <li><button class="dropdown-item" data-bind="click: edit"><i class="bi bi-pencil-square me-2"></i>Edit</button></li>
-                                                            <li><button class="dropdown-item" data-bind="click: copy"><i class="bi bi-copy me-2"></i>Copy</button></li>
-                                                            <li><button class="dropdown-item" data-bind="click: move"><i class="bi bi-calendar-event me-2"></i>Move</button></li>
-                                                            <li><button class="dropdown-item text-danger" data-bind="click: remove"><i class="bi bi-trash me-2"></i>Remove</button></li>
-                                                        </ul>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <!-- /ko -->
-                                        <!-- ko if: isTodo -->
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <div>
-                                                <div class="fw-bold">
-                                                    <span class="me-2" data-bind="css: scopeClasses"></span>
-                                                    <span data-bind="text: project"></span>
-                                                </div>
-                                                <p style="white-space: pre-wrap;" data-bind="text: notes" class="text-muted small mb-0 mt-1"></p>
-                                            </div>
-                                            <div class="flex-shrink-0">
-                                                <div class="btn-group btn-group-sm">
-                                                    <button data-bind="click: confirmTodo" class="btn btn-success" title="Confirm"><i class="bi bi-check-lg me-1"></i></button>
-                                                    <button data-bind="click: move" class="btn btn-secondary" title="Reschedule"><i class="bi bi-calendar-event me-1"></i></button>
-                                                    <button data-bind="click: remove" class="btn btn-danger" title="Discard"><i class="bi bi-trash me-1"></i></button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <!-- /ko -->
-                                    </li>
+                                    <!-- ko template: { name: 'entry-template', data: $data } --><!-- /ko -->
                                 </ul>
                                 <div data-bind="visible: filteredEntries().length === 0" class="text-center text-muted p-3">No entries yet</div>
                             </div>
@@ -344,6 +358,114 @@
                     </div>
                 </div>
                 <!-- /ko -->
+            </div>
+        </div>
+
+            </div>
+
+            <div data-bind="visible: activeView() === 'matrix'" class="card shadow-sm">
+                <div class="card-body">
+                    <div class="small text-muted mb-3">
+                        <i class="bi bi-info-circle me-2"></i>
+                        Click any project/day cell to inspect its entries. Use the actions column to add a new entry for that day.
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0 monthly-matrix-table">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Day</th>
+                                    <!-- ko foreach: projects -->
+                                    <th scope="col" class="text-center" data-bind="attr: { title: name }, text: shortName"></th>
+                                    <!-- /ko -->
+                                    <th scope="col" class="text-center">Total</th>
+                                    <th scope="col" class="text-nowrap">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <!-- ko foreach: monthlyMatrixRows -->
+                                <tr data-bind="css: rowClass">
+                                    <td class="fw-semibold monthly-matrix-day-cell" data-bind="click: $root.openProjectDayEntries.bind($root, day, null), attr: { title: 'Open entries for ' + dayLabel }">
+                                        <span data-bind="text: dayLabel"></span>
+                                    </td>
+                                    <!-- ko foreach: cells -->
+                                    <td class="text-center align-middle monthly-matrix-cell" data-bind="click: $root.openProjectDayEntries.bind($root, $parent.day, project), css: cellClass, attr: { title: tooltip }">
+                                        <span class="fw-semibold matrix-cell-value" data-bind="text: value"></span>
+                                    </td>
+                                    <!-- /ko -->
+                                    <td class="text-center align-middle monthly-matrix-total-cell" data-bind="css: totalCellClass">
+                                        <!-- ko if: totalProgressVisible -->
+                                        <div class="d-flex align-items-center justify-content-center gap-2">
+                                            <div class="progress monthly-matrix-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" data-bind="attr: { 'aria-valuenow': totalPercentage }">
+                                                <div class="progress-bar" data-bind="style: { width: totalPercentage + '%' }, css: totalProgressClass"></div>
+                                            </div>
+                                            <span class="fw-semibold matrix-cell-value" data-bind="text: totalLabel"></span>
+                                        </div>
+                                        <!-- /ko -->
+                                        <!-- ko ifnot: totalProgressVisible -->
+                                        <span class="fw-semibold matrix-cell-value text-muted" data-bind="text: totalLabel"></span>
+                                        <!-- /ko -->
+                                    </td>
+                                    <td class="text-nowrap monthly-matrix-actions">
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Day actions">
+                                                <i class="bi bi-three-dots-vertical"></i>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end">
+                                                <!-- ko if: day.isMissingTime() -->
+                                                <li>
+                                                    <button class="dropdown-item" type="button" data-bind="click: day.fillMissingHours.bind(day)">
+                                                        <i class="bi bi-battery-charging me-2"></i>Fill missing hours
+                                                    </button>
+                                                </li>
+                                                <!-- /ko -->
+                                                <li>
+                                                    <button class="dropdown-item" type="button" data-bind="click: $root.openNewTodoModal.bind($root, day)">
+                                                        <i class="bi bi-check2-square me-2"></i>New To-Do
+                                                    </button>
+                                                </li>
+                                                <li>
+                                                    <button class="dropdown-item" type="button" data-bind="click: $root.openNewEntryModal.bind($root, day)">
+                                                        <i class="bi bi-plus-lg me-2"></i>New Entry
+                                                    </button>
+                                                </li>
+                                                <li>
+                                                    <button class="dropdown-item" type="button" data-bind="click: day.toggleLeave.bind(day, day)">
+                                                        <i class="bi bi-person-slash me-2" data-bind="css: { 'text-info': day.isLeave(), 'text-muted': !day.isLeave() }"></i>
+                                                        <span data-bind="text: day.isLeave() ? 'Unmark as Leave' : 'Mark as Leave'"></span>
+                                                    </button>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </td>
+                                </tr>
+                                <!-- /ko -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="projectDayEntriesModal" tabindex="-1" aria-labelledby="projectDayEntriesModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-fullscreen-md-down">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="projectDayEntriesModalLabel" data-bind="text: matrixModalTitle"></h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div data-bind="if: matrixModalEntries().length === 0" class="text-muted text-center py-3">
+                            No entries logged for this day/project yet.
+                        </div>
+                        <ul class="list-group list-group-flush" data-bind="foreach: matrixModalEntries">
+                            <!-- ko template: { name: 'entry-template', data: $data } --><!-- /ko -->
+                        </ul>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary" data-bind="click: addEntryFromMatrixModal">Add entry</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -728,24 +850,7 @@
                 <!-- ko foreach: { data: week.filteredDays, as: 'day' } -->
                 <!-- ko foreach: filteredEntries() -->
                     <!-- ko if: isTodo -->
-                    <li data-bind="css: { readOnly: readOnly, 'selected-entry': $data === $root.selectedEntry(), 'todo-entry': isTodo() }, attr: { id: 'entry-' + id() }" class="list-group-item px-0">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <div class="fw-bold">
-                                    <span class="me-2" data-bind="css: scopeClasses"></span>
-                                    <span data-bind="text: project"></span>
-                                </div>
-                                <p style="white-space: pre-wrap;" data-bind="text: notes" class="text-muted small mb-0 mt-1"></p>
-                            </div>
-                            <div class="flex-shrink-0">
-                                <div class="btn-group btn-group-sm">
-                                    <button data-bind="click: confirmTodo" class="btn btn-success" title="Confirm"><i class="bi bi-check-lg me-1"></i></button>
-                                    <button data-bind="click: move" class="btn btn-secondary" title="Reschedule"><i class="bi bi-calendar-event me-1"></i></button>
-                                    <button data-bind="click: remove" class="btn btn-danger" title="Discard"><i class="bi bi-trash me-1"></i></button>
-                                </div>
-                            </div>
-                        </div>
-                    </li>
+                    <!-- ko template: { name: 'entry-template', data: $data } --><!-- /ko -->
                     <!-- /ko -->
                 <!-- /ko -->
                 <!-- /ko -->
