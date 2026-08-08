@@ -75,6 +75,89 @@ main {
     z-index: 99;
 }
 
+.monthly-matrix-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.9rem;
+}
+
+.monthly-matrix-table thead th {
+    border-bottom: 1px solid var(--bs-border-color);
+    color: var(--bs-secondary-color);
+    font-weight: 600;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+    white-space: nowrap;
+}
+
+.monthly-matrix-table tbody td {
+    border-top: 1px solid var(--bs-border-color-translucent);
+    padding: 0.6rem 0.5rem;
+    white-space: nowrap;
+}
+
+.monthly-matrix-table tbody tr:hover {
+    background-color: transparent;
+}
+
+.monthly-matrix-table tbody tr.table-secondary,
+.monthly-matrix-table tbody tr.table-light {
+    background-color: transparent;
+}
+
+.monthly-matrix-cell {
+    cursor: pointer;
+    min-width: 90px;
+    text-align: center;
+    color: var(--bs-secondary-color);
+}
+
+.monthly-matrix-cell:hover .matrix-cell-value {
+    font-weight: 700;
+}
+
+.monthly-matrix-cell.text-success {
+    color: var(--bs-success) !important;
+}
+
+.monthly-matrix-cell.text-muted {
+    color: var(--bs-secondary-color) !important;
+}
+
+.monthly-matrix-day-cell {
+    cursor: pointer;
+}
+
+.monthly-matrix-day-cell:hover {
+    font-weight: 700;
+}
+
+.monthly-matrix-total-cell {
+    min-width: 132px;
+}
+
+.monthly-matrix-actions {
+    width: 3rem;
+}
+
+.monthly-matrix-actions .dropdown-toggle {
+    padding: 0.25rem 0.45rem;
+}
+
+.monthly-matrix-actions .dropdown-menu {
+    min-width: 12rem;
+}
+
+.monthly-matrix-progress {
+    width: 54px;
+    height: 5px;
+    background-color: var(--bs-secondary-bg);
+}
+
+.monthly-matrix-progress .progress-bar {
+    border-radius: 0;
+}
+
 /* Select2 Dark Mode Overrides */
 [data-bs-theme="dark"] .select2-container--bootstrap-5 .select2-selection {
     background-color: var(--bs-body-bg);
