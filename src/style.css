@@ -75,6 +75,14 @@ main {
     z-index: 99;
 }
 
+.filters .form-check.form-switch {
+    padding-left: 0;
+}
+
+.filters .form-check.form-switch .form-check-input {
+    margin-left: 0;
+}
+
 .monthly-matrix-table {
     border-collapse: separate;
     border-spacing: 0;

@@ -156,7 +156,6 @@ class ViewModel {
         // Time Tracking
         this.weeks = ko.observableArray([]);
         this.projects = ko.observableArray([]);
-        this.showWeekends = ko.observable(false);
         this.activeView = ko.observable('daily');
         this.matrixModalTitle = ko.observable('Entries');
         this.matrixModalEntries = ko.observableArray([]);
@@ -167,12 +166,17 @@ class ViewModel {
         // Filters
         this.filterMissingHours = ko.observable(false);
         this.filterHideLeaveDays = ko.observable(true);
-        this.filterOnlyToday = ko.observable(false);
-        this.filterOnlyCurrentWeek = ko.observable(false);
+        this.hideWeekends = ko.observable(JSON.parse(localStorage.getItem('solutions:timetracking:hideWeekends') || 'true'));
+        this.filterHideCompleteDays = ko.observable(JSON.parse(localStorage.getItem('solutions:timetracking:hideCompleteDays') || 'false'));
+        this.viewRange = ko.observable(localStorage.getItem('solutions:timetracking:viewRange') || 'month');
+        this.preferredView = ko.observable(localStorage.getItem('solutions:timetracking:preferredView') || 'daily');
+        this.hiddenProjectIds = ko.observableArray(JSON.parse(localStorage.getItem('solutions:timetracking:hiddenProjects') || '[]'));
         this.filterByNotes = ko.observable('');
         this.filterByProject = ko.observable(null);
         this.filterByScope = {
             global: ko.observable(true),
+            task: ko.observable(true),
+            supportTicket: ko.observable(true),
         };
 
         // Default project
@@ -184,11 +188,23 @@ class ViewModel {
             } 
         });
 
-        this.filterByScope = {
-            global: ko.observable(true),
-            task: ko.observable(true),
-            supportTicket: ko.observable(true),
-        };
+        this.visibleProjects = ko.computed(() => {
+            return this.projects().filter(project => project.isVisible());
+        });
+
+        this.viewRange.subscribe(val => {
+            localStorage.setItem('solutions:timetracking:viewRange', val);
+        });
+        this.preferredView.subscribe(val => {
+            localStorage.setItem('solutions:timetracking:preferredView', val);
+            this.activeView(val);
+        });
+        this.hideWeekends.subscribe(val => {
+            localStorage.setItem('solutions:timetracking:hideWeekends', JSON.stringify(val));
+        });
+        this.filterHideCompleteDays.subscribe(val => {
+            localStorage.setItem('solutions:timetracking:hideCompleteDays', JSON.stringify(val));
+        });
 
         this.isCurrentMonth = ko.computed(() => {
             const today = new Date();
@@ -196,11 +212,15 @@ class ViewModel {
         });
 
         this.isCurrentMonth.subscribe(isCurrent => {
+            if (!isCurrent && (this.viewRange() === 'day' || this.viewRange() === 'week')) {
+                this.viewRange('month');
+            }
             if (!isCurrent) {
-                this.filterOnlyToday(false);
-                this.filterOnlyCurrentWeek(false);
+                this.filterMissingHours(false);
             }
         });
+
+        this.activeView = ko.observable(this.preferredView());
 
         // Keybindings
         const storedKeybindings = localStorage.getItem('solutions:timetracking:keybindingsEnabled');
@@ -214,7 +234,7 @@ class ViewModel {
         });
 
         this.monthlyMatrixRows = ko.computed(() => {
-            const projects = this.projects();
+            const projects = this.visibleProjects();
             if (!projects.length) {
                 return [];
             }
@@ -969,6 +989,29 @@ class ViewModel {
         this.activeView(view);
     }
 
+    setViewRange = (range) => {
+        if (['month', 'week', 'day'].includes(range)) {
+            this.viewRange(range);
+        }
+    }
+
+    showSettingsModal = () => {
+        const modal = this.initializeModal('settingsModal', 'settingsModal');
+        if (modal) modal.show();
+    }
+
+    logToday = async () => {
+        await this.goToToday();
+        const todayDateStr = getDateString(new Date());
+        const allDays = this.weeks().map(w => w.days()).flat();
+        const todayDayObject = allDays.find(d => d.dateStr() === todayDateStr);
+        if (todayDayObject) {
+            this.selectedDay(todayDayObject);
+            this.expandWeekAndScroll(todayDayObject);
+            this.openNewEntryModal(todayDayObject);
+        }
+    }
+
     getMatrixCellClass = (ms, day) => {
         if (!day || day.isLeave() || day.isHoliday()) {
             return 'text-muted';
@@ -1557,11 +1600,38 @@ class ViewModel {
             _sortType: 'asc',
             _size: 1000,
         });
-        this.projects(projects.map(p => ({
-            id: p.id,
-            name: p.label,
-            shortName: p.label.length > 15 ? `${p.label.slice(0, 15)}…` : p.label,
-        })));
+
+        const hiddenIds = this.hiddenProjectIds();
+        const mappedProjects = projects.map(p => {
+            const project = {
+                id: p.id,
+                name: p.label,
+                shortName: p.label.length > 15 ? `${p.label.slice(0, 15)}…` : p.label,
+                isVisible: ko.observable(!hiddenIds.includes(p.id)),
+            };
+
+            project.isVisible.subscribe(isVisible => {
+                const currentHidden = this.hiddenProjectIds().slice();
+                const exists = currentHidden.indexOf(project.id);
+                if (!isVisible && exists === -1) {
+                    currentHidden.push(project.id);
+                }
+                if (isVisible && exists !== -1) {
+                    currentHidden.splice(exists, 1);
+                }
+                this.hiddenProjectIds(currentHidden);
+                localStorage.setItem('solutions:timetracking:hiddenProjects', JSON.stringify(currentHidden));
+
+                if (!isVisible && this.filterByProject() === project.id) {
+                    this.filterByProject(null);
+                }
+                this.updateStats();
+            });
+
+            return project;
+        });
+
+        this.projects(mappedProjects);
 
         // Set default project if it's not set and there is one in localStorage
         if (!this.defaultProject()) {
@@ -1592,7 +1662,8 @@ class ViewModel {
  
         const projectsWithTime = [];
  
-        for (let project of projects) {
+        const visibleProjects = this.visibleProjects();
+        for (let project of visibleProjects) {
             let projectEntries = this.weeks()
                 .map(w => w.days()).flat()
                 .map(d => d.entries()).flat()
@@ -1613,7 +1684,7 @@ class ViewModel {
             }
             
             projectsWithTime.push({
-                name: project.label,
+                name: project.name,
                 stats: projectScopeStats,
                 total: projectScopeStats.global + projectScopeStats.task + projectScopeStats.supportTicket
             });
@@ -2216,11 +2287,14 @@ function Day (date, entries, week) {
     });
 
     day.isVisible = ko.computed(function() {
-        if (model.filterOnlyToday() && !day.isToday()) {
+        const range = model.viewRange();
+        const today = new Date();
+
+        if (range === 'day' && !day.isToday()) {
             return false;
         }
-        if (model.filterOnlyCurrentWeek()) {
-            const today = new Date();
+
+        if (range === 'week') {
             const currentDayOfWeek = today.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
             const firstDayOfWeek = new Date(today);
             // Adjust to Monday
@@ -2235,13 +2309,17 @@ function Day (date, entries, week) {
                 return false;
             }
         }
+
         if (model.filterHideLeaveDays() && day.isLeave()) {
             return false;
         }
         if (model.filterMissingHours() && !day.isMissingTime()) {
             return false;
         }
-        if (!model.showWeekends() && day.isWeekend() && !day.isLeave()) {
+        if (model.hideWeekends() && day.isWeekend() && !day.isLeave()) {
+            return false;
+        }
+        if (model.filterHideCompleteDays() && day.isBussinessDay() && day.durationMs() >= getMaxTimeSpent()) {
             return false;
         }
         return true;

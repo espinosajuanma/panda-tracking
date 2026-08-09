@@ -184,11 +184,15 @@
                                 </div>
                             </div>
                             <div class="col-md-7">
-                                 <div id="projects">
+                                 <div id="projects" data-bind="visible: visibleProjects().length > 0">
                                     <h6 class="mt-2">Projects</h6>
                                     <div style="position: relative; height:200px">
                                         <canvas id="projectHoursChart"></canvas>
                                     </div>
+                                </div>
+                                <div data-bind="visible: visibleProjects().length === 0" class="text-center text-muted py-5">
+                                    <div><i class="bi bi-eye-slash fs-2 mb-2"></i></div>
+                                    <p class="mb-0">No visible projects selected. Show projects in Settings.</p>
                                 </div>
                             </div>
                         </div>
@@ -211,55 +215,45 @@
             <div class="d-md-flex justify-content-between align-items-center mb-3">
                 <h5 class="mb-2 mb-md-0">Month entries</h5>
                 <div class="d-flex align-items-center flex-wrap justify-content-start justify-content-md-end" style="gap: 0.5rem;">
-                    <div class="form-check form-switch mx-2">
-                        <input class="form-check-input" type="checkbox" role="switch" id="filterMissingHours" data-bind="checked: filterMissingHours">
-                        <label class="form-check-label small" for="filterMissingHours">Missing Hours</label>
-                    </div>
-                    
-                    <div class="dropdown btn-group-sm">
-                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                            <i class="bi bi-sliders"></i> View Options
-                        </button>
-                        <div class="dropdown-menu dropdown-menu-end p-3" style="min-width: 250px;">
-                            <div class="mb-3">
-                                <label for="defaultProject" class="form-label small">Default Project</label>
-                                <select id="defaultProject" class="form-select form-select-sm" 
-                                        data-bind="options: projects, 
-                                                   optionsText: 'name', 
-                                                   optionsValue: 'id', 
-                                                   value: defaultProject, 
-                                                   optionsCaption: 'Choose...'">
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <label for="dailyWorkHours" class="form-label small">Daily Work Hours</label>
-                                <select id="dailyWorkHours" class="form-select form-select-sm" data-bind="value: dailyWorkHours">
-                                    <option value="8">8 Hours</option>
-                                    <option value="6">6 Hours</option>
-                                    <option value="4">4 Hours</option>
-                                </select>
-                            </div>
-                            <li class="form-check form-switch mx-2">
-                                <input class="form-check-input" type="checkbox" role="switch" id="filterOnlyToday" data-bind="checked: filterOnlyToday">
-                                <label class="form-check-label small" for="filterOnlyToday">Today Only</label>
-                            </li>
-                            <li class="form-check form-switch mx-2">
-                                <input class="form-check-input" type="checkbox" role="switch" id="filterOnlyCurrentWeek" data-bind="checked: filterOnlyCurrentWeek">
-                                <label class="form-check-label small" for="filterOnlyCurrentWeek">This Week</label>
-                            </li>
-                            <li class="form-check form-switch mx-2">
-                                <input class="form-check-input" type="checkbox" role="switch" id="filterHideLeaveDays" data-bind="checked: filterHideLeaveDays">
-                                <label class="form-check-label small" for="filterHideLeaveDays">Hide Leaves</label>
-                            </li>
-                            <li class="form-check form-switch mx-2">
-                                <input class="form-check-input" type="checkbox" role="switch" id="showWeekends" data-bind="checked: showWeekends">
-                                <label class="form-check-label small" for="showWeekends">Show Weekends</label>
-                            </li>
-                        </div>
-                    </div>
-                    <button data-bind="click: goToToday, attr: { disabled: loading }" class="btn btn-sm btn-outline-primary" title="Jump to today's date"><i class="bi bi-calendar-event"></i> Go to Today</button>
+                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bind="click: showSettingsModal">
+                        <i class="bi bi-sliders"></i> Settings
+                    </button>
+                    <button data-bind="click: logToday, attr: { disabled: loading }" class="btn btn-sm btn-outline-primary" title="Log an entry for today"><i class="bi bi-calendar-event"></i> Log Today</button>
                     <button class="btn btn-sm btn-outline-warning" type="button" data-bs-toggle="offcanvas" data-bs-target="#todo-list" aria-controls="offcanvasExample"><i class="bi bi-list-check"></i> To Do List</button>
                     <button data-bind="click: exportToCsv, attr: { disabled: loading }" class="btn btn-sm btn-outline-success" title="Export visible entries to CSV"><i class="bi bi-file-earmark-spreadsheet"></i> Export</button>
+                </div>
+            </div>
+            <div class="row mb-3 g-3 align-items-end">
+                <div class="col-md-2 d-flex justify-content-md-end">
+                    <div class="dropdown w-100 w-md-auto">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle w-100" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Hide/Show
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end p-3" style="min-width: 240px;">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="filterHideLeaveDays" data-bind="checked: filterHideLeaveDays">
+                                <label class="form-check-label small" for="filterHideLeaveDays">Hide Leaves</label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" id="hideWeekends" data-bind="checked: hideWeekends">
+                                <label class="form-check-label small" for="hideWeekends">Hide Weekends</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="hideCompleteDays" data-bind="checked: filterHideCompleteDays">
+                                <label class="form-check-label small" for="hideCompleteDays">Hide Complete Days</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2" data-bind="visible: isCurrentMonth">
+                    <div class="input-group input-group-sm" style="max-width: 300px;">
+                        <span class="input-group-text small">Current</span>
+                        <select class="form-select form-select-sm" data-bind="value: viewRange">
+                            <option value="month">Month</option>
+                            <option value="week">Week</option>
+                            <option value="day">Day</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             <div class="row mb-3 g-3 align-items-end">
@@ -270,36 +264,36 @@
                     </div>
                 </div>
                 <div class="col-md-4">
-                    <select class="form-select form-select-sm" data-bind="options: projects, optionsText: 'name', optionsValue: 'id', value: filterByProject, optionsCaption: 'All Projects'"></select>
+                    <select class="form-select form-select-sm" data-bind="options: visibleProjects, optionsText: 'name', optionsValue: 'id', value: filterByProject, optionsCaption: 'All Projects'"></select>
                 </div>
-                <div class="col-md-4">
-                    <div class="d-flex gap-3 justify-content-start justify-content-md-end">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" data-bind="checked: filterByScope.global" id="scopeGlobal">
-                            <label class="form-check-label small" for="scopeGlobal">
-                                Global
-                            </label>
+                <div class="col-md-4 d-flex justify-content-md-end">
+                    <div class="dropdown w-100 w-md-auto">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle w-100" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            Scope
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end p-3" style="min-width: 200px;">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" data-bind="checked: filterByScope.global" id="scopeGlobal">
+                                <label class="form-check-label small" for="scopeGlobal">Global</label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" data-bind="checked: filterByScope.task" id="scopeTask">
+                                <label class="form-check-label small" for="scopeTask">Task</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" data-bind="checked: filterByScope.supportTicket" id="scopeTicket">
+                                <label class="form-check-label small" for="scopeTicket">Ticket</label>
+                            </div>
                         </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" data-bind="checked: filterByScope.task" id="scopeTask">
-                            <label class="form-check-label small" for="scopeTask">
-                                Task
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" data-bind="checked: filterByScope.supportTicket" id="scopeTicket">
-                            <label class="form-check-label small" for="scopeTicket">
-                                Ticket
-                            </label>
                     </div>
                 </div>
             </div>
             <ul class="nav nav-tabs mb-3" role="tablist">
                 <li class="nav-item">
-                    <button class="nav-link" type="button" data-bind="click: setView.bind($data, 'daily'), css: { active: activeView() === 'daily' }">Daily view</button>
+                    <button class="nav-link" type="button" data-bind="click: setView.bind($data, 'daily'), css: { active: activeView() === 'daily' }">Details</button>
                 </li>
                 <li class="nav-item">
-                    <button class="nav-link" type="button" data-bind="click: setView.bind($data, 'matrix'), css: { active: activeView() === 'matrix' }">Project matrix</button>
+                    <button class="nav-link" type="button" data-bind="click: setView.bind($data, 'matrix'), css: { active: activeView() === 'matrix' }">Matrix</button>
                 </li>
             </ul>
 
@@ -363,7 +357,7 @@
 
             </div>
 
-            <div data-bind="visible: activeView() === 'matrix'" class="card shadow-sm">
+            <div data-bind="visible: logged() && activeView() === 'matrix'" class="card shadow-sm">
                 <div class="card-body">
                     <div class="small text-muted mb-3">
                         <i class="bi bi-info-circle me-2"></i>
@@ -374,7 +368,7 @@
                             <thead>
                                 <tr>
                                     <th scope="col">Day</th>
-                                    <!-- ko foreach: projects -->
+                                    <!-- ko foreach: visibleProjects -->
                                     <th scope="col" class="text-center" data-bind="attr: { title: name }, text: shortName"></th>
                                     <!-- /ko -->
                                     <th scope="col" class="text-center">Total</th>
@@ -464,6 +458,55 @@
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                         <button type="button" class="btn btn-primary" data-bind="click: addEntryFromMatrixModal">Add entry</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-fullscreen-md-down">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="settingsModalLabel"><i class="bi bi-sliders me-2"></i>Settings</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="defaultProject" class="form-label small">Default Project</label>
+                                <select id="defaultProject" class="form-select form-select-sm" 
+                                        data-bind="options: projects, optionsText: 'name', optionsValue: 'id', value: defaultProject, optionsCaption: 'Choose...'"></select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="dailyWorkHours" class="form-label small">Daily Work Hours</label>
+                                <select id="dailyWorkHours" class="form-select form-select-sm" data-bind="value: dailyWorkHours">
+                                    <option value="8">8 Hours</option>
+                                    <option value="6">6 Hours</option>
+                                    <option value="4">4 Hours</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="preferredView" class="form-label small">Preferred View</label>
+                                <select id="preferredView" class="form-select form-select-sm" data-bind="value: preferredView">
+                                    <option value="daily">Details</option>
+                                    <option value="matrix">Matrix</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small">Project visibility</label>
+                                <div class="list-group list-group-flush">
+                                    <!-- ko foreach: projects -->
+                                    <label class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span data-bind="text: name"></span>
+                                        <input class="form-check-input ms-2" type="checkbox" data-bind="checked: isVisible">
+                                    </label>
+                                    <!-- /ko -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                     </div>
                 </div>
             </div>
@@ -905,7 +948,7 @@
                                         <span><kbd>g</kbd> / <kbd>G</kbd></span>
                                     </li>
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
-                                        Go to Today
+                                        Log Today
                                         <span class="text-end">
                                             <span class="badge bg-secondary-subtle text-secondary-emphasis me-2">Day Mode</span>
                                             <kbd>T</kbd>
