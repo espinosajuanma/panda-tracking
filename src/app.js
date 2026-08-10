@@ -2289,6 +2289,7 @@ function Day (date, entries, week) {
     day.isVisible = ko.computed(function() {
         const range = model.viewRange();
         const today = new Date();
+        const todayStr = getDateString(today);
 
         if (range === 'day' && !day.isToday()) {
             return false;
@@ -2319,8 +2320,13 @@ function Day (date, entries, week) {
         if (model.hideWeekends() && day.isWeekend() && !day.isLeave()) {
             return false;
         }
-        if (model.filterHideCompleteDays() && day.isBussinessDay() && day.durationMs() >= getMaxTimeSpent()) {
-            return false;
+        if (model.filterHideCompleteDays()) {
+            if (day.dateStr() > todayStr) {
+                return false;
+            }
+            if (day.isBussinessDay() && day.durationMs() >= getMaxTimeSpent()) {
+                return false;
+            }
         }
         return true;
     });
