@@ -1056,13 +1056,11 @@ class ViewModel {
     }
 
     openMatrixDayForEntry = (day, project = null) => {
+        let selectedProject = null;
         if (project) {
-            const matchedProject = this.projects().find(p => p.id === project.id);
-            if (matchedProject) {
-                day.project(matchedProject);
-            }
+            selectedProject = this.projects().find(p => p.id === project.id) || null;
         }
-        this.openNewEntryModal(day);
+        this.openNewEntryModal(day, selectedProject);
     }
 
     addEntryFromMatrixModal = () => {
@@ -1070,21 +1068,27 @@ class ViewModel {
         if (!day) return;
 
         const project = this.matrixModalProject();
+        let selectedProject = null;
         if (project) {
-            const matchedProject = this.projects().find(p => p.id === project.id);
-            if (matchedProject) {
-                day.project(matchedProject);
-            }
+            selectedProject = this.projects().find(p => p.id === project.id) || null;
         }
 
         if (this.projectDayEntriesModal) {
             this.projectDayEntriesModal.hide();
         }
-        this.openNewEntryModal(day);
+        this.openNewEntryModal(day, selectedProject);
     }
 
-    openNewEntryModal = (day) => {
+    openNewEntryModal = (day, project = null) => {
         this.selectedDayForNewEntry(day);
+
+        // Prefer an explicit project, then the active filter, then the default.
+        const projectId = project?.id || this.filterByProject() || this.defaultProject();
+        const selectedProject = this.projects().find(project => project.id === projectId);
+        if (day && selectedProject) {
+            day.project(selectedProject);
+        }
+
         const modal = this.initializeModal('newEntryModal', 'newEntryModal');
         if (modal) modal.show();
     }
