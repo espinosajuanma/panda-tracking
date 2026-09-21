@@ -2536,7 +2536,6 @@ function Entry (entry, day) {
             model.loading(true);
             try {
                  const payload = {
-                    project: self.edit_project().id,
                     task: self.edit_scope() === 'task' ? self.edit_taskId() : null,
                     ticket: self.edit_scope() === 'supportTicket' ? self.edit_ticketId() : null,
                     timeSpent: parseInt(self.edit_timeSpent()),
