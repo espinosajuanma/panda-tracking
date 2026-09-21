@@ -233,6 +233,15 @@ class ViewModel {
             return this.weeks().map(w => w.days()).flat().filter(d => d.isVisible());
         });
 
+        this.todoEntries = ko.computed(() => {
+            return this.weeks()
+                .map(week => week.days())
+                .flat()
+                .map(day => day.filteredEntries())
+                .flat()
+                .filter(entry => entry.isTodo());
+        });
+
         this.monthlyMatrixRows = ko.computed(() => {
             const projects = this.visibleProjects();
             if (!projects.length) {
@@ -1009,6 +1018,16 @@ class ViewModel {
             this.selectedDay(todayDayObject);
             this.expandWeekAndScroll(todayDayObject);
             this.openNewEntryModal(todayDayObject);
+        }
+    }
+
+    openNewTodoToday = async () => {
+        await this.goToToday();
+        const todayDateStr = getDateString(new Date());
+        const allDays = this.weeks().map(w => w.days()).flat();
+        const todayDayObject = allDays.find(d => d.dateStr() === todayDateStr);
+        if (todayDayObject) {
+            this.openNewTodoModal(todayDayObject);
         }
     }
 
@@ -2536,7 +2555,6 @@ function Entry (entry, day) {
             model.loading(true);
             try {
                  const payload = {
-                    project: self.edit_project().id,
                     task: self.edit_scope() === 'task' ? self.edit_taskId() : null,
                     ticket: self.edit_scope() === 'supportTicket' ? self.edit_ticketId() : null,
                     timeSpent: parseInt(self.edit_timeSpent()),
