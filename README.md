@@ -18,7 +18,9 @@ This app connects directly to the official Solitions REST API but offers a signi
   - `m` to **Move** an entry to a different day.
   - `n` to create a New entry.
   - `Del` to remove entries.
+  - For today's selected entry in Entry Mode, `s` toggles its timer, `x` stops and logs it, and `d` discards it. Use the entry's More actions menu for previous days.
 - **Smart "To-Do" Hacking**: Create entries with `0ms` duration. They act as a to-do list right inside your calendar. When you are ready, just add time to them.
+- **Entry Timers**: Run timers on multiple logged entries or To-Dos at once. Pause/resume, stop to add elapsed time rounded to the nearest 30 minutes (minimum 30 minutes), or discard a timer without logging its time.
 - **Quick Edits**: Adjust time in 30-minute chunks with one click, or edit descriptions instantly.
 
 ### 📊 Data Hygiene & Stats

@@ -163,6 +163,32 @@ class ViewModel {
         this.matrixModalProject = ko.observable(null);
         this.projectDayEntriesModal = null;
 
+        // Entry timers (kept locally so they continue across page reloads)
+        const storedTimers = (() => {
+            try {
+                const saved = JSON.parse(localStorage.getItem('solutions:timetracking:activeTimer'));
+                const timers = Array.isArray(saved) ? saved : saved ? [{ ...saved, elapsedMs: 0 }] : [];
+                return timers.filter(timer => timer.entryId && (timer.startedAt === null || Number.isFinite(timer.startedAt)) && Number.isFinite(timer.elapsedMs) && timer.elapsedMs >= 0);
+            } catch (e) {
+                return [];
+            }
+        })();
+        this.timerRecords = ko.observableArray(storedTimers);
+        this.timerNow = ko.observable(Date.now());
+        this.timerStopping = ko.observable(false);
+        this.timerPanelMinimized = ko.observable(localStorage.getItem('solutions:timetracking:timerPanelMinimized') === 'true');
+        this.timerTickId = setInterval(() => this.timerNow(Date.now()), 1000);
+        this.timerPanelMinimized.subscribe(minimized => {
+            localStorage.setItem('solutions:timetracking:timerPanelMinimized', JSON.stringify(minimized));
+        });
+        this.timerRecords.subscribe(timers => {
+            if (timers.length) {
+                localStorage.setItem('solutions:timetracking:activeTimer', JSON.stringify(timers));
+            } else {
+                localStorage.removeItem('solutions:timetracking:activeTimer');
+            }
+        });
+
         // Filters
         this.filterMissingHours = ko.observable(false);
         this.filterHideLeaveDays = ko.observable(true);
@@ -614,6 +640,131 @@ class ViewModel {
         this.addToast('Logged out successfully.', 'success');
     }
 
+    getTimerFor = (entryId) => {
+        return this.timerRecords().find(timer => String(timer.entryId) === String(entryId));
+    }
+
+    isTimerRunningFor = (entry) => {
+        const timer = this.getTimerFor(entry.id());
+        return Boolean(timer && timer.startedAt !== null);
+    }
+
+    isTimerPausedFor = (entry) => {
+        const timer = this.getTimerFor(entry.id());
+        return Boolean(timer && timer.startedAt === null);
+    }
+
+    hasTimerFor = (entry) => Boolean(this.getTimerFor(entry.id()));
+
+    getTimerDuration = (timer) => {
+        const now = this.timerNow();
+        const elapsedMs = timer.elapsedMs + (timer.startedAt === null ? 0 : Math.max(0, now - timer.startedAt));
+        return formatElapsedTime(elapsedMs);
+    }
+
+    getEntryTimerLabel = (entry) => {
+        const timer = this.getTimerFor(entry.id());
+        return timer ? this.getTimerDuration(timer) : '';
+    }
+
+    getTimerEntryLabel = (timer) => {
+        const entry = this.weeks()
+            .map(week => week.days())
+            .flat()
+            .flatMap(day => day.entries())
+            .find(item => String(item.id()) === String(timer.entryId));
+        const notes = String(entry ? entry.notes() || '' : timer.notes || '').trim().replace(/\s+/g, ' ');
+        if (!notes) return '(no notes)';
+        return notes.length > 40 ? `${notes.slice(0, 40)}…` : notes;
+    }
+
+    toggleTimerPanelMinimized = () => this.timerPanelMinimized(!this.timerPanelMinimized());
+
+    replaceTimer = (entryId, update) => {
+        this.timerRecords(this.timerRecords().map(timer =>
+            String(timer.entryId) === String(entryId) ? { ...timer, ...update } : timer
+        ));
+    }
+
+    startTimer = (entry) => {
+        if (this.getTimerFor(entry.id())) return;
+        this.toggleTimerById(entry.id(), entry.notes());
+    }
+
+    toggleTimer = (entry) => this.toggleTimerById(entry.id(), entry.notes());
+
+    handleTimerShortcut = (action) => {
+        const entry = this.selectedEntry();
+        if (!entry) return;
+        if (!entry.day.isToday()) {
+            this.addToast('Use More actions to manage timers on previous-day entries.', 'info');
+            return;
+        }
+        action(entry);
+    }
+
+    toggleTimerById = (entryId, notes = '') => {
+        if (this.timerStopping()) return;
+        const timer = this.getTimerFor(entryId);
+        const now = Date.now();
+        if (!timer) {
+            this.timerRecords([...this.timerRecords(), { entryId, notes, startedAt: now, elapsedMs: 0 }]);
+            this.addToast('Timer started.', 'success');
+        } else if (timer.startedAt === null) {
+            this.replaceTimer(entryId, { startedAt: now });
+            this.addToast('Timer resumed.', 'success');
+        } else {
+            const elapsedMs = timer.elapsedMs + Math.max(0, now - timer.startedAt);
+            this.replaceTimer(entryId, { startedAt: null, elapsedMs });
+            this.addToast('Timer paused.', 'info');
+        }
+    }
+
+    discardTimer = (entryId) => {
+        if (this.timerStopping()) return;
+        const timer = this.getTimerFor(entryId);
+        if (!timer) return;
+        this.timerRecords(this.timerRecords().filter(item => String(item.entryId) !== String(entryId)));
+        this.addToast('Timer discarded. No time was added.', 'info');
+    }
+
+    stopTimer = async (entryId) => {
+        const timer = this.getTimerFor(entryId);
+        if (!timer || this.timerStopping()) return;
+
+        this.timerStopping(true);
+        try {
+            const halfHourMs = 30 * 60 * 1000;
+            const elapsedMs = timer.elapsedMs + (timer.startedAt === null ? 0 : Math.max(0, Date.now() - timer.startedAt));
+            const roundedMs = Math.max(halfHourMs, Math.round(elapsedMs / halfHourMs) * halfHourMs);
+            const entry = this.weeks()
+                .map(week => week.days())
+                .flat()
+                .flatMap(day => day.entries())
+                .find(item => String(item.id()) === String(timer.entryId));
+
+            if (entry) {
+                const updated = await entry.updateTime(roundedMs);
+                if (!updated) return;
+            } else {
+                // The user may have navigated away from the entry's month while the timer was running.
+                const currentEntry = await this.slingr.get(`/data/${TIME_TRACKING_ENTITY}/${timer.entryId}`);
+                await this.slingr.put(`/data/${TIME_TRACKING_ENTITY}/${timer.entryId}`, {
+                    ...currentEntry,
+                    timeSpent: (currentEntry.timeSpent || 0) + roundedMs,
+                });
+            }
+
+            this.timerRecords(this.timerRecords().filter(item => String(item.entryId) !== String(timer.entryId)));
+            this.addToast(`Timer stopped. Added ${formatMsToDuration(roundedMs)} to the entry.`, 'success');
+        } catch (e) {
+            console.error('Error stopping timer:', e);
+            this.addToast('Error stopping timer. It is still saved; please try again.', 'error');
+        } finally {
+            this.timerStopping(false);
+        }
+    }
+
     scrollToDay = (day, block = 'center') => {
         if (!day) return;
         const dayElement = document.getElementById(day.dateStr());
@@ -858,7 +1009,7 @@ class ViewModel {
         const entries = currentDay.filteredEntries();
         let currentIndex = entries.indexOf(this.selectedEntry());
 
-        if (entries.length === 0 && ['e', 'r', '+', '-'].includes(e.key)) {
+        if (entries.length === 0 && ['e', 'r', '+', '-', 's', 'x', 'd'].includes(e.key.toLowerCase())) {
             e.preventDefault();
             return; // No entries to act on
         }
@@ -953,6 +1104,27 @@ class ViewModel {
                     this.selectedEntry().edit(this.selectedEntry());
                 }
                 break;
+            case 's':
+                e.preventDefault();
+                this.handleTimerShortcut(entry => this.toggleTimer(entry));
+                break;
+            case 'x':
+                if (e.ctrlKey || e.metaKey) {
+                    e.preventDefault();
+                    if (this.selectedEntry()) {
+                        this.entryForCut(this.selectedEntry());
+                        this.entryForPaste(null);
+                        this.addToast('Entry cut. Press Ctrl+V on a day to paste.', 'success');
+                    }
+                } else {
+                    e.preventDefault();
+                    this.handleTimerShortcut(entry => this.stopTimer(entry.id()));
+                }
+                break;
+            case 'd':
+                e.preventDefault();
+                this.handleTimerShortcut(entry => this.discardTimer(entry.id()));
+                break;
             case 'r':
                 e.preventDefault();
                 if (this.selectedEntry()) {
@@ -966,16 +1138,6 @@ class ViewModel {
                         this.entryForPaste(this.selectedEntry());
                         this.entryForCut(null);
                         this.addToast('Entry copied.', 'success');
-                    }
-                }
-                break;
-            case 'x':
-                if (e.ctrlKey || e.metaKey) {
-                    e.preventDefault();
-                    if (this.selectedEntry()) {
-                        this.entryForCut(this.selectedEntry());
-                        this.entryForPaste(null);
-                        this.addToast('Entry cut. Press Ctrl+V on a day to paste.', 'success');
                     }
                 }
                 break;
@@ -2423,11 +2585,14 @@ function Entry (entry, day) {
                 day.durationBillable(formatMsToDuration(day.durationBillableMs()));
 
                 await model.updateStats();
+                return true;
             } catch (e) {
                 console.error(e);
                 model.addToast('Error updating time entry.', 'error');
+                return false;
+            } finally {
+                model.loading(false);
             }
-            model.loading(false);
         },
         notes: ko.observable(entry.notes),
         day: day,
@@ -2767,6 +2932,14 @@ function getMsFromHours(hours) {
     return hours * 1000 * 60 * 60;
 }
 
+function formatElapsedTime(ms) {
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
 const model = new ViewModel();
 
 // A custom binding for select2
@@ -2817,7 +2990,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (backToTopBtn) {
         const scrollFunction = () => {
             if (document.body.scrollTop > 100 || document.documentElement.scrollTop > 100) {
-                backToTopBtn.style.display = "block";
+                backToTopBtn.style.display = "flex";
             } else {
                 backToTopBtn.style.display = "none";
             }
