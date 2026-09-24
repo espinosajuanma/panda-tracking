@@ -43,21 +43,38 @@
                 <div class="d-flex align-items-center">
                     <i class="bi bi-stopwatch me-1"></i>
                     <strong data-bind="text: duration"></strong>
+                    <span class="badge ms-2" data-bind="visible: $root.hasTimerFor($data), css: { 'text-bg-warning': $root.isTimerRunningFor($data), 'text-bg-secondary': $root.isTimerPausedFor($data) }, text: $root.getEntryTimerLabel($data)"></span>
                 </div>
             </div>
             <div class="d-flex justify-content-between align-items-start mt-2">
                 <p style="white-space: pre-wrap;" data-bind="html: formattedNotes" class="text-muted small mb-0 me-3"></p>
                 <div data-bind="hidden: readOnly" class="flex-shrink-0">
                     <div class="btn-group btn-group-sm">
-                        <button data-bind="click: updateTime.bind($data, -1800000)" class="btn btn-outline-secondary" title="Subtract 30m"><i class="bi bi-dash"></i></button>
-                        <button data-bind="click: updateTime.bind($data, 1800000)" class="btn btn-outline-secondary" title="Add 30m"><i class="bi bi-plus"></i></button>
+                        <button data-bind="click: $root.startTimer.bind($root, $data), visible: day.isToday() && !$root.hasTimerFor($data), attr: { disabled: $root.timerStopping() }" class="btn btn-outline-success" type="button" title="Start timer">
+                            <i class="bi bi-play-fill"></i>
+                        </button>
+                        <button data-bind="click: updateTime.bind($data, -1800000)" class="btn btn-secondary" title="Subtract 30m"><i class="bi bi-dash"></i></button>
+                        <button data-bind="click: updateTime.bind($data, 1800000)" class="btn btn-secondary" title="Add 30m"><i class="bi bi-plus"></i></button>
                         <div class="btn-group" role="group">
-                            <button type="button" class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="More actions"></button>
+                            <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="More actions"></button>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li><button class="dropdown-item" data-bind="click: edit"><i class="bi bi-pencil-square me-2"></i>Edit</button></li>
                                 <li><button class="dropdown-item" data-bind="click: copy"><i class="bi bi-copy me-2"></i>Copy</button></li>
                                 <li><button class="dropdown-item" data-bind="click: move"><i class="bi bi-calendar-event me-2"></i>Move</button></li>
                                 <li><button class="dropdown-item text-danger" data-bind="click: remove"><i class="bi bi-trash me-2"></i>Remove</button></li>
+                                <li data-bind="visible: !day.isToday()"><hr class="dropdown-divider"></li>
+                                <li data-bind="visible: !day.isToday()">
+                                    <button class="dropdown-item" data-bind="click: $root.toggleTimer.bind($root, $data), attr: { disabled: $root.timerStopping() }">
+                                        <i class="bi me-2" data-bind="css: { 'bi-pause-fill': $root.isTimerRunningFor($data), 'bi-play-fill': !$root.isTimerRunningFor($data) }"></i>
+                                        <span data-bind="text: $root.isTimerRunningFor($data) ? 'Pause timer' : $root.isTimerPausedFor($data) ? 'Resume timer' : 'Start timer'"></span>
+                                    </button>
+                                </li>
+                                <li data-bind="visible: !day.isToday() && $root.hasTimerFor($data)">
+                                    <button class="dropdown-item" data-bind="click: $root.stopTimer.bind($root, id()), attr: { disabled: $root.timerStopping() }"><i class="bi bi-stop-fill me-2"></i>Stop timer and log</button>
+                                </li>
+                                <li data-bind="visible: !day.isToday() && $root.hasTimerFor($data)">
+                                    <button class="dropdown-item" data-bind="click: $root.discardTimer.bind($root, id()), attr: { disabled: $root.timerStopping() }"><i class="bi bi-x-circle me-2"></i>Discard timer</button>
+                                </li>
                             </ul>
                         </div>
                     </div>
@@ -65,7 +82,7 @@
             </div>
             <!-- /ko -->
             <!-- ko if: isTodo -->
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex justify-content-between align-items-start">
                 <div>
                     <div class="fw-bold">
                         <span class="me-2" data-bind="css: scopeClasses"></span>
@@ -73,12 +90,33 @@
                     </div>
                     <p style="white-space: pre-wrap;" data-bind="text: notes" class="text-muted small mb-0 mt-1"></p>
                 </div>
-                <div class="flex-shrink-0">
+                <div class="flex-shrink-0 text-end">
+                    <span class="badge d-block mb-1 ms-auto" style="width: fit-content;" data-bind="visible: $root.hasTimerFor($data), css: { 'text-bg-warning': $root.isTimerRunningFor($data), 'text-bg-secondary': $root.isTimerPausedFor($data) }, text: $root.getEntryTimerLabel($data)"></span>
                     <div class="btn-group btn-group-sm">
+                        <button data-bind="click: $root.startTimer.bind($root, $data), visible: day.isToday() && !$root.hasTimerFor($data), attr: { disabled: $root.timerStopping() }" class="btn btn-outline-success" type="button" title="Start timer">
+                            <i class="bi bi-play-fill"></i>
+                        </button>
                         <button data-bind="click: confirmTodo" class="btn btn-success" title="Confirm"><i class="bi bi-check-lg me-1"></i></button>
-                        <button data-bind="click: edit" class="btn btn-outline-secondary" title="Edit"><i class="bi bi-pencil-square"></i></button>
+                        <button data-bind="click: edit" class="btn btn-secondary" title="Edit"><i class="bi bi-pencil-square"></i></button>
                         <button data-bind="click: move" class="btn btn-secondary" title="Reschedule"><i class="bi bi-calendar-event me-1"></i></button>
                         <button data-bind="click: remove" class="btn btn-danger" title="Discard"><i class="bi bi-trash me-1"></i></button>
+                        <div class="btn-group" role="group" data-bind="visible: !day.isToday()">
+                            <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="More actions"></button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                    <button class="dropdown-item" data-bind="click: $root.toggleTimer.bind($root, $data), attr: { disabled: $root.timerStopping() }">
+                                        <i class="bi me-2" data-bind="css: { 'bi-pause-fill': $root.isTimerRunningFor($data), 'bi-play-fill': !$root.isTimerRunningFor($data) }"></i>
+                                        <span data-bind="text: $root.isTimerRunningFor($data) ? 'Pause timer' : $root.isTimerPausedFor($data) ? 'Resume timer' : 'Start timer'"></span>
+                                    </button>
+                                </li>
+                                <li data-bind="visible: $root.hasTimerFor($data)">
+                                    <button class="dropdown-item" data-bind="click: $root.stopTimer.bind($root, id()), attr: { disabled: $root.timerStopping() }"><i class="bi bi-stop-fill me-2"></i>Stop timer and log</button>
+                                </li>
+                                <li data-bind="visible: $root.hasTimerFor($data)">
+                                    <button class="dropdown-item" data-bind="click: $root.discardTimer.bind($root, id()), attr: { disabled: $root.timerStopping() }"><i class="bi bi-x-circle me-2"></i>Discard timer</button>
+                                </li>
+                            </ul>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -122,6 +160,34 @@
             </div>
         </nav>
     </header>
+
+    <aside class="timer-floating-panel card shadow" aria-label="Entry timers" data-bind="visible: logged() && timerRecords().length > 0">
+        <div class="card-header d-flex justify-content-between align-items-center py-2">
+            <strong><i class="bi bi-stopwatch me-2"></i>Timers</strong>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge text-bg-secondary" data-bind="text: timerRecords().length"></span>
+                <button type="button" class="btn btn-sm btn-outline-secondary py-0" data-bind="click: toggleTimerPanelMinimized, attr: { title: timerPanelMinimized() ? 'Expand timers' : 'Minimize timers', 'aria-expanded': !timerPanelMinimized() }" aria-label="Minimize timers">
+                    <i class="bi" data-bind="css: timerPanelMinimized() ? 'bi-chevron-up' : 'bi-dash-lg'"></i>
+                </button>
+            </div>
+        </div>
+        <ul class="list-group list-group-flush overflow-auto" data-bind="foreach: timerRecords, visible: !timerPanelMinimized()">
+            <li class="list-group-item d-flex align-items-center justify-content-between gap-2 py-2">
+                <div class="text-truncate me-2">
+                    <div class="small text-truncate" data-bind="text: $root.getTimerEntryLabel($data), attr: { title: $root.getTimerEntryLabel($data) }"></div>
+                    <code data-bind="text: $root.getTimerDuration($data)"></code>
+                    <span class="badge ms-1" data-bind="text: startedAt === null ? 'Paused' : 'Running', css: { 'text-bg-secondary': startedAt === null, 'text-bg-warning': startedAt !== null }"></span>
+                </div>
+                <div class="btn-group btn-group-sm flex-shrink-0">
+                    <button class="btn" type="button" data-bind="click: $root.toggleTimerById.bind($root, entryId), css: { 'btn-outline-primary': startedAt !== null, 'btn-outline-success': startedAt === null }, attr: { disabled: $root.timerStopping(), title: startedAt === null ? 'Resume timer' : 'Pause timer' }">
+                        <i class="bi" data-bind="css: startedAt === null ? 'bi-play-fill' : 'bi-pause-fill'"></i>
+                    </button>
+                    <button class="btn btn-outline-danger" type="button" title="Stop timer and add time" data-bind="click: $root.stopTimer.bind($root, entryId), attr: { disabled: $root.timerStopping() }"><i class="bi bi-stop-fill"></i></button>
+                    <button class="btn btn-outline-secondary" type="button" title="Discard timer without adding time" data-bind="click: $root.discardTimer.bind($root, entryId), attr: { disabled: $root.timerStopping() }"><i class="bi bi-x-circle"></i></button>
+                </div>
+            </li>
+        </ul>
+    </aside>
 
     <main class="container pb-5">
 
@@ -571,12 +637,12 @@
                             <div class="col-lg-4">
                                 <label class="form-label"><i class="bi bi-stopwatch"></i> Duration <span class="text-danger">*</span></label>
                                 <div class="input-group">
-                                    <button class="btn btn-outline-secondary" type="button" data-bind="click: updateTimeSpentInModal.bind($data, -1800000), attr: { disabled: $root.loading() }">
+                                    <button class="btn btn-secondary" type="button" data-bind="click: updateTimeSpentInModal.bind($data, -1800000), attr: { disabled: $root.loading() }">
                                         <span class="d-none d-sm-inline">-30m</span>
                                         <span class="d-inline d-sm-none">-</span>
                                     </button>
                                     <input type="text" class="form-control text-center fw-bold" data-bind="value: time, event: { change: updateTimeFromInput }, attr: { disabled: $root.loading() }">
-                                    <button class="btn btn-outline-secondary" type="button" data-bind="click: updateTimeSpentInModal.bind($data, 1800000), attr: { disabled: $root.loading() }">
+                                    <button class="btn btn-secondary" type="button" data-bind="click: updateTimeSpentInModal.bind($data, 1800000), attr: { disabled: $root.loading() }">
                                         <span class="d-none d-sm-inline">+30m</span>
                                         <span class="d-inline d-sm-none">+</span>
                                     </button>
@@ -677,12 +743,12 @@
                             <div class="col-lg-4">
                                 <label class="form-label"><i class="bi bi-stopwatch"></i> Duration <span class="text-danger">*</span></label>
                                 <div class="input-group">
-                                    <button class="btn btn-outline-secondary" type="button" data-bind="click: updateEditTimeSpent.bind($data, -1800000), attr: { disabled: $root.loading() }">
+                                    <button class="btn btn-secondary" type="button" data-bind="click: updateEditTimeSpent.bind($data, -1800000), attr: { disabled: $root.loading() }">
                                         <span class="d-none d-sm-inline">-30m</span>
                                         <span class="d-inline d-sm-none">-</span>
                                     </button>
                                     <input type="text" class="form-control text-center fw-bold" data-bind="value: edit_time, event: { change: updateEditTimeFromInput }, attr: { disabled: $root.loading() }">
-                                    <button class="btn btn-outline-secondary" type="button" data-bind="click: updateEditTimeSpent.bind($data, 1800000), attr: { disabled: $root.loading() }">
+                                    <button class="btn btn-secondary" type="button" data-bind="click: updateEditTimeSpent.bind($data, 1800000), attr: { disabled: $root.loading() }">
                                         <span class="d-none d-sm-inline">+30m</span>
                                         <span class="d-inline d-sm-none">+</span>
                                     </button>
@@ -998,6 +1064,27 @@
                                         </span>
                                     </li>
                                     <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Start / Pause / Resume Selected Timer
+                                        <span class="text-end">
+                                            <span class="badge bg-secondary-subtle text-secondary-emphasis me-2">Entry Mode · Today</span>
+                                            <kbd>s</kbd>
+                                        </span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Stop Selected Timer and Log Time
+                                        <span class="text-end">
+                                            <span class="badge bg-secondary-subtle text-secondary-emphasis me-2">Entry Mode · Today</span>
+                                            <kbd>x</kbd>
+                                        </span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Discard Selected Timer
+                                        <span class="text-end">
+                                            <span class="badge bg-secondary-subtle text-secondary-emphasis me-2">Entry Mode · Today</span>
+                                            <kbd>d</kbd>
+                                        </span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
                                         Adjust Entry Time (+/- 30m)
                                         <span class="text-end">
                                             <span class="badge bg-secondary-subtle text-secondary-emphasis me-2">Entry Mode</span>
@@ -1075,7 +1162,7 @@
     </main>
 
     <button type="button" class="btn btn-primary rounded-circle shadow-lg" id="back-to-top-btn" title="Back to top">
-        <i class="bi bi-arrow-up fs-4"></i>
+        <i class="bi bi-arrow-up fs-5"></i>
     </button>
 
     <footer class="text-center text-body-secondary py-3 mt-5 border-top">
@@ -1093,7 +1180,7 @@
     </footer>
 
     <!-- Toasts -->
-    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1090">
         <!-- ko foreach: toasts -->
         <div class="toast" role="alert" aria-live="assertive" aria-atomic="true" data-bind="attr: { id: id }">
             <div class="toast-header">

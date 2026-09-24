@@ -2,31 +2,21 @@
     --bs-body-bg: rgb(15 23 42);
 }
 
-[data-bs-theme="dark"] button.btn-outline-secondary {
-    --bs-btn-color: #fff;
-    --bs-btn-bg: var(--bs-secondary);
-    --bs-btn-border-color: var(--bs-secondary);
-    --bs-btn-hover-color: #fff;
-    --bs-btn-hover-bg: #5c636a;
-    --bs-btn-hover-border-color: #565e64;
-    --bs-btn-active-color: #fff;
-    --bs-btn-active-bg: #565e64;
-    --bs-btn-active-border-color: #51585e;
-}
-[data-bs-theme="dark"] button.btn-outline-danger {
-    --bs-btn-color: #fff;
-    --bs-btn-bg: var(--bs-danger);
-    --bs-btn-border-color: var(--bs-danger);
-    --bs-btn-hover-color: #fff;
-    --bs-btn-hover-bg: #bb2d3b;
-    --bs-btn-hover-border-color: #b02a37;
-    --bs-btn-active-color: #fff;
-    --bs-btn-active-bg: #b02a37;
-    --bs-btn-active-border-color: #a52834;
-}
-
 main {
     min-height: calc(100vh - 120px); /* Adjust based on header/footer height */
+}
+
+.timer-floating-panel {
+    position: fixed;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 1040;
+    width: min(360px, calc(100vw - 2rem));
+    max-height: min(55vh, 420px);
+}
+
+.timer-floating-panel .list-group {
+    min-height: 0;
 }
 
 #login {
@@ -69,9 +59,14 @@ main {
 
 #back-to-top-btn {
     position: fixed;
-    bottom: 20px;
-    right: 30px;
+    bottom: 3.5rem;
+    left: 1rem;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
     display: none;
+    align-items: center;
+    justify-content: center;
     z-index: 99;
 }
 
