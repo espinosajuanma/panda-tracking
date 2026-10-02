@@ -2948,10 +2948,11 @@ function Day (date, entries, week) {
     });
 
     day.durationClass = ko.computed(function() {
-        const percentage = (day.durationMs() / getMaxTimeSpent()) * 100;
-        if (percentage < 100) return 'bg-warning';
-        if (percentage >= 100 && percentage < 110) return 'bg-success';
-        return 'bg-danger'; // over 110%
+        const durationMs = day.durationMs();
+        const maxTimeSpent = getMaxTimeSpent();
+        if (durationMs < maxTimeSpent) return 'bg-warning';
+        if (durationMs === maxTimeSpent) return 'bg-success';
+        return 'bg-danger';
     });
 
     return day;
