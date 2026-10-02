@@ -34,8 +34,14 @@ main {
 }
 
 .loading {
-    opacity: .5;
+    opacity: 1;
     pointer-events: none;
+}
+
+.filter-chip-close {
+    width: 0.55rem;
+    height: 0.55rem;
+    padding: 0.25rem;
 }
 
 .selected-day {
@@ -103,16 +109,46 @@ main {
     background-color: transparent;
 }
 
-.monthly-matrix-table tbody tr.table-secondary,
-.monthly-matrix-table tbody tr.table-light {
-    background-color: transparent;
+.monthly-matrix-table tbody tr.matrix-non-working-day > * {
+    --bs-table-bg: var(--bs-tertiary-bg);
+    --bs-table-bg-state: var(--bs-tertiary-bg);
+    background-color: var(--bs-tertiary-bg);
+    color: var(--bs-secondary-color);
+}
+
+.monthly-matrix-table tbody tr.matrix-non-working-day > :first-child {
+    border-inline-start: 3px solid var(--bs-info);
+}
+
+.monthly-matrix-table tbody tr.matrix-non-working-day .matrix-day-status {
+    vertical-align: middle;
+}
+
+.monthly-matrix-table tbody tr.matrix-non-working-day .monthly-matrix-cell-button {
+    opacity: 0.85;
 }
 
 .monthly-matrix-cell {
-    cursor: pointer;
     min-width: 90px;
     text-align: center;
     color: var(--bs-secondary-color);
+}
+
+.monthly-matrix-cell-button {
+    min-width: 100%;
+    color: inherit;
+    text-decoration: none;
+}
+
+.monthly-matrix-cell-button:hover {
+    color: inherit;
+    font-weight: 700;
+}
+
+.monthly-matrix-cell-button:focus-visible,
+.monthly-matrix-day-cell .btn:focus-visible {
+    outline: 3px solid var(--bs-primary);
+    outline-offset: 2px;
 }
 
 .monthly-matrix-cell:hover .matrix-cell-value {
@@ -128,7 +164,7 @@ main {
 }
 
 .monthly-matrix-day-cell {
-    cursor: pointer;
+    min-width: 132px;
 }
 
 .monthly-matrix-day-cell:hover {
@@ -197,6 +233,50 @@ main {
 
 .daily-progress:hover .daily-progress-scopes {
     display: flex;
+}
+
+@media (max-width: 575.98px) {
+    header .navbar > .container {
+        justify-content: center;
+        row-gap: 0.5rem;
+    }
+
+    header .navbar > .container > .d-flex:first-child,
+    header .navbar > .container > .d-flex:last-child {
+        justify-content: center;
+        width: 100%;
+    }
+
+    header .navbar > .container > .d-flex:last-child {
+        flex-wrap: wrap;
+    }
+
+    .timer-floating-panel {
+        right: 0.5rem;
+        bottom: 3rem;
+        width: calc(100vw - 1rem);
+        max-height: min(38vh, 320px);
+    }
+
+    #stats {
+        padding: 0;
+    }
+
+    .navigation-mode-indicator {
+        bottom: 0.5rem;
+        left: 0.5rem;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
 }
 
 /* Select2 Dark Mode Overrides */
