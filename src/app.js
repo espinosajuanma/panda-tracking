@@ -88,6 +88,17 @@ class ViewModel {
         this.pass = ko.observable(null);
         this.logginIn = ko.observable(false);
         this.logged = ko.observable(false);
+        this.dashboardLoading = ko.observable(false);
+        this.dashboardRefreshSequence = 0;
+        this.dashboardRefreshPromise = null;
+        this.dashboardRefreshPending = false;
+        this.dashboardHasLoaded = ko.observable(false);
+        this.statsWarning = ko.observable('');
+        this.holidayWarning = ko.observable('');
+        this.lastUpdatedAt = ko.observable(null);
+        this.lastUpdatedLabel = ko.computed(() => this.lastUpdatedAt()
+            ? `Updated ${this.lastUpdatedAt().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+            : 'Not yet updated');
         this.logged.subscribe(val => {
             if (val) {
                 this.addToast('Logged in');
@@ -98,26 +109,29 @@ class ViewModel {
         this.dailyWorkHours = ko.observable(parseInt(localStorage.getItem('solutions:timetracking:dailyWorkHours'), 10) || 8);
         this.dailyWorkHours.subscribe(val => {
             localStorage.setItem('solutions:timetracking:dailyWorkHours', val);
-            this.updateDashboard();
+            if (this.logged()) this.updateDashboard();
         });
 
         let token = localStorage.getItem('solutions:timetracking:token');
         if (token) {
-            console.log('Using token', token);
             this.slingr.token = token;
             this.logginIn(true);
             this.slingr.getCurrentUser()
             .then(user => {
-                console.log('Logged in as', user);
                 this.logged(true);
                 localStorage.setItem('solutions:timetracking:token', this.slingr.token);
             })
             .catch(e => {
-                console.warn('Invalid token', e);
-                this.slingr.token = null;
-                localStorage.removeItem('solutions:timetracking:token');
                 this.logged(false);
-                this.addToast('Invalid token or expired', 'error');
+                if (e instanceof AuthError) {
+                    console.warn('Saved session is no longer valid:', e);
+                    this.slingr.token = null;
+                    localStorage.removeItem('solutions:timetracking:token');
+                    this.addToast('Your saved session expired. Please sign in again.', 'warning');
+                } else {
+                    console.warn('Could not verify saved session:', e);
+                    this.addToast('Could not reach Solutions. Your saved session is kept; check your connection and retry.', 'error');
+                }
             })
             .finally(e => {
                 this.logginIn(false);
@@ -138,7 +152,10 @@ class ViewModel {
                     setTimeout(() => {
                         const toastEl = document.getElementById(toastData.id);
                         if (toastEl) {
-                            const toast = new bootstrap.Toast(toastEl);
+                            const toast = new bootstrap.Toast(toastEl, {
+                                autohide: !toastData.error,
+                                delay: toastData.error ? 10000 : 5000,
+                            });
                             toast.show();
                             toastEl.addEventListener('hidden.bs.toast', () => {
                                 this.toasts.remove(toastData);
@@ -150,8 +167,21 @@ class ViewModel {
         }, null, 'arrayChange');
         // Calendar
         this.holidays = ko.observableArray([]);
+        this.holidayCache = new Map();
+        this.holidayFetches = new Map();
+        this.holidaySettingsVersion = 0;
+        this.argentinaHolidaysEnabled = ko.observable(localStorage.getItem('solutions:timetracking:argentinaHolidaysEnabled') !== 'false');
+        this.argentinaHolidaysEnabled.subscribe(enabled => {
+            this.holidaySettingsVersion++;
+            localStorage.setItem('solutions:timetracking:argentinaHolidaysEnabled', JSON.stringify(enabled));
+            if (!enabled && this.filterHideHolidays) this.filterHideHolidays(false);
+            if (this.logged()) this.updateDashboard();
+        });
+        this.calendar = null;
         this.month = ko.observable(new Date().getMonth());
         this.year = ko.observable(new Date().getFullYear());
+        this.selectedMonthLabel = ko.computed(() => new Date(this.year(), this.month(), 1)
+            .toLocaleDateString(undefined, { month: 'long', year: 'numeric' }));
 
         // Time Tracking
         this.weeks = ko.observableArray([]);
@@ -190,19 +220,91 @@ class ViewModel {
         });
 
         // Filters
-        this.filterMissingHours = ko.observable(false);
-        this.filterHideLeaveDays = ko.observable(true);
-        this.hideWeekends = ko.observable(JSON.parse(localStorage.getItem('solutions:timetracking:hideWeekends') || 'true'));
-        this.filterHideCompleteDays = ko.observable(JSON.parse(localStorage.getItem('solutions:timetracking:hideCompleteDays') || 'false'));
+        const getStoredFilter = (key, fallback) => {
+            try {
+                const value = localStorage.getItem(`solutions:timetracking:${key}`);
+                return value === null ? fallback : JSON.parse(value);
+            } catch (e) {
+                return fallback;
+            }
+        };
+        const saveFilter = (key, value) => localStorage.setItem(`solutions:timetracking:${key}`, JSON.stringify(value));
+        const asBoolean = (value, fallback) => typeof value === 'boolean' ? value : fallback;
+        const storedScopeFilters = getStoredFilter('filterByScope', {}) || {};
+        this.filterMissingHours = ko.observable(asBoolean(getStoredFilter('filterMissingHours', false), false));
+        this.filterHideLeaveDays = ko.observable(asBoolean(getStoredFilter('filterHideLeaveDays', true), true));
+        this.filterHideHolidays = ko.observable(asBoolean(getStoredFilter('filterHideHolidays', false), false));
+        this.hideWeekends = ko.observable(asBoolean(getStoredFilter('hideWeekends', true), true));
         this.viewRange = ko.observable(localStorage.getItem('solutions:timetracking:viewRange') || 'month');
         this.preferredView = ko.observable(localStorage.getItem('solutions:timetracking:preferredView') || 'daily');
         this.hiddenProjectIds = ko.observableArray(JSON.parse(localStorage.getItem('solutions:timetracking:hiddenProjects') || '[]'));
-        this.filterByNotes = ko.observable('');
-        this.filterByProject = ko.observable(null);
+        const storedNotesFilter = getStoredFilter('filterByNotes', '');
+        const storedProjectFilter = getStoredFilter('filterByProject', null);
+        this.filterByNotes = ko.observable(typeof storedNotesFilter === 'string' ? storedNotesFilter : '');
+        this.filterByProject = ko.observable(typeof storedProjectFilter === 'string' ? storedProjectFilter : null);
         this.filterByScope = {
-            global: ko.observable(true),
-            task: ko.observable(true),
-            supportTicket: ko.observable(true),
+            global: ko.observable(asBoolean(storedScopeFilters.global, true)),
+            task: ko.observable(asBoolean(storedScopeFilters.task, true)),
+            supportTicket: ko.observable(asBoolean(storedScopeFilters.supportTicket, true)),
+        };
+        this.filterMissingHours.subscribe(value => saveFilter('filterMissingHours', value));
+        this.filterHideLeaveDays.subscribe(value => saveFilter('filterHideLeaveDays', value));
+        this.filterHideHolidays.subscribe(value => saveFilter('filterHideHolidays', value));
+        this.hideWeekends.subscribe(value => saveFilter('hideWeekends', value));
+        this.filterByNotes.subscribe(value => saveFilter('filterByNotes', value));
+        this.filterByProject.subscribe(value => saveFilter('filterByProject', value));
+        Object.values(this.filterByScope).forEach(enabled => {
+            enabled.subscribe(value => saveFilter('filterByScope', {
+                global: this.filterByScope.global(),
+                task: this.filterByScope.task(),
+                supportTicket: this.filterByScope.supportTicket(),
+            }));
+        });
+
+        this.activeFilterChips = ko.computed(() => {
+            const chips = [];
+            const projectId = this.filterByProject();
+            if (projectId) {
+                const project = this.projects().find(item => item.id === projectId);
+                chips.push({ label: `Project: ${project?.name || 'Selected'}`, clear: () => this.filterByProject(null) });
+            }
+            if (this.filterByNotes().trim()) {
+                chips.push({ label: `Search: ${this.filterByNotes().trim()}`, clear: () => this.filterByNotes('') });
+            }
+            const scopes = Object.entries(this.filterByScope).filter(([, enabled]) => enabled()).map(([name]) => ({
+                global: 'Global', task: 'Task', supportTicket: 'Ticket',
+            }[name]));
+            if (scopes.length !== 3) {
+                chips.push({ label: `Scopes: ${scopes.length ? scopes.join(', ') : 'None'}`, clear: () => {
+                    Object.values(this.filterByScope).forEach(enabled => enabled(true));
+                } });
+            }
+            if (this.filterMissingHours()) {
+                chips.push({ label: 'Missing hours', clear: () => this.filterMissingHours(false) });
+            }
+            if (this.filterHideLeaveDays()) {
+                chips.push({ label: 'Hiding leave days', clear: () => this.filterHideLeaveDays(false) });
+            }
+            if (this.filterHideHolidays()) {
+                chips.push({ label: 'Hiding holidays', clear: () => this.filterHideHolidays(false) });
+            }
+            if (this.hideWeekends()) {
+                chips.push({ label: 'Hiding weekends', clear: () => this.hideWeekends(false) });
+            }
+            return chips;
+        });
+        this.filteredEntryCount = ko.computed(() => this.weeks()
+            .flatMap(week => week.days())
+            .filter(day => day.isVisible())
+            .reduce((count, day) => count + day.filteredEntries().length, 0));
+        this.clearAllFilters = () => {
+            this.filterByProject(null);
+            this.filterByNotes('');
+            Object.values(this.filterByScope).forEach(enabled => enabled(true));
+            this.filterMissingHours(false);
+            this.filterHideLeaveDays(false);
+            this.filterHideHolidays(false);
+            this.hideWeekends(false);
         };
 
         // Default project
@@ -213,9 +315,24 @@ class ViewModel {
                 this.addToast('Default project saved.', 'success');
             } 
         });
+        const storedDefaultScope = localStorage.getItem('solutions:timetracking:defaultScope');
+        this.defaultScope = ko.observable(['global', 'task', 'supportTicket'].includes(storedDefaultScope) ? storedDefaultScope : 'global');
+        this.defaultScope.subscribe(scope => localStorage.setItem('solutions:timetracking:defaultScope', scope));
 
         this.visibleProjects = ko.computed(() => {
             return this.projects().filter(project => project.isVisible());
+        });
+        this.projectHoursSummary = ko.computed(() => {
+            const totals = this.visibleProjects().map(project => {
+                const ms = this.weeks().flatMap(week => week.days())
+                    .flatMap(day => day.entries())
+                    .filter(entry => !entry.isTodo() && entry.raw?.project?.id === project.id)
+                    .reduce((sum, entry) => sum + entry.timeSpent(), 0);
+                return { name: project.name, ms };
+            }).filter(project => project.ms > 0).sort((a, b) => b.ms - a.ms).slice(0, 5);
+            return totals.length
+                ? `Project chart, top tracked projects: ${totals.map(project => `${project.name}, ${formatMsToDuration(project.ms)}`).join('; ')}.`
+                : 'No project hours logged for this month.';
         });
 
         this.viewRange.subscribe(val => {
@@ -225,13 +342,6 @@ class ViewModel {
             localStorage.setItem('solutions:timetracking:preferredView', val);
             this.activeView(val);
         });
-        this.hideWeekends.subscribe(val => {
-            localStorage.setItem('solutions:timetracking:hideWeekends', JSON.stringify(val));
-        });
-        this.filterHideCompleteDays.subscribe(val => {
-            localStorage.setItem('solutions:timetracking:hideCompleteDays', JSON.stringify(val));
-        });
-
         this.isCurrentMonth = ko.computed(() => {
             const today = new Date();
             return this.month() === today.getMonth() && this.year() === today.getFullYear();
@@ -251,6 +361,7 @@ class ViewModel {
         // Keybindings
         const storedKeybindings = localStorage.getItem('solutions:timetracking:keybindingsEnabled');
         this.keybindingsEnabled = ko.observable(storedKeybindings ? JSON.parse(storedKeybindings) : false);
+        this.toggleKeybindings = () => this.keybindingsEnabled(!this.keybindingsEnabled());
         this.navigationMode = ko.observable('none'); // 'none', 'day', 'entry'
         this.selectedDay = ko.observable(null);
         this.selectedEntry = ko.observable(null);
@@ -261,8 +372,7 @@ class ViewModel {
 
         this.todoEntries = ko.computed(() => {
             return this.weeks()
-                .map(week => week.days())
-                .flat()
+                .flatMap(week => week.days().filter(day => day.isVisible()))
                 .map(day => day.filteredEntries())
                 .flat()
                 .filter(entry => entry.isTodo());
@@ -279,22 +389,25 @@ class ViewModel {
                     return false;
                 }
 
-                const hasActiveFilters = this.filterMissingHours() || this.filterByNotes().trim() || this.filterByProject() || !this.filterByScope.global() || !this.filterByScope.task() || !this.filterByScope.supportTicket();
+                const hasActiveFilters = this.filterMissingHours() || this.filterHideHolidays() || this.filterByNotes().trim() || this.filterByProject() || !this.filterByScope.global() || !this.filterByScope.task() || !this.filterByScope.supportTicket();
                 if (!hasActiveFilters) {
                     return true;
                 }
 
                 return day.filteredEntries().length > 0;
             }).map(day => {
+                const dayStatus = this.getMatrixDayStatus(day);
+                const isNonWorkingDay = Boolean(dayStatus);
                 const cells = projects.map(project => {
                     const matchingEntries = day.filteredEntries().filter(entry => !entry.isTodo() && entry.raw?.project?.id === project.id);
                     const ms = matchingEntries.reduce((sum, entry) => sum + entry.raw.timeSpent, 0);
+                    const duration = ms > 0 ? formatMsToHours(ms) : isNonWorkingDay ? '—' : '0h';
                     return {
                         project,
-                        value: ms > 0 ? formatMsToHours(ms) : '0h',
+                        value: duration,
                         ms,
                         cellClass: this.getMatrixCellClass(ms, day),
-                        tooltip: `${project.name}: ${ms > 0 ? formatMsToHours(ms) : '0h'}`,
+                        tooltip: `${dayStatus ? `${dayStatus.title} · ` : ''}${project.name}: ${duration}`,
                     };
                 });
 
@@ -307,9 +420,11 @@ class ViewModel {
                 return {
                     day,
                     dayLabel: this.formatMatrixDayLabel(day),
+                    dayStatus: dayStatus?.label || '',
+                    dayStatusTitle: dayStatus?.title || '',
                     cells,
                     totalMs,
-                    totalLabel: formatMsToHours(totalMs),
+                    totalLabel: totalMs > 0 ? formatMsToHours(totalMs) : isNonWorkingDay ? '—' : '0h',
                     totalCellClass: this.getMatrixCellClass(totalMs, day),
                     totalPercentage,
                     totalProgressVisible,
@@ -342,6 +457,8 @@ class ViewModel {
         this.monthProgress = {
             scopes: ko.observableArray([]),
             total: ko.observable('0h'),
+            loggedToDate: ko.observable('0h'),
+            expectedToDate: ko.observable('0h'),
             missing: ko.observable(0),
         };
         this.monthScopeChart = null;
@@ -352,10 +469,79 @@ class ViewModel {
         this.leaveDays = ko.observableArray(JSON.parse(localStorage.getItem('solutions:timetracking:leavedays')) || []);
         this.leaveDays.subscribe(val => {
             localStorage.setItem('solutions:timetracking:leavedays', JSON.stringify(val));
+            if (this.calendar) {
+                this.calendar.set({ selectedHolidays: [...this.holidays().map(item => item.day), ...val] });
+            }
         });
 
         this.selectedDayForNewEntry = ko.observable(null);
         this.newEntryModal = null;
+        this.newEntryForms = ko.observableArray([]);
+        this.newEntrySubmissionStatus = ko.observable('');
+        this.newEntryMaxForms = 10;
+        this.newEntryMaxRequests = 50;
+        this.newEntryBatchRequestCount = ko.computed(() => {
+            const day = this.selectedDayForNewEntry();
+            if (!day) return 0;
+            return this.newEntryForms().reduce((total, form) => total + (form.scheduled() ? form.scheduleDates().length : 1), 0);
+        });
+        this.newEntryBatchValid = ko.computed(() => {
+            const forms = this.newEntryForms();
+            return forms.length > 0
+                && forms.length <= this.newEntryMaxForms
+                && forms.every(form => form.isLoggable())
+                && forms.every(form => form.scheduleValid())
+                && this.newEntryBatchRequestCount() > 0
+                && this.newEntryBatchRequestCount() <= this.newEntryMaxRequests;
+        });
+        this.newEntrySubmitLabel = ko.computed(() => {
+            const forms = this.newEntryForms();
+            if (forms.some(form => form.scheduled() && !form.scheduleValid())) return 'Create Entry Batch';
+            const total = this.newEntryBatchRequestCount();
+            if (total > this.newEntryMaxRequests) return 'Reduce Batch Size';
+            return total <= 1 ? 'Log Entry' : `Log ${total} Entries`;
+        });
+        this.newEntryScheduleSummary = ko.computed(() => {
+            const forms = this.newEntryForms();
+            const scheduledForms = forms.filter(form => form.scheduled());
+            const requestCount = this.newEntryBatchRequestCount();
+            if (!forms.length) return '';
+            if (scheduledForms.some(form => !form.scheduleValid())) return 'Review the date range and holiday status for each scheduled entry.';
+            if (requestCount > this.newEntryMaxRequests) return `This batch contains ${requestCount} create requests; the limit is ${this.newEntryMaxRequests}. Shorten schedules or remove entries.`;
+            return `${requestCount} create ${requestCount === 1 ? 'request' : 'requests'} across ${forms.length} ${forms.length === 1 ? 'entry form' : 'entry forms'}${scheduledForms.length ? `, including ${scheduledForms.length} scheduled ${scheduledForms.length === 1 ? 'entry' : 'entries'}` : ''}.`;
+        });
+        this.newEntryBatchTargetWarning = ko.computed(() => {
+            const day = this.selectedDayForNewEntry();
+            const forms = this.newEntryForms();
+            if (!day || !forms.length) return '';
+
+            const validForms = forms.filter(form => !form.scheduled() || form.scheduleValid());
+            if (!validForms.length) return '';
+            const addedTimeByDate = new Map();
+            for (const form of validForms) {
+                const dates = form.scheduled() ? form.scheduleDates() : [day.dateStr()];
+                for (const date of dates) {
+                    addedTimeByDate.set(date, (addedTimeByDate.get(date) || 0) + Number(form.timeSpent()));
+                }
+            }
+            const visibleDays = this.weeks().flatMap(week => week.days());
+            const targetMs = this.dailyWorkHours() * 60 * 60 * 1000;
+            let largestOverage = null;
+            for (const [date, addedTime] of addedTimeByDate) {
+                const dateDay = visibleDays.find(visibleDay => visibleDay.dateStr() === date)
+                    || (day.dateStr() === date ? day : null);
+                const projectedMs = (dateDay?.durationMs() || 0) + addedTime;
+                if (projectedMs > targetMs && (!largestOverage || projectedMs > largestOverage.projectedMs)) {
+                    largestOverage = { date, projectedMs };
+                }
+            }
+            if (!largestOverage) return '';
+
+            const overage = formatMsToDuration(largestOverage.projectedMs - targetMs);
+            const dateLabel = addedTimeByDate.size > 1 ? ` on ${formatEntryDateLabel(largestOverage.date)}` : '';
+            const lead = validForms.length === 1 && addedTimeByDate.size === 1 ? 'If logged, this would bring the day' : `If logged, these entries${dateLabel} would bring the day`;
+            return `${lead} to ${formatMsToDuration(largestOverage.projectedMs)}, ${overage} above the ${this.dailyWorkHours()}h daily target.`;
+        });
 
         this.selectedEntryForEdit = ko.observable(null);
         this.editEntryModal = null;
@@ -384,10 +570,21 @@ class ViewModel {
         this.pomodoroModal = null;
         this.isPomodoroModalVisible = ko.observable(false);
         this.pomodoroDurationMinutes = ko.observable(50);
+        this.pomodoroDurationInput = ko.observable(formatMsToDuration(this.pomodoroDurationMinutes() * 60 * 1000));
+        this.pomodoroDurationValid = ko.computed(() => {
+            const duration = Number(this.pomodoroDurationMinutes());
+            return Number.isInteger(duration) && duration >= 1 && duration <= 480;
+        });
         this.pomodoroRemainingTime = ko.observable(50 * 60);
         this.pomodoroTimerId = null;
         this.pomodoroIsRunning = ko.observable(false);
         this.pomodoroFinished = ko.observable(false);
+        this.pomodoroAudioContext = null;
+        this.pomodoroProgress = ko.computed(() => {
+            const durationSeconds = Number(this.pomodoroDurationMinutes()) * 60;
+            if (durationSeconds <= 0) return 0;
+            return Math.max(0, Math.min(100, Math.round((1 - this.pomodoroRemainingTime() / durationSeconds) * 100)));
+        });
         this.faviconBlinkerId = null;
         this.originalFavicon = null; // will be set later
         this.blankFavicon = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
@@ -416,10 +613,13 @@ class ViewModel {
         this.submitRemove = async () => {
             const entryToRemove = this.entryForRemoval();
             if (!entryToRemove) return;
+            const removedEntryId = entryToRemove.id();
+            const timerWillBeDiscarded = Boolean(this.getTimerFor(removedEntryId));
 
             this.loading(true);
             try {
-                await this.slingr.delete(`/data/${TIME_TRACKING_ENTITY}/${entryToRemove.id()}`);
+                await this.slingr.delete(`/data/${TIME_TRACKING_ENTITY}/${removedEntryId}`);
+                this.timerRecords(this.timerRecords().filter(timer => String(timer.entryId) !== String(removedEntryId)));
 
                 const day = entryToRemove.day;
                 day.entries.remove(entryToRemove);
@@ -443,7 +643,9 @@ class ViewModel {
 
                 await this.updateStats();
 
-                this.addToast('Entry removed successfully.', 'success');
+                this.addToast(timerWillBeDiscarded
+                    ? 'Entry removed and its timer discarded without logging time.'
+                    : 'Entry removed successfully.', 'success');
                 this.removeConfirmModal.hide();
                 this.entryForRemoval(null);
             } catch (e) {
@@ -455,12 +657,15 @@ class ViewModel {
         }
 
         // Theme
-        const storedTheme = localStorage.getItem('solutions:timetracking:theme') || 'dark';
+        const storedTheme = localStorage.getItem('solutions:timetracking:theme')
+            || document.documentElement.getAttribute('data-bs-theme')
+            || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
         this.theme = ko.observable(storedTheme);
         this.isDarkMode = ko.computed({
             read: () => this.theme() === 'dark',
             write: (value) => this.theme(value ? 'dark' : 'light')
         });
+        this.toggleTheme = () => this.isDarkMode(!this.isDarkMode());
 
         this.theme.subscribe(newTheme => {
             localStorage.setItem('solutions:timetracking:theme', newTheme);
@@ -501,6 +706,9 @@ class ViewModel {
         if (options.onShow) {
             modalElement.addEventListener('show.bs.modal', options.onShow);
         }
+        if (options.onShown) {
+            modalElement.addEventListener('shown.bs.modal', options.onShown);
+        }
 
         return modal;
     }
@@ -528,9 +736,111 @@ class ViewModel {
         if (modal) modal.show();
     }
 
-    startPomodoro = () => {
-        if (this.pomodoroIsRunning()) return;
+    adjustPomodoroDuration = (amount) => {
+        const minutes = Math.max(1, Math.min(480, this.pomodoroDurationMinutes() + amount));
+        this.pomodoroDurationMinutes(minutes);
+        this.pomodoroDurationInput(formatMsToDuration(minutes * 60 * 1000));
+    }
 
+    updatePomodoroDurationFromInput = () => {
+        const durationMs = parseDurationToMs(this.pomodoroDurationInput());
+        if (durationMs <= 0) {
+            this.pomodoroDurationInput(formatMsToDuration(this.pomodoroDurationMinutes() * 60 * 1000));
+            return;
+        }
+
+        const minuteMs = 60 * 1000;
+        const roundedMs = Math.round(durationMs / minuteMs) * minuteMs;
+        const clampedMs = Math.max(minuteMs, Math.min(roundedMs, 480 * 60 * 1000));
+        const minutes = clampedMs / 60 / 1000;
+        this.pomodoroDurationMinutes(minutes);
+        this.pomodoroDurationInput(formatMsToDuration(clampedMs));
+    }
+
+    preparePomodoroAudio = () => {
+        try {
+            const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextConstructor) return;
+            if (!this.pomodoroAudioContext) {
+                this.pomodoroAudioContext = new AudioContextConstructor();
+            }
+            if (this.pomodoroAudioContext.state === 'suspended') {
+                this.pomodoroAudioContext.resume().catch(() => {});
+            }
+        } catch (error) {
+            this.pomodoroAudioContext = null;
+        }
+    }
+
+    playPomodoroChime = () => {
+        const context = this.pomodoroAudioContext;
+        if (!context) return;
+
+        const play = () => {
+            if (context.state !== 'running') return;
+            const now = context.currentTime;
+            [659.25, 783.99, 1046.5].forEach((frequency, index) => {
+                const startAt = now + index * 0.16;
+                const oscillator = context.createOscillator();
+                const volume = context.createGain();
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(frequency, startAt);
+                volume.gain.setValueAtTime(0.0001, startAt);
+                volume.gain.exponentialRampToValueAtTime(0.12, startAt + 0.025);
+                volume.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.55);
+                oscillator.connect(volume);
+                volume.connect(context.destination);
+                oscillator.start(startAt);
+                oscillator.stop(startAt + 0.56);
+            });
+        };
+
+        if (context.state === 'suspended') {
+            context.resume().then(play).catch(() => {});
+        } else {
+            play();
+        }
+    }
+
+    requestPomodoroNotificationPermission = () => {
+        const NotificationApi = window.Notification;
+        if (!NotificationApi || NotificationApi.permission !== 'default') return;
+        try {
+            const permissionRequest = NotificationApi.requestPermission();
+            if (permissionRequest && typeof permissionRequest.catch === 'function') {
+                permissionRequest.catch(() => {});
+            }
+        } catch (error) {
+            // Notifications may be unavailable in this browser or context.
+        }
+    }
+
+    notifyPomodoroFinished = () => {
+        const NotificationApi = window.Notification;
+        if (!NotificationApi || NotificationApi.permission !== 'granted') return;
+        try {
+            const notification = new NotificationApi('Focus session complete', {
+                body: 'Your focus timer has reached zero.',
+                icon: '/img/hourglass-done.png',
+                tag: 'panda-tracking-focus-session',
+            });
+            notification.onclick = () => {
+                window.focus();
+                if (!this.isPomodoroModalVisible() && this.pomodoroModal) {
+                    this.pomodoroModal.show();
+                }
+                notification.close();
+            };
+        } catch (error) {
+            // The browser can deny notifications even after permission was granted.
+        }
+    }
+
+    startPomodoro = () => {
+        if (this.pomodoroIsRunning() || !this.pomodoroDurationValid()) return;
+
+        this.preparePomodoroAudio();
+        this.requestPomodoroNotificationPermission();
         this.pomodoroRemainingTime(this.pomodoroDurationMinutes() * 60);
         this.pomodoroIsRunning(true);
         this.pomodoroFinished(false);
@@ -541,6 +851,8 @@ class ViewModel {
             this.pomodoroRemainingTime(remaining);
             if (remaining === 0) {
                 this.pomodoroFinished(true);
+                this.playPomodoroChime();
+                this.notifyPomodoroFinished();
                 this.startFaviconBlinking();
                 if (!this.isPomodoroModalVisible()) {
                     this.pomodoroModal.show();
@@ -617,27 +929,39 @@ class ViewModel {
         this.slingr.token = null;
         try {
             await this.slingr.login(this.email(), this.pass());
-        } catch (e) {
-            this.addToast('Invalid email or password', 'error');
-        }
-        if (this.slingr.token) {
+            const user = await this.slingr.getCurrentUser();
             localStorage.setItem('solutions:timetracking:email', this.email());
-            let user = await this.slingr.getCurrentUser();
             localStorage.setItem('solutions:timetracking:token', this.slingr.token);
-            console.log('Logged', user);
+            this.slingr.user = user;
             this.logged(true);
+        } catch (e) {
+            console.error('Login failed:', e);
+            this.slingr.token = null;
+            localStorage.removeItem('solutions:timetracking:token');
+            const message = e instanceof TypeError
+                ? 'Could not connect to Solutions. Check your connection and try again.'
+                : e instanceof AuthError
+                    ? 'Your session could not be verified. Please sign in again.'
+                    : 'Login failed. Check your credentials and try again.';
+            this.addToast(message, 'error');
+        } finally {
+            this.pass(null);
+            this.logginIn(false);
         }
-        this.pass(null);
-        this.logginIn(false);
     }
 
-    logout = () => {
-        this.slingr.post('/auth/logout');
+    logout = (notify = true) => {
+        if (this.slingr.token) {
+            this.slingr.post('/auth/logout').catch(() => {});
+        }
         this.slingr.token = null;
         this.slingr.user = null;
         localStorage.removeItem('solutions:timetracking:token');
         this.logged(false);
-        this.addToast('Logged out successfully.', 'success');
+        this.dashboardHasLoaded(false);
+        this.weeks([]);
+        this.projects([]);
+        if (notify) this.addToast('Logged out successfully.', 'success');
     }
 
     getTimerFor = (entryId) => {
@@ -1160,6 +1484,30 @@ class ViewModel {
         this.activeView(view);
     }
 
+    handleViewTabKeydown = (view, event) => {
+        const views = ['daily', 'matrix', 'todo'];
+        const currentIndex = views.indexOf(view);
+        let nextIndex = currentIndex;
+        if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % views.length;
+        else if (event.key === 'ArrowLeft') nextIndex = (currentIndex + views.length - 1) % views.length;
+        else if (event.key === 'Home') nextIndex = 0;
+        else if (event.key === 'End') nextIndex = views.length - 1;
+        else return;
+
+        event.preventDefault();
+        this.activeView(views[nextIndex]);
+        const tabIds = { daily: 'detailsTab', matrix: 'matrixTab', todo: 'todoTab' };
+        document.getElementById(tabIds[views[nextIndex]])?.focus();
+    }
+
+    showMissingHours = () => {
+        this.viewRange('month');
+        this.activeView('daily');
+        this.filterMissingHours(true);
+        const entries = document.getElementById('entries');
+        if (entries) entries.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
     setViewRange = (range) => {
         if (['month', 'week', 'day'].includes(range)) {
             this.viewRange(range);
@@ -1194,24 +1542,20 @@ class ViewModel {
     }
 
     getMatrixCellClass = (ms, day) => {
-        if (!day || day.isLeave() || day.isHoliday()) {
-            return 'text-muted';
-        }
-        if (ms <= 0) {
-            return 'text-muted';
-        }
-
-        return 'text-success';
+        if (ms > 0) return 'text-success';
+        return 'text-muted';
     }
 
     getMatrixRowClass = (day) => {
-        if (!day || day.isLeave() || day.isHoliday()) {
-            return 'table-secondary';
-        }
-        if (day.isWeekend()) {
-            return 'table-light';
-        }
-        return '';
+        return this.getMatrixDayStatus(day) ? 'matrix-non-working-day' : '';
+    }
+
+    getMatrixDayStatus = (day) => {
+        if (!day) return null;
+        if (day.isLeave()) return { label: 'Leave', title: 'Marked as leave' };
+        if (day.isHoliday()) return { label: 'Holiday', title: day.holidayDetail() || 'Public holiday' };
+        if (day.isWeekend()) return { label: 'Weekend', title: 'Weekend' };
+        return null;
     }
 
     formatMatrixDayLabel = (day) => {
@@ -1260,29 +1604,187 @@ class ViewModel {
         this.openNewEntryModal(day, selectedProject);
     }
 
+    addNewEntryForm = () => {
+        if (this.loading() || this.newEntryForms().length >= this.newEntryMaxForms) return;
+        const day = this.selectedDayForNewEntry();
+        const source = this.newEntryForms()[this.newEntryForms().length - 1] || day;
+        if (!source || !day) return;
+        const form = new NewEntryDraft(source, true, day.date);
+        this.newEntryForms.push(form);
+        setTimeout(() => document.getElementById(`entry-notes-${form.id}`)?.focus(), 0);
+    }
+
+    removeNewEntryForm = (form) => {
+        if (this.loading() || this.newEntryForms().length <= 1) return;
+        this.newEntryForms.remove(form);
+        form.dispose();
+    }
+
+    clearNewEntryForms = () => {
+        this.newEntryForms().forEach(form => form.dispose());
+        this.newEntryForms([]);
+    }
+
     openNewEntryModal = (day, project = null) => {
+        const isNewDay = this.selectedDayForNewEntry() !== day;
+        if (isNewDay || this.newEntryForms().length === 0) {
+            this.clearNewEntryForms();
+            this.newEntryForms([new NewEntryDraft(day, false, day.date)]);
+            this.newEntrySubmissionStatus('');
+        }
         this.selectedDayForNewEntry(day);
 
         // Prefer an explicit project, then the active filter, then the default.
         const projectId = project?.id || this.filterByProject() || this.defaultProject();
         const selectedProject = this.projects().find(project => project.id === projectId);
-        if (day && selectedProject) {
+        if (day && selectedProject && (isNewDay || project)) {
             day.project(selectedProject);
+            this.newEntryForms()[0]?.project(selectedProject);
         }
 
-        const modal = this.initializeModal('newEntryModal', 'newEntryModal');
+        const modal = this.initializeModal('newEntryModal', 'newEntryModal', {
+            onShown: () => {
+                const currentDay = this.selectedDayForNewEntry();
+                const firstRequiredField = currentDay?.project()
+                    ? document.querySelector('#newEntryModal textarea[id^="entry-notes-"]')
+                    : document.querySelector('#newEntryModal select[aria-label="Project"]');
+                firstRequiredField?.focus();
+            },
+        });
         if (modal) modal.show();
+    }
+
+    submitNewEntryBatch = async (day) => {
+        if (this.loading()) return;
+        const forms = this.newEntryForms().slice();
+        if (forms.length === 0 || forms.some(form => !form.isLoggable())) {
+            this.addToast('Complete the required project, scope, task, and notes fields in each entry form.', 'error');
+            return;
+        }
+        if (forms.some(form => !form.scheduleValid())) {
+            this.addToast('Review the date range and holiday status for each scheduled entry.', 'error');
+            return;
+        }
+        const requests = forms.flatMap((form, formIndex) => {
+            const dates = form.scheduled() ? form.scheduleDates() : [day.dateStr()];
+            const entry = {
+                project: form.project().id,
+                scope: form.scope(),
+                task: form.scope() === 'task' ? form.taskId() : null,
+                ticket: form.scope() === 'supportTicket' ? form.ticketId() : null,
+                forMe: true,
+                timeSpent: parseInt(form.timeSpent(), 10),
+                notes: form.notes(),
+            };
+            return dates.map(date => ({ date, formIndex, entry }));
+        });
+        if (requests.length === 0 || requests.length > this.newEntryMaxRequests) {
+            this.addToast(`This batch must contain between 1 and ${this.newEntryMaxRequests} create requests.`, 'error');
+            return;
+        }
+        const loggedRequests = [];
+        let failedRequest = null;
+        let requestError = null;
+        this.loading(true);
+
+        try {
+            for (let index = 0; index < requests.length; index++) {
+                const request = requests[index];
+                this.newEntrySubmissionStatus(requests.length > 1
+                    ? `Creating entry ${index + 1} of ${requests.length}…`
+                    : 'Creating entry…');
+                try {
+                    await this.slingr.put(`/data/${TIME_TRACKING_ENTITY}/logTime`, { ...request.entry, date: request.date });
+                    loggedRequests.push(request);
+                } catch (error) {
+                    failedRequest = request;
+                    requestError = error;
+                    break;
+                }
+            }
+
+            if (loggedRequests.length === 0) {
+                throw requestError || new Error('No entries were created.');
+            }
+
+            day.notes('');
+            day.timeSpent(1 * 60 * 60 * 1000);
+            day.scope(this.defaultScope());
+            day.taskId(null);
+            day.ticketId(null);
+            this.clearNewEntryForms();
+            this.newEntryModal?.hide();
+
+            let refreshError = null;
+            try {
+                this.newEntrySubmissionStatus('Refreshing entries…');
+                const visibleDays = this.weeks().flatMap(week => week.days());
+                const loggedDates = [...new Set(loggedRequests.map(request => request.date))];
+                const refreshDays = [...new Set(loggedDates
+                    .map(date => visibleDays.find(visibleDay => visibleDay.dateStr() === date))
+                    .filter(Boolean))];
+                await Promise.all(refreshDays.map(refreshDay => refreshDay.updateDay()));
+                await this.updateStats();
+
+                if (this.keybindingsEnabled() && this.navigationMode() === 'entry') {
+                    const firstLoggedDay = refreshDays.find(refreshDay => refreshDay.dateStr() === loggedRequests[0].date);
+                    const entries = firstLoggedDay ? firstLoggedDay.entries() : [];
+                    const newEntry = entries[entries.length - 1];
+                    if (newEntry) {
+                        this.selectedEntry(newEntry);
+                        setTimeout(() => this.scrollToEntry(newEntry), 50);
+                    }
+                }
+            } catch (error) {
+                console.error('Entries were logged, but the dashboard could not be refreshed:', error);
+                refreshError = error;
+            }
+
+            if (requestError) {
+                this.addToast(
+                    `Created ${loggedRequests.length} of ${requests.length} entries. Entry ${failedRequest.formIndex + 1} on ${formatEntryDateLabel(failedRequest.date)} failed; remaining requests were skipped.${refreshError ? ' Refresh the dashboard to verify the created entries.' : ''}`,
+                    'warning',
+                    'Batch Partially Created'
+                );
+            } else if (refreshError) {
+                this.addToast('Entries were created, but the affected days could not be refreshed. Refresh the dashboard to see the latest data.', 'warning');
+            } else if (requests.length > 1) {
+                const createdDates = new Set(loggedRequests.map(request => request.date));
+                this.addToast(`Created ${requests.length} entries across ${createdDates.size} date${createdDates.size === 1 ? '' : 's'}.`, 'success');
+            } else {
+                this.addToast('Entry created.', 'success');
+            }
+        } catch (error) {
+            console.error(error);
+            this.addToast('Could not create any entries. Review the forms and try again.', 'error');
+        } finally {
+            this.newEntrySubmissionStatus('');
+            this.loading(false);
+        }
     }
 
     openNewTodoModal = (day) => {
         this.selectedDayForNewEntry(day);
-        const modal = this.initializeModal('newTodoModal', 'newTodoModal');
+        const projectId = this.filterByProject() || this.defaultProject();
+        const selectedProject = this.projects().find(project => project.id === projectId);
+        if (day && selectedProject) day.project(selectedProject);
+        const modal = this.initializeModal('newTodoModal', 'newTodoModal', {
+            onShown: () => {
+                const currentDay = this.selectedDayForNewEntry();
+                const firstRequiredField = currentDay?.project()
+                    ? document.querySelector('#newTodoModal textarea[name="notes"]')
+                    : document.querySelector('#newTodoModal select[aria-label="Project"]');
+                firstRequiredField?.focus();
+            },
+        });
         if (modal) modal.show();
     }
 
     openEditEntryModal = (entry) => {
         this.selectedEntryForEdit(entry);
-        const modal = this.initializeModal('editEntryModal', 'editEntryModal');
+        const modal = this.initializeModal('editEntryModal', 'editEntryModal', {
+            onShown: () => document.querySelector('#editEntryModal textarea[name="notes"]')?.focus(),
+        });
         if (modal) modal.show();
     }
 
@@ -1523,7 +2025,7 @@ class ViewModel {
     }
 
     addToast = (msg, type = 'info', title = null) => {
-        let id = 'toast-' + new Date().getTime();
+        let id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         if (title === null) {
             switch (type) {
                 case 'error':
@@ -1594,18 +2096,54 @@ class ViewModel {
     }
 
     updateDashboard = async () => {
-        this.loading(true);
-        try {
-            await this.updateHolidays();
-            await this.updateTimeTracking();
-        } catch (e) {
-            if (e instanceof AuthError) {
-                this.logout();
-                this.addToast('Your session expired. Please log in again.', 'warning');
-            }
-        } finally {
-            this.loading(false);
+        if (!this.logged() || !this.slingr.user) return;
+        if (this.dashboardRefreshPromise) {
+            this.dashboardRefreshPending = true;
+            return this.dashboardRefreshPromise;
         }
+
+        this.dashboardLoading(true);
+        this.loading(true);
+        this.statsWarning('');
+
+        this.dashboardRefreshPromise = (async () => {
+            try {
+                do {
+                    this.dashboardRefreshPending = false;
+                    this.dashboardRefreshSequence++;
+                    this.statsWarning('');
+                    try {
+                        await this.updateHolidays();
+                    } catch (error) {
+                        console.warn('Holiday data could not be refreshed:', error);
+                        if (this.argentinaHolidaysEnabled()) {
+                            this.holidayWarning('Argentina holiday data could not be loaded; missing-hours totals may include public holidays.');
+                        }
+                    }
+
+                    try {
+                        await this.updateTimeTracking();
+                        this.lastUpdatedAt(new Date());
+                    } catch (e) {
+                        if (e instanceof AuthError) {
+                            console.warn('Dashboard refresh stopped because the session expired:', e);
+                            this.logout(false);
+                            this.addToast('Your session expired. Please log in again.', 'warning');
+                            break;
+                        }
+                        console.error('Dashboard refresh attempt failed:', e);
+                    }
+                } while (this.dashboardRefreshPending && this.logged() && this.slingr.user);
+            } catch (error) {
+                console.error('Dashboard refresh failed unexpectedly:', error);
+            } finally {
+                this.dashboardLoading(false);
+                this.loading(false);
+                this.dashboardRefreshPromise = null;
+            }
+
+        })();
+        return this.dashboardRefreshPromise;
     }
 
     goToToday = async () => {
@@ -1636,19 +2174,77 @@ class ViewModel {
     }
 
     // Get holidays of the month
-    updateHolidays = async () => {
-        let query = {
-            // todo -> filter by country
-            day: `between(${this.getStartMonth().getTime()},${this.getEndMonth().getTime()})`,
-            _size: 1000,
-            _sortField: 'day',
-            _sortType: 'asc',
+    ensureHolidayYearLoaded = async (year) => {
+        if (this.holidayCache.has(year)) return;
+
+        let request = this.holidayFetches.get(year);
+        if (!request) {
+            request = (async () => {
+                const response = await fetch(`https://api.argentinadatos.com/v1/feriados/${year}`);
+                if (!response.ok) throw new Error(`Holiday API returned ${response.status}`);
+                const items = await response.json();
+                if (!Array.isArray(items)) throw new Error('Unexpected holiday API response');
+                return items;
+            })();
+            this.holidayFetches.set(year, request);
         }
-        //let { items: holidays } = await this.slingr.get('/data/management.holidays', query);
-        let { items: holidays } = JSON.parse(`{"total":2,"offset":"6716b9119ecada7d9349a037","items":[{"id":"68482c459450ec084b4e4f39","version":0,"label":"June , 16 - Passing to Immortality of General Martín Güemes","entity":{"id":"5e84a6cb07081b50bd6c1bc6","name":"management.holidays"},"country":{"id":"5c617a71bbaa2e000c9a4740","label":"Argentina"},"day":"2025-06-16","title":"Passing to Immortality of General Martín Güemes","ignore":false},{"id":"6716b9119ecada7d9349a037","version":0,"label":"June , 20 - Anniversary of the Death of General Manuel Belgrano","entity":{"id":"5e84a6cb07081b50bd6c1bc6","name":"management.holidays"},"country":{"id":"5c617a71bbaa2e000c9a4740","label":"Argentina"},"day":"2025-06-20","title":"Anniversary of the Death of General Manuel Belgrano","ignore":false}]}`)
-        holidays.push({ day: '2025-06-02', label: 'Leave' });
-        this.calendar.set({ selectedHolidays: holidays.map(h => h.day) });
-        this.holidays(holidays)
+
+        try {
+            this.holidayCache.set(year, await request);
+        } finally {
+            if (this.holidayFetches.get(year) === request) this.holidayFetches.delete(year);
+        }
+    }
+
+    ensureHolidayDataForRange = async (startDate, endDate) => {
+        if (!this.argentinaHolidaysEnabled()) return;
+        const start = parseLocalDate(startDate);
+        const end = parseLocalDate(endDate);
+        if (!start || !end || end < start) throw new Error('Choose a valid schedule date range.');
+        const years = [];
+        for (let year = start.getFullYear(); year <= end.getFullYear(); year++) years.push(year);
+        await Promise.all(years.map(year => this.ensureHolidayYearLoaded(year)));
+    }
+
+    updateHolidays = async () => {
+        const settingsVersion = this.holidaySettingsVersion;
+        const year = this.year();
+        const month = this.month();
+        const applyLeaveDaysOnly = () => {
+            this.holidays([]);
+            this.calendar?.set?.({ selectedHolidays: this.leaveDays() });
+            this.holidayWarning('');
+        };
+        if (!this.argentinaHolidaysEnabled()) {
+            applyLeaveDaysOnly();
+            return;
+        }
+
+        try {
+            await this.ensureHolidayYearLoaded(year);
+            if (settingsVersion !== this.holidaySettingsVersion || year !== this.year() || month !== this.month()) return;
+            if (!this.argentinaHolidaysEnabled()) {
+                applyLeaveDaysOnly();
+                return;
+            }
+            const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}-`;
+            const holidays = this.holidayCache.get(year)
+                .filter(item => item.fecha?.startsWith(monthPrefix) && item.nombre)
+                .map(item => ({ day: item.fecha, title: item.nombre, label: item.nombre }));
+            this.holidays(holidays);
+            this.calendar?.set?.({ selectedHolidays: [...holidays.map(item => item.day), ...this.leaveDays()] });
+            this.holidayWarning('');
+        } catch (e) {
+            if (settingsVersion !== this.holidaySettingsVersion || year !== this.year() || month !== this.month()) return;
+            if (!this.argentinaHolidaysEnabled()) {
+                applyLeaveDaysOnly();
+                return;
+            }
+            console.warn('Could not load holiday data:', e);
+            this.holidays([]);
+            this.calendar?.set?.({ selectedHolidays: this.leaveDays() });
+            this.holidayWarning('Argentina holiday data could not be loaded; missing-hours totals may include public holidays.');
+        }
     }
 
     updateTimeTracking = async () => {
@@ -1665,8 +2261,19 @@ class ViewModel {
         let weeks = this.listWeeksBetweenMonth()
             .map(week => new Week(week, entries));
         this.weeks(weeks);
+        this.dashboardHasLoaded(true);
 
-        await this.updateStats();
+        const refreshId = this.dashboardRefreshSequence;
+        this.updateStats().catch(error => {
+            if (refreshId !== this.dashboardRefreshSequence) return;
+            if (error instanceof AuthError) {
+                this.logout(false);
+                this.addToast('Your session expired. Please log in again.', 'warning');
+                return;
+            }
+            console.warn('Time entries loaded, but dashboard statistics could not be refreshed:', error);
+            this.statsWarning('Time entries loaded, but one or more summary charts could not be refreshed.');
+        });
     }
 
     updateStats = async () => {
@@ -1730,6 +2337,8 @@ class ViewModel {
  
         this.monthProgress.scopes(scopeProgress);
         this.monthProgress.total(formatMsToDuration(totalTimeSpent));
+        this.monthProgress.loggedToDate(formatMsToDuration(totalTimeSpentMtd));
+        this.monthProgress.expectedToDate(formatMsToDuration(expectedMtdMs));
 
         const missingMs = expectedMtdMs - totalTimeSpentMtd;
         this.monthProgress.missing(missingMs > 0 ? missingMs : 0);
@@ -2092,6 +2701,247 @@ function Week(week, entries) {
     return self;
 }
 
+let newEntryFormSequence = 0;
+
+function NewEntryDraft(source, copyDetails = false, baseDate = null) {
+    const initialProject = source.project ? source.project() : null;
+    const initialScope = source.scope ? source.scope() : model.defaultScope();
+    const initialTime = !copyDetails && source.timeSpent ? source.timeSpent() : 1 * 60 * 60 * 1000;
+    const selectedDate = baseDate || source.date || new Date();
+    const selectedDateString = getDateString(selectedDate);
+    const selectedMonthEnd = getDateString(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0));
+    this.id = `new-entry-form-${++newEntryFormSequence}`;
+    this.project = ko.observable(initialProject);
+    this.scope = ko.observable(initialScope || 'global');
+    this.notes = ko.observable(!copyDetails && source.notes ? source.notes() : '');
+    this.timeSpent = ko.observable(initialTime);
+    this.time = ko.observable(formatMsToDuration(initialTime));
+    this.entryNumber = ko.computed(() => model.newEntryForms.indexOf(this) + 1);
+    this.taskId = ko.observable(source.taskId ? source.taskId() : null);
+    this.ticketId = ko.observable(source.ticketId ? source.ticketId() : null);
+    this.tasks = ko.observableArray([]);
+    this.tickets = ko.observableArray([]);
+    this.taskStatusFilter = ko.observable(source.taskStatusFilter ? source.taskStatusFilter() : 'all');
+    this.taskStatusOptions = [
+        { value: 'all', text: 'All' },
+        { value: 'new', text: 'New' },
+        { value: 'toDo', text: 'To Do' },
+        { value: 'inProgress', text: 'In Progress' },
+        { value: 'inReview', text: 'In Review' },
+        { value: 'completed', text: 'Completed' },
+        { value: 'staging', text: 'Staging' },
+        { value: 'released', text: 'Released' },
+    ];
+    this.onlyAssignedToMe = ko.observable(source.onlyAssignedToMe ? source.onlyAssignedToMe() : true);
+    this.scheduled = ko.observable(false);
+    this.scheduleFrequency = ko.observable('businessDaily');
+    this.scheduleStart = ko.observable(selectedDateString);
+    this.scheduleEnd = ko.observable(selectedMonthEnd);
+    this.scheduleHolidayLoading = ko.observable(false);
+    this.scheduleHolidayError = ko.observable('');
+    this.scheduleRequestId = 0;
+    this.scheduleRangeValid = ko.computed(() => {
+        const start = parseLocalDate(this.scheduleStart());
+        const end = parseLocalDate(this.scheduleEnd());
+        return Boolean(start && end && end >= start && end.getFullYear() - start.getFullYear() <= 10);
+    });
+    this.scheduleHolidayDataReady = ko.computed(() => {
+        if (!this.scheduled()) return true;
+        this.scheduleHolidayLoading();
+        if (!this.scheduleRangeValid() || this.scheduleHolidayError()) return false;
+        if (!model.argentinaHolidaysEnabled()) return true;
+        const start = parseLocalDate(this.scheduleStart());
+        const end = parseLocalDate(this.scheduleEnd());
+        for (let year = start.getFullYear(); year <= end.getFullYear(); year++) {
+            if (!model.holidayCache.has(year)) return false;
+        }
+        return true;
+    });
+    this.scheduleDates = ko.computed(() => {
+        if (!this.scheduled() || !this.scheduleRangeValid() || !this.scheduleHolidayDataReady()) return [];
+        const start = parseLocalDate(this.scheduleStart());
+        const end = parseLocalDate(this.scheduleEnd());
+        const holidayDates = new Set();
+        if (model.argentinaHolidaysEnabled()) {
+            for (let year = start.getFullYear(); year <= end.getFullYear(); year++) {
+                for (const holiday of model.holidayCache.get(year) || []) {
+                    if (holiday.fecha) holidayDates.add(holiday.fecha);
+                }
+            }
+        }
+        return buildScheduledEntryDates(this.scheduleFrequency(), start, end, holidayDates, new Set(model.leaveDays()));
+    });
+    this.scheduleValid = ko.computed(() => {
+        if (!this.scheduled()) return true;
+        if (!this.scheduleRangeValid() || !this.scheduleHolidayDataReady()) return false;
+        const dates = this.scheduleDates();
+        return dates.length > 0 && dates.length <= model.newEntryMaxRequests;
+    });
+    this.scheduleSummary = ko.computed(() => {
+        if (!this.scheduled()) return '';
+        const start = parseLocalDate(this.scheduleStart());
+        const end = parseLocalDate(this.scheduleEnd());
+        if (!start || !end) return 'Choose a start and end date.';
+        if (end < start) return 'The end date must be on or after the start date.';
+        if (end.getFullYear() - start.getFullYear() > 10) return 'Choose a date range of 10 years or less.';
+        if (this.scheduleHolidayLoading()) return 'Loading holiday data for this range…';
+        if (this.scheduleHolidayError()) return this.scheduleHolidayError();
+        if (!this.scheduleHolidayDataReady()) return 'Holiday data is unavailable for this range.';
+        const dates = this.scheduleDates();
+        if (!dates.length) return 'No eligible business days fall within this date range.';
+        if (dates.length > model.newEntryMaxRequests) return `This entry would create ${dates.length} requests. Shorten the date range to 50 or fewer occurrences.`;
+        const frequencyLabel = {
+            businessDaily: 'every business day',
+            weekly: 'weekly',
+            biweekly: 'every two weeks',
+        }[this.scheduleFrequency()];
+        return `${dates.length} ${frequencyLabel} occurrences, ${formatEntryDateLabel(dates[0])} through ${formatEntryDateLabel(dates[dates.length - 1])}.`;
+    });
+    this.optionsLoading = ko.observable(false);
+    this.scopeOptionsRequest = 0;
+    this.isLoggable = ko.computed(() => {
+        if (!this.project() || !this.notes().trim()) return false;
+        if (this.scope() === 'task' && !this.taskId()) return false;
+        if (this.scope() === 'supportTicket' && !this.ticketId()) return false;
+        return true;
+    });
+    this.updateTimeSpentInModal = (amount) => {
+        const next = this.timeSpent() + amount;
+        const maxTime = model.dailyWorkHours() * 60 * 60 * 1000;
+        if (next >= 1800000 && next <= maxTime) this.timeSpent(next);
+    };
+    this.updateTimeFromInput = () => {
+        const durationMs = parseDurationToMs(this.time());
+        if (durationMs <= 0) {
+            this.time(formatMsToDuration(this.timeSpent()));
+            return;
+        }
+        const step = 1800000;
+        const roundedMs = Math.round(durationMs / step) * step;
+        const maxTime = model.dailyWorkHours() * 60 * 60 * 1000;
+        this.timeSpent(Math.max(step, Math.min(roundedMs, maxTime)));
+    };
+    this.loadScopeOptions = async () => {
+        const requestId = ++this.scopeOptionsRequest;
+        const project = this.project();
+        const scope = this.scope();
+        this.tasks([]);
+        this.tickets([]);
+        if (!project || !scope || scope === 'global') {
+            this.optionsLoading(false);
+            return;
+        }
+
+        this.optionsLoading(true);
+        try {
+            const taskScope = scope === 'task';
+            const entity = taskScope ? 'dev.tasks' : 'support.tickets';
+            const params = {
+                project: project.id,
+                _size: 1000,
+                _fields: 'id,label,number',
+                ...(taskScope
+                    ? { _sortField: 'createdAt', _sortType: 'desc' }
+                    : { _sortField: 'draftTimestamp', _sortType: 'desc' }),
+            };
+            if (this.onlyAssignedToMe()) {
+                if (taskScope) params.assignees = model.slingr.user.id;
+                else params.assignee = model.slingr.user.id;
+            }
+            if (taskScope && this.taskStatusFilter() !== 'all') params.status = this.taskStatusFilter();
+            const { items } = await model.slingr.get(`/data/${entity}`, params);
+            if (requestId === this.scopeOptionsRequest) {
+                const options = items.map(item => ({ id: item.id, name: item.label }));
+                if (taskScope) this.tasks(options);
+                else this.tickets(options);
+            }
+        } catch (error) {
+            if (requestId === this.scopeOptionsRequest) {
+                console.error('Error loading scope options', error);
+                model.addToast('Error loading tasks/tickets for an entry form.', 'error');
+            }
+        } finally {
+            if (requestId === this.scopeOptionsRequest) this.optionsLoading(false);
+        }
+    };
+    this.loadScheduleHolidayData = async () => {
+        const requestId = ++this.scheduleRequestId;
+        this.scheduleHolidayError('');
+        if (!this.scheduled() || !model.argentinaHolidaysEnabled()) {
+            this.scheduleHolidayLoading(false);
+            return;
+        }
+        const start = this.scheduleStart();
+        const end = this.scheduleEnd();
+        if (!this.scheduleRangeValid()) {
+            this.scheduleHolidayLoading(false);
+            return;
+        }
+
+        this.scheduleHolidayLoading(true);
+        try {
+            await model.ensureHolidayDataForRange(start, end);
+        } catch (error) {
+            if (requestId === this.scheduleRequestId) {
+                console.error('Error loading holidays for an entry schedule:', error);
+                this.scheduleHolidayError('Could not load public holidays for this range. Retry or turn off holiday support.');
+            }
+        } finally {
+            if (requestId === this.scheduleRequestId) this.scheduleHolidayLoading(false);
+        }
+    };
+
+    const subscriptions = [
+        this.project.subscribe(() => {
+            this.taskId(null);
+            this.ticketId(null);
+            this.loadScopeOptions();
+        }),
+        this.scope.subscribe(scope => {
+            model.defaultScope(scope);
+            this.taskId(null);
+            this.ticketId(null);
+            this.loadScopeOptions();
+        }),
+        this.taskStatusFilter.subscribe(() => {
+            this.taskId(null);
+            this.loadScopeOptions();
+        }),
+        this.onlyAssignedToMe.subscribe(() => {
+            this.taskId(null);
+            this.ticketId(null);
+            this.loadScopeOptions();
+        }),
+        this.scheduled.subscribe(scheduled => {
+            if (scheduled) {
+                this.loadScheduleHolidayData();
+            } else {
+                this.scheduleRequestId++;
+                this.scheduleHolidayLoading(false);
+                this.scheduleHolidayError('');
+            }
+        }),
+        this.scheduleStart.subscribe(() => this.loadScheduleHolidayData()),
+        this.scheduleEnd.subscribe(() => this.loadScheduleHolidayData()),
+        model.argentinaHolidaysEnabled.subscribe(() => this.loadScheduleHolidayData()),
+        this.timeSpent.subscribe(value => this.time(formatMsToDuration(value))),
+    ];
+    this.dispose = () => {
+        this.scopeOptionsRequest++;
+        this.scheduleRequestId++;
+        subscriptions.forEach(subscription => subscription.dispose());
+        this.isLoggable.dispose();
+        this.entryNumber.dispose();
+        this.scheduleRangeValid.dispose();
+        this.scheduleHolidayDataReady.dispose();
+        this.scheduleDates.dispose();
+        this.scheduleValid.dispose();
+        this.scheduleSummary.dispose();
+    };
+
+    if (this.scope() !== 'global') this.loadScopeOptions();
+}
+
 function Day (date, entries, week) {
     const getMaxTimeSpent = () => model.dailyWorkHours() * 60 * 60 * 1000;
     let dateStr = getDateString(date);
@@ -2119,7 +2969,7 @@ function Day (date, entries, week) {
         durationNonBillable: 0,
         visibleNotes: ko.observable(true),
         // Form
-        scope: ko.observable('global'),
+        scope: ko.observable(model.defaultScope()),
         notes: ko.observable(''),
         timeSpent: ko.observable(1 * 60 * 60 * 1000),
         time: ko.observable('1h'),
@@ -2230,64 +3080,6 @@ function Day (date, entries, week) {
                 model.loading(false);
             }
         },
-        logEntry: async (day) => {
-            model.loading(true);
-            try {
-                // Ensure project is selected before logging
-                if (!day.project()) {
-                    model.addToast('Please select a project.', 'error');
-                    model.loading(false);
-                    return;
-                }
-                // Ensure task/ticket is selected if scope is task/ticket
-                if (day.scope() === 'task' && !day.taskId()) {
-                    model.addToast('Please select a task.', 'error');
-                    model.loading(false);
-                    return;
-                }
-                if (day.scope() === 'supportTicket' && !day.ticketId()) {
-                    model.addToast('Please select a ticket.', 'error');
-                    model.loading(false);
-                    return;
-                }
-
-                await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/logTime`, {
-                    project: day.project().id,
-                    scope: day.scope(),
-                    task: day.scope() === 'task' ? day.taskId() : null,
-                    ticket: day.scope() === 'supportTicket' ? day.ticketId() : null,
-                    forMe: true,
-                    date: day.dateStr(),
-                    timeSpent: parseInt(day.timeSpent()),
-                    notes: day.notes(),
-                });
-
-                await day.updateDay();
-
-                // Update selection for keybindings
-                if (model.keybindingsEnabled() && model.navigationMode() === 'entry') {
-                    const newEntry = day.entries()[day.entries().length - 1];
-                    if (newEntry) {
-                        model.selectedEntry(newEntry);
-                        setTimeout(() => model.scrollToEntry(newEntry), 50);
-                    }
-                }
-
-                // Reset form fields after successful log
-                day.notes('');
-                day.timeSpent(1 * 60 * 60 * 1000); // Reset to 1 hour
-                day.scope('global'); // Reset scope to global
-                day.taskId(null); // Clear task selection
-                day.ticketId(null); // Clear ticket selection
-
-                model.newEntryModal.hide();
-                await model.updateStats();
-            } catch(e) {
-                console.error(e);
-                model.addToast('Error logging entry.', 'error');
-            }
-            model.loading(false);
-        },
         showNotes: (day, a) => {
             day.visibleNotes(! day.visibleNotes());
         }
@@ -2295,7 +3087,7 @@ function Day (date, entries, week) {
 
     day.fillMissingHours = function() {
         day.timeSpent(getMaxTimeSpent() - day.durationMs());
-        day.notes('-');
+        day.notes('');
         model.openNewEntryModal(day);
     }
 
@@ -2358,8 +3150,8 @@ function Day (date, entries, week) {
         if (filterText) {
             const filterTerms = filterText.split(',').map(term => term.trim()).filter(term => term);
             entries = entries.filter(entry => {
-                const notes = (entry.notes() || '').toLowerCase();
-                return filterTerms.some(term => notes.includes(term));
+                const searchableText = [entry.notes(), entry.project(), entry.task()].join(' ').toLowerCase();
+                return filterTerms.some(term => searchableText.includes(term));
             });
         }
         return entries;
@@ -2438,6 +3230,7 @@ function Day (date, entries, week) {
 
     day.project.subscribe(async () => await loadScopeOptions());
     day.scope.subscribe(async () => {
+        model.defaultScope(day.scope());
         day.taskId(null);
         day.ticketId(null);
         await loadScopeOptions();
@@ -2474,7 +3267,6 @@ function Day (date, entries, week) {
     day.isVisible = ko.computed(function() {
         const range = model.viewRange();
         const today = new Date();
-        const todayStr = getDateString(today);
 
         if (range === 'day' && !day.isToday()) {
             return false;
@@ -2499,19 +3291,14 @@ function Day (date, entries, week) {
         if (model.filterHideLeaveDays() && day.isLeave()) {
             return false;
         }
+        if (model.filterHideHolidays() && day.isHoliday()) {
+            return false;
+        }
         if (model.filterMissingHours() && !day.isMissingTime()) {
             return false;
         }
         if (model.hideWeekends() && day.isWeekend() && !day.isLeave()) {
             return false;
-        }
-        if (model.filterHideCompleteDays()) {
-            if (day.dateStr() > todayStr) {
-                return false;
-            }
-            if (day.isBussinessDay() && day.durationMs() >= getMaxTimeSpent()) {
-                return false;
-            }
         }
         return true;
     });
@@ -2534,11 +3321,44 @@ function Day (date, entries, week) {
         return Math.min(percentage, 100);
     });
 
+    day.durationScopes = ko.computed(function() {
+        const scopeDetails = {
+            global: { name: 'Global', colorClass: 'bg-primary', timeSpent: 0 },
+            task: { name: 'Task', colorClass: 'bg-success', timeSpent: 0 },
+            supportTicket: { name: 'Ticket', colorClass: 'bg-danger', timeSpent: 0 },
+        };
+        const totalTime = day.durationMs();
+        if (totalTime <= 0) {
+            return [];
+        }
+
+        for (const entry of day.entries()) {
+            const scope = entry.scope();
+            if (scopeDetails[scope]) {
+                scopeDetails[scope].timeSpent += entry.timeSpent();
+            }
+        }
+
+        return Object.values(scopeDetails)
+            .filter(scope => scope.timeSpent > 0)
+            .map(scope => ({
+                ...scope,
+                duration: formatMsToDuration(scope.timeSpent),
+                width: `${(scope.timeSpent / totalTime) * 100}%`,
+            }));
+    });
+
+    day.durationScopeSummary = ko.computed(function() {
+        const scopeSummary = day.durationScopes().map(scope => `${scope.name}: ${scope.duration}`);
+        return [day.duration() + ' logged', ...scopeSummary].join(' · ');
+    });
+
     day.durationClass = ko.computed(function() {
-        const percentage = (day.durationMs() / getMaxTimeSpent()) * 100;
-        if (percentage < 100) return 'bg-warning';
-        if (percentage >= 100 && percentage < 110) return 'bg-success';
-        return 'bg-danger'; // over 110%
+        const durationMs = day.durationMs();
+        const maxTimeSpent = getMaxTimeSpent();
+        if (durationMs < maxTimeSpent) return 'bg-warning';
+        if (durationMs === maxTimeSpent) return 'bg-success';
+        return 'bg-danger';
     });
 
     return day;
@@ -2772,6 +3592,13 @@ function Entry (entry, day) {
         },
     };
 
+    self.editTargetWarning = ko.computed(function() {
+        const targetMs = model.dailyWorkHours() * 60 * 60 * 1000;
+        const projectedMs = self.day.durationMs() - self.raw.timeSpent + self.edit_timeSpent();
+        if (!Number.isFinite(projectedMs) || projectedMs <= targetMs) return '';
+        return `After saving, the day's total would be ${formatMsToDuration(projectedMs)}, ${formatMsToDuration(projectedMs - targetMs)} above the ${model.dailyWorkHours()}h daily target.`;
+    });
+
     self.labels = ko.computed(function() {
         const notesText = self.notes() || '';
         const matches = notesText.match(/#\w+/g) || [];
@@ -2780,7 +3607,10 @@ function Entry (entry, day) {
 
     self.formattedNotes = ko.computed(function() {
         const notesText = self.notes() || '';
-        return notesText.replace(/#(\w+)/g, (match, word) => {
+        const escapedNotes = notesText.replace(/[&<>"']/g, character => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+        }[character]));
+        return escapedNotes.replace(/#(\w+)/g, (match, word) => {
             return `<span class="badge bg-secondary text-dark me-1">#${word}</span>`;
         });
     });
@@ -2836,7 +3666,7 @@ function Entry (entry, day) {
         if (self.edit_scope() === 'supportTicket' && !self.edit_ticketId()) {
             return false;
         }
-        if (self.edit_notes() && self.edit_notes().trim() === '') {
+        if (!self.edit_notes() || self.edit_notes().trim() === '') {
             return false;
         }
         return true;
@@ -2871,8 +3701,58 @@ function Entry (entry, day) {
 /* Date Utils */
 
 function getDateString(date) {
-    return date.toISOString().split('T')[0];
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
+
+function parseLocalDate(dateString) {
+    if (typeof dateString !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return null;
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return getDateString(date) === dateString ? date : null;
+}
+
+function buildScheduledEntryDates(frequency, startDate, endDate, holidayDates, leaveDates) {
+    if (!(startDate instanceof Date) || !(endDate instanceof Date) || endDate < startDate) return [];
+    if (!['businessDaily', 'weekly', 'biweekly'].includes(frequency)) return [];
+
+    const isBusinessDate = date => {
+        const dateString = getDateString(date);
+        return date.getDay() !== 0
+            && date.getDay() !== 6
+            && !holidayDates.has(dateString)
+            && !leaveDates.has(dateString);
+    };
+    const dates = [];
+    const date = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const rangeEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+
+    if (frequency === 'businessDaily') {
+        while (date <= rangeEnd && dates.length <= 50) {
+            if (isBusinessDate(date)) dates.push(getDateString(date));
+            date.setDate(date.getDate() + 1);
+        }
+        return dates;
+    }
+
+    const cadenceDays = frequency === 'weekly' ? 7 : 14;
+    while (date <= rangeEnd && !isBusinessDate(date)) date.setDate(date.getDate() + 1);
+    while (date <= rangeEnd && dates.length <= 50) {
+        if (isBusinessDate(date)) dates.push(getDateString(date));
+        date.setDate(date.getDate() + cadenceDays);
+    }
+    return dates;
+}
+
+function formatEntryDateLabel(dateStr) {
+    const [year, month, date] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, date).toLocaleDateString(undefined, {
+        weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+    });
+}
+
 function formatMsToHours(ms) {
     let n = (ms / 1000 / 60 / 60);
     n = n % 1 === 0 ? n.toString() : n.toFixed(1);
