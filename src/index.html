@@ -126,11 +126,17 @@
 
     <script type="text/html" id="new-entry-form-template">
         <div class="card new-entry-form-card mb-3">
-            <div class="card-header d-flex align-items-center justify-content-between py-2">
+            <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2 py-2">
                 <strong data-bind="text: 'Entry ' + entryNumber()"></strong>
-                <button type="button" class="btn btn-sm btn-outline-danger" data-bind="click: $root.removeNewEntryForm.bind($root, $data), visible: $root.newEntryForms().length > 1, attr: { disabled: $root.loading(), 'aria-label': 'Remove this entry' }">
-                    <i class="bi bi-trash me-1" aria-hidden="true"></i>Remove
-                </button>
+                <div class="d-flex align-items-center gap-3">
+                    <div class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" role="switch" data-bind="checked: scheduled, attr: { id: 'entry-scheduled-' + id, disabled: $root.loading() }">
+                        <label class="form-check-label" data-bind="attr: { for: 'entry-scheduled-' + id }">Schedule</label>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-danger" data-bind="click: $root.removeNewEntryForm.bind($root, $data), visible: $root.newEntryForms().length > 1, attr: { disabled: $root.loading(), 'aria-label': 'Remove this entry' }">
+                        <i class="bi bi-trash me-1" aria-hidden="true"></i>Remove
+                    </button>
+                </div>
             </div>
             <div class="card-body">
                 <div class="row g-3 align-items-start">
@@ -196,6 +202,31 @@
                         <label class="form-label" data-bind="attr: { for: 'entry-notes-' + id }">Notes <span class="text-danger">*</span></label>
                         <textarea class="form-control" rows="3" placeholder="What did you work on?" data-bind="value: notes, attr: { id: 'entry-notes-' + id, 'aria-label': 'Notes for entry ' + entryNumber(), disabled: $root.loading() || optionsLoading() }"></textarea>
                     </div>
+                </div>
+                <div class="entry-schedule-panel rounded bg-body-tertiary p-3 mt-3" data-bind="visible: scheduled">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label" data-bind="attr: { for: 'entry-schedule-frequency-' + id }">Repeat</label>
+                            <select class="form-select" data-bind="value: scheduleFrequency, attr: { id: 'entry-schedule-frequency-' + id, disabled: $root.loading() }">
+                                <option value="businessDaily">Every business day</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="biweekly">Every 2 weeks (biweekly)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" data-bind="attr: { for: 'entry-schedule-start-' + id }">Start date</label>
+                            <input type="date" class="form-control" data-bind="value: scheduleStart, attr: { id: 'entry-schedule-start-' + id, disabled: $root.loading() }">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label" data-bind="attr: { for: 'entry-schedule-end-' + id }">End date</label>
+                            <input type="date" class="form-control" data-bind="value: scheduleEnd, attr: { id: 'entry-schedule-end-' + id, disabled: $root.loading() }">
+                        </div>
+                    </div>
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-2">
+                        <div class="small text-body-secondary" role="status" aria-live="polite" data-bind="text: scheduleSummary"></div>
+                        <button type="button" class="btn btn-sm btn-outline-warning" data-bind="click: loadScheduleHolidayData, visible: scheduleHolidayError, attr: { disabled: $root.loading() }">Retry holiday data</button>
+                    </div>
+                    <div class="form-text mt-1">Occurrences are created immediately as a one-time batch, not an ongoing schedule. Weekends and saved leave dates are skipped; public holidays are skipped when holiday support is enabled.</div>
                 </div>
             </div>
         </div>
@@ -774,25 +805,7 @@
                             <div data-bind="template: { name: 'new-entry-form-template', data: $data }"></div>
                         </div>
                         <div class="form-text mb-3" data-bind="visible: $root.newEntryForms().length >= $root.newEntryMaxForms">A batch can contain up to <span data-bind="text: $root.newEntryMaxForms"></span> entry forms.</div>
-                        <div class="card bg-body-tertiary border-0 p-3 mb-3">
-                            <div class="row g-3 align-items-end">
-                                <div class="col-md-6">
-                                    <label for="newEntryRepeatFrequency" class="form-label">Schedule</label>
-                                    <select id="newEntryRepeatFrequency" class="form-select" data-bind="value: $root.newEntryRepeatFrequency, attr: { disabled: $root.loading() }">
-                                        <option value="none">Selected day only</option>
-                                        <option value="businessDays" data-bind="attr: { disabled: !$root.newEntryBusinessDatesReady() || $root.newEntryRepeatOccurrenceLimit() < 2 }">Repeat on business days through month end</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6" data-bind="visible: $root.newEntryRepeatFrequency() === 'businessDays'">
-                                    <label for="newEntryRepeatCount" class="form-label">Business-day occurrences</label>
-                                    <input type="number" class="form-control" id="newEntryRepeatCount" min="2" data-bind="value: $root.newEntryRepeatCount, valueUpdate: 'input', attr: { max: $root.newEntryRepeatOccurrenceLimit(), disabled: $root.loading() }">
-                                </div>
-                            </div>
-                            <div class="form-text mt-2" data-bind="visible: $root.newEntryRepeatFrequency() === 'businessDays'">Creates these entries now as a one-time batch, from the selected date through month end. Weekends and saved leave days are skipped; public holidays are skipped when holiday support is enabled.</div>
-                            <div class="form-text mt-2" data-bind="visible: $root.newEntryRepeatFrequency() === 'businessDays', text: $root.newEntryRepeatSummary"></div>
-                            <div class="form-text text-warning mt-2" data-bind="visible: $root.argentinaHolidaysEnabled() && !$root.newEntryBusinessDatesReady()">Public holiday data is unavailable, so business-day repeats are disabled until the month is refreshed.</div>
-                            <div class="form-text mt-2" data-bind="visible: $root.newEntryRepeatFrequency() === 'none' && $root.newEntryBusinessDatesReady() && $root.newEntryBusinessDates().length < 2">No additional eligible business days remain in this month.</div>
-                        </div>
+                        <div class="form-text mb-3" role="status" aria-live="polite" data-bind="visible: $root.newEntryBatchRequestCount() > 1, text: $root.newEntryScheduleSummary"></div>
                         <div class="alert alert-warning py-2 mb-3 w-100" role="status" aria-live="polite" data-bind="visible: $root.newEntryBatchTargetWarning, text: $root.newEntryBatchTargetWarning"></div>
                         <div class="form-text mb-3" role="status" aria-live="polite" data-bind="visible: $root.newEntrySubmissionStatus, text: $root.newEntrySubmissionStatus"></div>
                     </div>

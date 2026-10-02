@@ -168,6 +168,7 @@ class ViewModel {
         // Calendar
         this.holidays = ko.observableArray([]);
         this.holidayCache = new Map();
+        this.holidayFetches = new Map();
         this.holidaySettingsVersion = 0;
         this.argentinaHolidaysEnabled = ko.observable(localStorage.getItem('solutions:timetracking:argentinaHolidaysEnabled') !== 'false');
         this.argentinaHolidaysEnabled.subscribe(enabled => {
@@ -476,85 +477,60 @@ class ViewModel {
         this.selectedDayForNewEntry = ko.observable(null);
         this.newEntryModal = null;
         this.newEntryForms = ko.observableArray([]);
-        this.newEntryRepeatFrequency = ko.observable('none');
-        this.newEntryRepeatCount = ko.observable(2);
         this.newEntrySubmissionStatus = ko.observable('');
         this.newEntryMaxForms = 10;
         this.newEntryMaxRequests = 50;
-        this.newEntryBusinessDatesReady = ko.computed(() => {
+        this.newEntryBatchRequestCount = ko.computed(() => {
             const day = this.selectedDayForNewEntry();
-            this.holidays();
-            return Boolean(day) && (!this.argentinaHolidaysEnabled() || this.holidayCache.has(day.date.getFullYear()));
-        });
-        this.newEntryBusinessDates = ko.computed(() => {
-            const day = this.selectedDayForNewEntry();
-            if (!day || !this.newEntryBusinessDatesReady()) return [];
-            const year = day.date.getFullYear();
-            const holidayDates = this.argentinaHolidaysEnabled()
-                ? new Set((this.holidayCache.get(year) || []).map(item => item.fecha).filter(Boolean))
-                : new Set();
-            return buildBusinessDatesThroughMonthEnd(day.date, holidayDates, new Set(this.leaveDays()));
-        });
-        this.newEntryRepeatOccurrenceLimit = ko.computed(() => {
-            if (this.newEntryRepeatFrequency() === 'none') return 1;
-            const formsCount = Math.max(this.newEntryForms().length, 1);
-            return Math.min(this.newEntryBusinessDates().length, Math.floor(this.newEntryMaxRequests / formsCount));
-        });
-        this.newEntryRepeatValid = ko.computed(() => {
-            if (this.newEntryRepeatFrequency() === 'none') return true;
-            const count = Number(this.newEntryRepeatCount());
-            return this.newEntryBusinessDatesReady()
-                && Number.isInteger(count)
-                && count >= 2
-                && count <= this.newEntryRepeatOccurrenceLimit();
+            if (!day) return 0;
+            return this.newEntryForms().reduce((total, form) => total + (form.scheduled() ? form.scheduleDates().length : 1), 0);
         });
         this.newEntryBatchValid = ko.computed(() => {
             const forms = this.newEntryForms();
             return forms.length > 0
                 && forms.length <= this.newEntryMaxForms
                 && forms.every(form => form.isLoggable())
-                && this.newEntryRepeatValid();
+                && forms.every(form => form.scheduleValid())
+                && this.newEntryBatchRequestCount() > 0
+                && this.newEntryBatchRequestCount() <= this.newEntryMaxRequests;
         });
         this.newEntrySubmitLabel = ko.computed(() => {
-            const formsCount = this.newEntryForms().length || 1;
-            if (this.newEntryRepeatFrequency() !== 'none' && !this.newEntryRepeatValid()) return 'Create Entry Batch';
-            const occurrenceCount = this.newEntryRepeatFrequency() === 'none' ? 1 : Number(this.newEntryRepeatCount());
-            const total = formsCount * (Number.isInteger(occurrenceCount) ? occurrenceCount : 1);
-            return total === 1 ? 'Log Entry' : `Log ${total} Entries`;
+            const forms = this.newEntryForms();
+            if (forms.some(form => form.scheduled() && !form.scheduleValid())) return 'Create Entry Batch';
+            const total = this.newEntryBatchRequestCount();
+            if (total > this.newEntryMaxRequests) return 'Reduce Batch Size';
+            return total <= 1 ? 'Log Entry' : `Log ${total} Entries`;
         });
-        this.newEntryRepeatSummary = ko.computed(() => {
-            const frequency = this.newEntryRepeatFrequency();
-            const day = this.selectedDayForNewEntry();
-            if (frequency === 'none' || !day) return '';
-            if (!this.newEntryBusinessDatesReady()) return 'Holiday data is unavailable. Refresh the month before creating business-day repeats.';
-            const dates = this.newEntryBusinessDates();
-            const limit = this.newEntryRepeatOccurrenceLimit();
-            if (limit < 2) return 'No additional business days are available in this month.';
-            if (!this.newEntryRepeatValid()) return `Choose between 2 and ${limit} business days for this batch.`;
-            const occurrences = dates.slice(0, Number(this.newEntryRepeatCount()));
-            const formCount = this.newEntryForms().length;
-            const requestLimitNote = dates.length > limit ? ' This batch is limited to 50 create requests.' : '';
-            return `${occurrences.length} business days from ${formatEntryDateLabel(occurrences[0])} through ${formatEntryDateLabel(occurrences[occurrences.length - 1])}; ${formCount} ${formCount === 1 ? 'entry' : 'entries'} per day (${occurrences.length * formCount} create requests).${requestLimitNote}`;
+        this.newEntryScheduleSummary = ko.computed(() => {
+            const forms = this.newEntryForms();
+            const scheduledForms = forms.filter(form => form.scheduled());
+            const requestCount = this.newEntryBatchRequestCount();
+            if (!forms.length) return '';
+            if (scheduledForms.some(form => !form.scheduleValid())) return 'Review the date range and holiday status for each scheduled entry.';
+            if (requestCount > this.newEntryMaxRequests) return `This batch contains ${requestCount} create requests; the limit is ${this.newEntryMaxRequests}. Shorten schedules or remove entries.`;
+            return `${requestCount} create ${requestCount === 1 ? 'request' : 'requests'} across ${forms.length} ${forms.length === 1 ? 'entry form' : 'entry forms'}${scheduledForms.length ? `, including ${scheduledForms.length} scheduled ${scheduledForms.length === 1 ? 'entry' : 'entries'}` : ''}.`;
         });
         this.newEntryBatchTargetWarning = ko.computed(() => {
             const day = this.selectedDayForNewEntry();
             const forms = this.newEntryForms();
             if (!day || !forms.length) return '';
 
-            let dates = [day.dateStr()];
-            if (this.newEntryRepeatFrequency() === 'businessDays') {
-                if (!this.newEntryRepeatValid()) return '';
-                dates = this.newEntryBusinessDates().slice(0, Number(this.newEntryRepeatCount()));
+            const validForms = forms.filter(form => !form.scheduled() || form.scheduleValid());
+            if (!validForms.length) return '';
+            const addedTimeByDate = new Map();
+            for (const form of validForms) {
+                const dates = form.scheduled() ? form.scheduleDates() : [day.dateStr()];
+                for (const date of dates) {
+                    addedTimeByDate.set(date, (addedTimeByDate.get(date) || 0) + Number(form.timeSpent()));
+                }
             }
-
             const visibleDays = this.weeks().flatMap(week => week.days());
             const targetMs = this.dailyWorkHours() * 60 * 60 * 1000;
-            const newTimeMs = forms.reduce((total, form) => total + Number(form.timeSpent()), 0);
             let largestOverage = null;
-            for (const date of dates) {
+            for (const [date, addedTime] of addedTimeByDate) {
                 const dateDay = visibleDays.find(visibleDay => visibleDay.dateStr() === date)
                     || (day.dateStr() === date ? day : null);
-                const projectedMs = (dateDay?.durationMs() || 0) + newTimeMs;
+                const projectedMs = (dateDay?.durationMs() || 0) + addedTime;
                 if (projectedMs > targetMs && (!largestOverage || projectedMs > largestOverage.projectedMs)) {
                     largestOverage = { date, projectedMs };
                 }
@@ -562,8 +538,8 @@ class ViewModel {
             if (!largestOverage) return '';
 
             const overage = formatMsToDuration(largestOverage.projectedMs - targetMs);
-            const dateLabel = dates.length > 1 ? ` on ${formatEntryDateLabel(largestOverage.date)}` : '';
-            const lead = forms.length === 1 && dates.length === 1 ? 'If logged, this would bring the day' : `If logged, these entries${dateLabel} would bring the day`;
+            const dateLabel = addedTimeByDate.size > 1 ? ` on ${formatEntryDateLabel(largestOverage.date)}` : '';
+            const lead = validForms.length === 1 && addedTimeByDate.size === 1 ? 'If logged, this would bring the day' : `If logged, these entries${dateLabel} would bring the day`;
             return `${lead} to ${formatMsToDuration(largestOverage.projectedMs)}, ${overage} above the ${this.dailyWorkHours()}h daily target.`;
         });
 
@@ -1630,9 +1606,10 @@ class ViewModel {
 
     addNewEntryForm = () => {
         if (this.loading() || this.newEntryForms().length >= this.newEntryMaxForms) return;
-        const source = this.newEntryForms()[this.newEntryForms().length - 1] || this.selectedDayForNewEntry();
-        if (!source) return;
-        const form = new NewEntryDraft(source, true);
+        const day = this.selectedDayForNewEntry();
+        const source = this.newEntryForms()[this.newEntryForms().length - 1] || day;
+        if (!source || !day) return;
+        const form = new NewEntryDraft(source, true, day.date);
         this.newEntryForms.push(form);
         setTimeout(() => document.getElementById(`entry-notes-${form.id}`)?.focus(), 0);
     }
@@ -1652,9 +1629,7 @@ class ViewModel {
         const isNewDay = this.selectedDayForNewEntry() !== day;
         if (isNewDay || this.newEntryForms().length === 0) {
             this.clearNewEntryForms();
-            this.newEntryForms([new NewEntryDraft(day)]);
-            this.newEntryRepeatFrequency('none');
-            this.newEntryRepeatCount(2);
+            this.newEntryForms([new NewEntryDraft(day, false, day.date)]);
             this.newEntrySubmissionStatus('');
         }
         this.selectedDayForNewEntry(day);
@@ -1682,38 +1657,31 @@ class ViewModel {
     submitNewEntryBatch = async (day) => {
         if (this.loading()) return;
         const forms = this.newEntryForms().slice();
-        const frequency = this.newEntryRepeatFrequency();
         if (forms.length === 0 || forms.some(form => !form.isLoggable())) {
             this.addToast('Complete the required project, scope, task, and notes fields in each entry form.', 'error');
             return;
         }
-        if (!this.newEntryRepeatValid()) {
-            this.addToast('Choose a valid number of remaining business days for this batch.', 'error');
+        if (forms.some(form => !form.scheduleValid())) {
+            this.addToast('Review the date range and holiday status for each scheduled entry.', 'error');
             return;
         }
-        const occurrenceDates = frequency === 'none'
-            ? [day.dateStr()]
-            : this.newEntryBusinessDates().slice(0, Number(this.newEntryRepeatCount()));
-        if (occurrenceDates.length === 0) {
-            this.addToast('There are no eligible business days for this schedule.', 'error');
+        const requests = forms.flatMap((form, formIndex) => {
+            const dates = form.scheduled() ? form.scheduleDates() : [day.dateStr()];
+            const entry = {
+                project: form.project().id,
+                scope: form.scope(),
+                task: form.scope() === 'task' ? form.taskId() : null,
+                ticket: form.scope() === 'supportTicket' ? form.ticketId() : null,
+                forMe: true,
+                timeSpent: parseInt(form.timeSpent(), 10),
+                notes: form.notes(),
+            };
+            return dates.map(date => ({ date, formIndex, entry }));
+        });
+        if (requests.length === 0 || requests.length > this.newEntryMaxRequests) {
+            this.addToast(`This batch must contain between 1 and ${this.newEntryMaxRequests} create requests.`, 'error');
             return;
         }
-
-        const entries = forms.map(form => ({
-            project: form.project().id,
-            scope: form.scope(),
-            task: form.scope() === 'task' ? form.taskId() : null,
-            ticket: form.scope() === 'supportTicket' ? form.ticketId() : null,
-            forMe: true,
-            timeSpent: parseInt(form.timeSpent(), 10),
-            notes: form.notes(),
-        }));
-        const requests = occurrenceDates.flatMap((date, dateIndex) => entries.map((entry, formIndex) => ({
-            date,
-            dateIndex,
-            formIndex,
-            entry,
-        })));
         const loggedRequests = [];
         let failedRequest = null;
         let requestError = null;
@@ -1744,8 +1712,6 @@ class ViewModel {
             day.scope(this.defaultScope());
             day.taskId(null);
             day.ticketId(null);
-            this.newEntryRepeatFrequency('none');
-            this.newEntryRepeatCount(2);
             this.clearNewEntryForms();
             this.newEntryModal?.hide();
 
@@ -1782,10 +1748,9 @@ class ViewModel {
                 );
             } else if (refreshError) {
                 this.addToast('Entries were created, but the affected days could not be refreshed. Refresh the dashboard to see the latest data.', 'warning');
-            } else if (requests.length > 1 && frequency === 'businessDays') {
-                this.addToast(`Created ${requests.length} entries across ${occurrenceDates.length} business days.`, 'success');
             } else if (requests.length > 1) {
-                this.addToast(`Created ${requests.length} entries for ${formatEntryDateLabel(day.dateStr())}.`, 'success');
+                const createdDates = new Set(loggedRequests.map(request => request.date));
+                this.addToast(`Created ${requests.length} entries across ${createdDates.size} date${createdDates.size === 1 ? '' : 's'}.`, 'success');
             } else {
                 this.addToast('Entry created.', 'success');
             }
@@ -2209,6 +2174,38 @@ class ViewModel {
     }
 
     // Get holidays of the month
+    ensureHolidayYearLoaded = async (year) => {
+        if (this.holidayCache.has(year)) return;
+
+        let request = this.holidayFetches.get(year);
+        if (!request) {
+            request = (async () => {
+                const response = await fetch(`https://api.argentinadatos.com/v1/feriados/${year}`);
+                if (!response.ok) throw new Error(`Holiday API returned ${response.status}`);
+                const items = await response.json();
+                if (!Array.isArray(items)) throw new Error('Unexpected holiday API response');
+                return items;
+            })();
+            this.holidayFetches.set(year, request);
+        }
+
+        try {
+            this.holidayCache.set(year, await request);
+        } finally {
+            if (this.holidayFetches.get(year) === request) this.holidayFetches.delete(year);
+        }
+    }
+
+    ensureHolidayDataForRange = async (startDate, endDate) => {
+        if (!this.argentinaHolidaysEnabled()) return;
+        const start = parseLocalDate(startDate);
+        const end = parseLocalDate(endDate);
+        if (!start || !end || end < start) throw new Error('Choose a valid schedule date range.');
+        const years = [];
+        for (let year = start.getFullYear(); year <= end.getFullYear(); year++) years.push(year);
+        await Promise.all(years.map(year => this.ensureHolidayYearLoaded(year)));
+    }
+
     updateHolidays = async () => {
         const settingsVersion = this.holidaySettingsVersion;
         const year = this.year();
@@ -2224,13 +2221,7 @@ class ViewModel {
         }
 
         try {
-            if (!this.holidayCache.has(year)) {
-                const response = await fetch(`https://api.argentinadatos.com/v1/feriados/${year}`);
-                if (!response.ok) throw new Error(`Holiday API returned ${response.status}`);
-                const items = await response.json();
-                if (!Array.isArray(items)) throw new Error('Unexpected holiday API response');
-                this.holidayCache.set(year, items);
-            }
+            await this.ensureHolidayYearLoaded(year);
             if (settingsVersion !== this.holidaySettingsVersion || year !== this.year() || month !== this.month()) return;
             if (!this.argentinaHolidaysEnabled()) {
                 applyLeaveDaysOnly();
@@ -2712,10 +2703,13 @@ function Week(week, entries) {
 
 let newEntryFormSequence = 0;
 
-function NewEntryDraft(source, copyDetails = false) {
+function NewEntryDraft(source, copyDetails = false, baseDate = null) {
     const initialProject = source.project ? source.project() : null;
     const initialScope = source.scope ? source.scope() : model.defaultScope();
     const initialTime = !copyDetails && source.timeSpent ? source.timeSpent() : 1 * 60 * 60 * 1000;
+    const selectedDate = baseDate || source.date || new Date();
+    const selectedDateString = getDateString(selectedDate);
+    const selectedMonthEnd = getDateString(new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0));
     this.id = `new-entry-form-${++newEntryFormSequence}`;
     this.project = ko.observable(initialProject);
     this.scope = ko.observable(initialScope || 'global');
@@ -2739,6 +2733,70 @@ function NewEntryDraft(source, copyDetails = false) {
         { value: 'released', text: 'Released' },
     ];
     this.onlyAssignedToMe = ko.observable(source.onlyAssignedToMe ? source.onlyAssignedToMe() : true);
+    this.scheduled = ko.observable(false);
+    this.scheduleFrequency = ko.observable('businessDaily');
+    this.scheduleStart = ko.observable(selectedDateString);
+    this.scheduleEnd = ko.observable(selectedMonthEnd);
+    this.scheduleHolidayLoading = ko.observable(false);
+    this.scheduleHolidayError = ko.observable('');
+    this.scheduleRequestId = 0;
+    this.scheduleRangeValid = ko.computed(() => {
+        const start = parseLocalDate(this.scheduleStart());
+        const end = parseLocalDate(this.scheduleEnd());
+        return Boolean(start && end && end >= start && end.getFullYear() - start.getFullYear() <= 10);
+    });
+    this.scheduleHolidayDataReady = ko.computed(() => {
+        if (!this.scheduled()) return true;
+        this.scheduleHolidayLoading();
+        if (!this.scheduleRangeValid() || this.scheduleHolidayError()) return false;
+        if (!model.argentinaHolidaysEnabled()) return true;
+        const start = parseLocalDate(this.scheduleStart());
+        const end = parseLocalDate(this.scheduleEnd());
+        for (let year = start.getFullYear(); year <= end.getFullYear(); year++) {
+            if (!model.holidayCache.has(year)) return false;
+        }
+        return true;
+    });
+    this.scheduleDates = ko.computed(() => {
+        if (!this.scheduled() || !this.scheduleRangeValid() || !this.scheduleHolidayDataReady()) return [];
+        const start = parseLocalDate(this.scheduleStart());
+        const end = parseLocalDate(this.scheduleEnd());
+        const holidayDates = new Set();
+        if (model.argentinaHolidaysEnabled()) {
+            for (let year = start.getFullYear(); year <= end.getFullYear(); year++) {
+                for (const holiday of model.holidayCache.get(year) || []) {
+                    if (holiday.fecha) holidayDates.add(holiday.fecha);
+                }
+            }
+        }
+        return buildScheduledEntryDates(this.scheduleFrequency(), start, end, holidayDates, new Set(model.leaveDays()));
+    });
+    this.scheduleValid = ko.computed(() => {
+        if (!this.scheduled()) return true;
+        if (!this.scheduleRangeValid() || !this.scheduleHolidayDataReady()) return false;
+        const dates = this.scheduleDates();
+        return dates.length > 0 && dates.length <= model.newEntryMaxRequests;
+    });
+    this.scheduleSummary = ko.computed(() => {
+        if (!this.scheduled()) return '';
+        const start = parseLocalDate(this.scheduleStart());
+        const end = parseLocalDate(this.scheduleEnd());
+        if (!start || !end) return 'Choose a start and end date.';
+        if (end < start) return 'The end date must be on or after the start date.';
+        if (end.getFullYear() - start.getFullYear() > 10) return 'Choose a date range of 10 years or less.';
+        if (this.scheduleHolidayLoading()) return 'Loading holiday data for this range…';
+        if (this.scheduleHolidayError()) return this.scheduleHolidayError();
+        if (!this.scheduleHolidayDataReady()) return 'Holiday data is unavailable for this range.';
+        const dates = this.scheduleDates();
+        if (!dates.length) return 'No eligible business days fall within this date range.';
+        if (dates.length > model.newEntryMaxRequests) return `This entry would create ${dates.length} requests. Shorten the date range to 50 or fewer occurrences.`;
+        const frequencyLabel = {
+            businessDaily: 'every business day',
+            weekly: 'weekly',
+            biweekly: 'every two weeks',
+        }[this.scheduleFrequency()];
+        return `${dates.length} ${frequencyLabel} occurrences, ${formatEntryDateLabel(dates[0])} through ${formatEntryDateLabel(dates[dates.length - 1])}.`;
+    });
     this.optionsLoading = ko.observable(false);
     this.scopeOptionsRequest = 0;
     this.isLoggable = ko.computed(() => {
@@ -2806,6 +2864,32 @@ function NewEntryDraft(source, copyDetails = false) {
             if (requestId === this.scopeOptionsRequest) this.optionsLoading(false);
         }
     };
+    this.loadScheduleHolidayData = async () => {
+        const requestId = ++this.scheduleRequestId;
+        this.scheduleHolidayError('');
+        if (!this.scheduled() || !model.argentinaHolidaysEnabled()) {
+            this.scheduleHolidayLoading(false);
+            return;
+        }
+        const start = this.scheduleStart();
+        const end = this.scheduleEnd();
+        if (!this.scheduleRangeValid()) {
+            this.scheduleHolidayLoading(false);
+            return;
+        }
+
+        this.scheduleHolidayLoading(true);
+        try {
+            await model.ensureHolidayDataForRange(start, end);
+        } catch (error) {
+            if (requestId === this.scheduleRequestId) {
+                console.error('Error loading holidays for an entry schedule:', error);
+                this.scheduleHolidayError('Could not load public holidays for this range. Retry or turn off holiday support.');
+            }
+        } finally {
+            if (requestId === this.scheduleRequestId) this.scheduleHolidayLoading(false);
+        }
+    };
 
     const subscriptions = [
         this.project.subscribe(() => {
@@ -2828,13 +2912,31 @@ function NewEntryDraft(source, copyDetails = false) {
             this.ticketId(null);
             this.loadScopeOptions();
         }),
+        this.scheduled.subscribe(scheduled => {
+            if (scheduled) {
+                this.loadScheduleHolidayData();
+            } else {
+                this.scheduleRequestId++;
+                this.scheduleHolidayLoading(false);
+                this.scheduleHolidayError('');
+            }
+        }),
+        this.scheduleStart.subscribe(() => this.loadScheduleHolidayData()),
+        this.scheduleEnd.subscribe(() => this.loadScheduleHolidayData()),
+        model.argentinaHolidaysEnabled.subscribe(() => this.loadScheduleHolidayData()),
         this.timeSpent.subscribe(value => this.time(formatMsToDuration(value))),
     ];
     this.dispose = () => {
         this.scopeOptionsRequest++;
+        this.scheduleRequestId++;
         subscriptions.forEach(subscription => subscription.dispose());
         this.isLoggable.dispose();
         this.entryNumber.dispose();
+        this.scheduleRangeValid.dispose();
+        this.scheduleHolidayDataReady.dispose();
+        this.scheduleDates.dispose();
+        this.scheduleValid.dispose();
+        this.scheduleSummary.dispose();
     };
 
     if (this.scope() !== 'global') this.loadScopeOptions();
@@ -3605,18 +3707,41 @@ function getDateString(date) {
     return `${year}-${month}-${day}`;
 }
 
-function buildBusinessDatesThroughMonthEnd(startDate, holidayDates, leaveDates) {
-    if (!(startDate instanceof Date)) return [];
+function parseLocalDate(dateString) {
+    if (typeof dateString !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateString)) return null;
+    const [year, month, day] = dateString.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return getDateString(date) === dateString ? date : null;
+}
+
+function buildScheduledEntryDates(frequency, startDate, endDate, holidayDates, leaveDates) {
+    if (!(startDate instanceof Date) || !(endDate instanceof Date) || endDate < startDate) return [];
+    if (!['businessDaily', 'weekly', 'biweekly'].includes(frequency)) return [];
+
+    const isBusinessDate = date => {
+        const dateString = getDateString(date);
+        return date.getDay() !== 0
+            && date.getDay() !== 6
+            && !holidayDates.has(dateString)
+            && !leaveDates.has(dateString);
+    };
     const dates = [];
     const date = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
-    const monthEnd = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
-    while (date <= monthEnd) {
-        const dateStr = getDateString(date);
-        const isWeekday = date.getDay() !== 0 && date.getDay() !== 6;
-        if (isWeekday && !holidayDates.has(dateStr) && !leaveDates.has(dateStr)) {
-            dates.push(dateStr);
+    const rangeEnd = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+
+    if (frequency === 'businessDaily') {
+        while (date <= rangeEnd && dates.length <= 50) {
+            if (isBusinessDate(date)) dates.push(getDateString(date));
+            date.setDate(date.getDate() + 1);
         }
-        date.setDate(date.getDate() + 1);
+        return dates;
+    }
+
+    const cadenceDays = frequency === 'weekly' ? 7 : 14;
+    while (date <= rangeEnd && !isBusinessDate(date)) date.setDate(date.getDate() + 1);
+    while (date <= rangeEnd && dates.length <= 50) {
+        if (isBusinessDate(date)) dates.push(getDateString(date));
+        date.setDate(date.getDate() + cadenceDays);
     }
     return dates;
 }
