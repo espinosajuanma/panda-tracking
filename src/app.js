@@ -475,6 +475,97 @@ class ViewModel {
 
         this.selectedDayForNewEntry = ko.observable(null);
         this.newEntryModal = null;
+        this.newEntryForms = ko.observableArray([]);
+        this.newEntryRepeatFrequency = ko.observable('none');
+        this.newEntryRepeatCount = ko.observable(2);
+        this.newEntrySubmissionStatus = ko.observable('');
+        this.newEntryMaxForms = 10;
+        this.newEntryMaxRequests = 50;
+        this.newEntryBusinessDatesReady = ko.computed(() => {
+            const day = this.selectedDayForNewEntry();
+            this.holidays();
+            return Boolean(day) && (!this.argentinaHolidaysEnabled() || this.holidayCache.has(day.date.getFullYear()));
+        });
+        this.newEntryBusinessDates = ko.computed(() => {
+            const day = this.selectedDayForNewEntry();
+            if (!day || !this.newEntryBusinessDatesReady()) return [];
+            const year = day.date.getFullYear();
+            const holidayDates = this.argentinaHolidaysEnabled()
+                ? new Set((this.holidayCache.get(year) || []).map(item => item.fecha).filter(Boolean))
+                : new Set();
+            return buildBusinessDatesThroughMonthEnd(day.date, holidayDates, new Set(this.leaveDays()));
+        });
+        this.newEntryRepeatOccurrenceLimit = ko.computed(() => {
+            if (this.newEntryRepeatFrequency() === 'none') return 1;
+            const formsCount = Math.max(this.newEntryForms().length, 1);
+            return Math.min(this.newEntryBusinessDates().length, Math.floor(this.newEntryMaxRequests / formsCount));
+        });
+        this.newEntryRepeatValid = ko.computed(() => {
+            if (this.newEntryRepeatFrequency() === 'none') return true;
+            const count = Number(this.newEntryRepeatCount());
+            return this.newEntryBusinessDatesReady()
+                && Number.isInteger(count)
+                && count >= 2
+                && count <= this.newEntryRepeatOccurrenceLimit();
+        });
+        this.newEntryBatchValid = ko.computed(() => {
+            const forms = this.newEntryForms();
+            return forms.length > 0
+                && forms.length <= this.newEntryMaxForms
+                && forms.every(form => form.isLoggable())
+                && this.newEntryRepeatValid();
+        });
+        this.newEntrySubmitLabel = ko.computed(() => {
+            const formsCount = this.newEntryForms().length || 1;
+            if (this.newEntryRepeatFrequency() !== 'none' && !this.newEntryRepeatValid()) return 'Create Entry Batch';
+            const occurrenceCount = this.newEntryRepeatFrequency() === 'none' ? 1 : Number(this.newEntryRepeatCount());
+            const total = formsCount * (Number.isInteger(occurrenceCount) ? occurrenceCount : 1);
+            return total === 1 ? 'Log Entry' : `Log ${total} Entries`;
+        });
+        this.newEntryRepeatSummary = ko.computed(() => {
+            const frequency = this.newEntryRepeatFrequency();
+            const day = this.selectedDayForNewEntry();
+            if (frequency === 'none' || !day) return '';
+            if (!this.newEntryBusinessDatesReady()) return 'Holiday data is unavailable. Refresh the month before creating business-day repeats.';
+            const dates = this.newEntryBusinessDates();
+            const limit = this.newEntryRepeatOccurrenceLimit();
+            if (limit < 2) return 'No additional business days are available in this month.';
+            if (!this.newEntryRepeatValid()) return `Choose between 2 and ${limit} business days for this batch.`;
+            const occurrences = dates.slice(0, Number(this.newEntryRepeatCount()));
+            const formCount = this.newEntryForms().length;
+            const requestLimitNote = dates.length > limit ? ' This batch is limited to 50 create requests.' : '';
+            return `${occurrences.length} business days from ${formatEntryDateLabel(occurrences[0])} through ${formatEntryDateLabel(occurrences[occurrences.length - 1])}; ${formCount} ${formCount === 1 ? 'entry' : 'entries'} per day (${occurrences.length * formCount} create requests).${requestLimitNote}`;
+        });
+        this.newEntryBatchTargetWarning = ko.computed(() => {
+            const day = this.selectedDayForNewEntry();
+            const forms = this.newEntryForms();
+            if (!day || !forms.length) return '';
+
+            let dates = [day.dateStr()];
+            if (this.newEntryRepeatFrequency() === 'businessDays') {
+                if (!this.newEntryRepeatValid()) return '';
+                dates = this.newEntryBusinessDates().slice(0, Number(this.newEntryRepeatCount()));
+            }
+
+            const visibleDays = this.weeks().flatMap(week => week.days());
+            const targetMs = this.dailyWorkHours() * 60 * 60 * 1000;
+            const newTimeMs = forms.reduce((total, form) => total + Number(form.timeSpent()), 0);
+            let largestOverage = null;
+            for (const date of dates) {
+                const dateDay = visibleDays.find(visibleDay => visibleDay.dateStr() === date)
+                    || (day.dateStr() === date ? day : null);
+                const projectedMs = (dateDay?.durationMs() || 0) + newTimeMs;
+                if (projectedMs > targetMs && (!largestOverage || projectedMs > largestOverage.projectedMs)) {
+                    largestOverage = { date, projectedMs };
+                }
+            }
+            if (!largestOverage) return '';
+
+            const overage = formatMsToDuration(largestOverage.projectedMs - targetMs);
+            const dateLabel = dates.length > 1 ? ` on ${formatEntryDateLabel(largestOverage.date)}` : '';
+            const lead = forms.length === 1 && dates.length === 1 ? 'If logged, this would bring the day' : `If logged, these entries${dateLabel} would bring the day`;
+            return `${lead} to ${formatMsToDuration(largestOverage.projectedMs)}, ${overage} above the ${this.dailyWorkHours()}h daily target.`;
+        });
 
         this.selectedEntryForEdit = ko.observable(null);
         this.editEntryModal = null;
@@ -1537,26 +1628,174 @@ class ViewModel {
         this.openNewEntryModal(day, selectedProject);
     }
 
+    addNewEntryForm = () => {
+        if (this.loading() || this.newEntryForms().length >= this.newEntryMaxForms) return;
+        const source = this.newEntryForms()[this.newEntryForms().length - 1] || this.selectedDayForNewEntry();
+        if (!source) return;
+        const form = new NewEntryDraft(source, true);
+        this.newEntryForms.push(form);
+        setTimeout(() => document.getElementById(`entry-notes-${form.id}`)?.focus(), 0);
+    }
+
+    removeNewEntryForm = (form) => {
+        if (this.loading() || this.newEntryForms().length <= 1) return;
+        this.newEntryForms.remove(form);
+        form.dispose();
+    }
+
+    clearNewEntryForms = () => {
+        this.newEntryForms().forEach(form => form.dispose());
+        this.newEntryForms([]);
+    }
+
     openNewEntryModal = (day, project = null) => {
+        const isNewDay = this.selectedDayForNewEntry() !== day;
+        if (isNewDay || this.newEntryForms().length === 0) {
+            this.clearNewEntryForms();
+            this.newEntryForms([new NewEntryDraft(day)]);
+            this.newEntryRepeatFrequency('none');
+            this.newEntryRepeatCount(2);
+            this.newEntrySubmissionStatus('');
+        }
         this.selectedDayForNewEntry(day);
 
         // Prefer an explicit project, then the active filter, then the default.
         const projectId = project?.id || this.filterByProject() || this.defaultProject();
         const selectedProject = this.projects().find(project => project.id === projectId);
-        if (day && selectedProject) {
+        if (day && selectedProject && (isNewDay || project)) {
             day.project(selectedProject);
+            this.newEntryForms()[0]?.project(selectedProject);
         }
 
         const modal = this.initializeModal('newEntryModal', 'newEntryModal', {
             onShown: () => {
                 const currentDay = this.selectedDayForNewEntry();
                 const firstRequiredField = currentDay?.project()
-                    ? document.querySelector('#newEntryModal textarea[name="notes"]')
+                    ? document.querySelector('#newEntryModal textarea[id^="entry-notes-"]')
                     : document.querySelector('#newEntryModal select[aria-label="Project"]');
                 firstRequiredField?.focus();
             },
         });
         if (modal) modal.show();
+    }
+
+    submitNewEntryBatch = async (day) => {
+        if (this.loading()) return;
+        const forms = this.newEntryForms().slice();
+        const frequency = this.newEntryRepeatFrequency();
+        if (forms.length === 0 || forms.some(form => !form.isLoggable())) {
+            this.addToast('Complete the required project, scope, task, and notes fields in each entry form.', 'error');
+            return;
+        }
+        if (!this.newEntryRepeatValid()) {
+            this.addToast('Choose a valid number of remaining business days for this batch.', 'error');
+            return;
+        }
+        const occurrenceDates = frequency === 'none'
+            ? [day.dateStr()]
+            : this.newEntryBusinessDates().slice(0, Number(this.newEntryRepeatCount()));
+        if (occurrenceDates.length === 0) {
+            this.addToast('There are no eligible business days for this schedule.', 'error');
+            return;
+        }
+
+        const entries = forms.map(form => ({
+            project: form.project().id,
+            scope: form.scope(),
+            task: form.scope() === 'task' ? form.taskId() : null,
+            ticket: form.scope() === 'supportTicket' ? form.ticketId() : null,
+            forMe: true,
+            timeSpent: parseInt(form.timeSpent(), 10),
+            notes: form.notes(),
+        }));
+        const requests = occurrenceDates.flatMap((date, dateIndex) => entries.map((entry, formIndex) => ({
+            date,
+            dateIndex,
+            formIndex,
+            entry,
+        })));
+        const loggedRequests = [];
+        let failedRequest = null;
+        let requestError = null;
+        this.loading(true);
+
+        try {
+            for (let index = 0; index < requests.length; index++) {
+                const request = requests[index];
+                this.newEntrySubmissionStatus(requests.length > 1
+                    ? `Creating entry ${index + 1} of ${requests.length}…`
+                    : 'Creating entry…');
+                try {
+                    await this.slingr.put(`/data/${TIME_TRACKING_ENTITY}/logTime`, { ...request.entry, date: request.date });
+                    loggedRequests.push(request);
+                } catch (error) {
+                    failedRequest = request;
+                    requestError = error;
+                    break;
+                }
+            }
+
+            if (loggedRequests.length === 0) {
+                throw requestError || new Error('No entries were created.');
+            }
+
+            day.notes('');
+            day.timeSpent(1 * 60 * 60 * 1000);
+            day.scope(this.defaultScope());
+            day.taskId(null);
+            day.ticketId(null);
+            this.newEntryRepeatFrequency('none');
+            this.newEntryRepeatCount(2);
+            this.clearNewEntryForms();
+            this.newEntryModal?.hide();
+
+            let refreshError = null;
+            try {
+                this.newEntrySubmissionStatus('Refreshing entries…');
+                const visibleDays = this.weeks().flatMap(week => week.days());
+                const loggedDates = [...new Set(loggedRequests.map(request => request.date))];
+                const refreshDays = [...new Set(loggedDates
+                    .map(date => visibleDays.find(visibleDay => visibleDay.dateStr() === date))
+                    .filter(Boolean))];
+                await Promise.all(refreshDays.map(refreshDay => refreshDay.updateDay()));
+                await this.updateStats();
+
+                if (this.keybindingsEnabled() && this.navigationMode() === 'entry') {
+                    const firstLoggedDay = refreshDays.find(refreshDay => refreshDay.dateStr() === loggedRequests[0].date);
+                    const entries = firstLoggedDay ? firstLoggedDay.entries() : [];
+                    const newEntry = entries[entries.length - 1];
+                    if (newEntry) {
+                        this.selectedEntry(newEntry);
+                        setTimeout(() => this.scrollToEntry(newEntry), 50);
+                    }
+                }
+            } catch (error) {
+                console.error('Entries were logged, but the dashboard could not be refreshed:', error);
+                refreshError = error;
+            }
+
+            if (requestError) {
+                this.addToast(
+                    `Created ${loggedRequests.length} of ${requests.length} entries. Entry ${failedRequest.formIndex + 1} on ${formatEntryDateLabel(failedRequest.date)} failed; remaining requests were skipped.${refreshError ? ' Refresh the dashboard to verify the created entries.' : ''}`,
+                    'warning',
+                    'Batch Partially Created'
+                );
+            } else if (refreshError) {
+                this.addToast('Entries were created, but the affected days could not be refreshed. Refresh the dashboard to see the latest data.', 'warning');
+            } else if (requests.length > 1 && frequency === 'businessDays') {
+                this.addToast(`Created ${requests.length} entries across ${occurrenceDates.length} business days.`, 'success');
+            } else if (requests.length > 1) {
+                this.addToast(`Created ${requests.length} entries for ${formatEntryDateLabel(day.dateStr())}.`, 'success');
+            } else {
+                this.addToast('Entry created.', 'success');
+            }
+        } catch (error) {
+            console.error(error);
+            this.addToast('Could not create any entries. Review the forms and try again.', 'error');
+        } finally {
+            this.newEntrySubmissionStatus('');
+            this.loading(false);
+        }
     }
 
     openNewTodoModal = (day) => {
@@ -2471,6 +2710,136 @@ function Week(week, entries) {
     return self;
 }
 
+let newEntryFormSequence = 0;
+
+function NewEntryDraft(source, copyDetails = false) {
+    const initialProject = source.project ? source.project() : null;
+    const initialScope = source.scope ? source.scope() : model.defaultScope();
+    const initialTime = !copyDetails && source.timeSpent ? source.timeSpent() : 1 * 60 * 60 * 1000;
+    this.id = `new-entry-form-${++newEntryFormSequence}`;
+    this.project = ko.observable(initialProject);
+    this.scope = ko.observable(initialScope || 'global');
+    this.notes = ko.observable(!copyDetails && source.notes ? source.notes() : '');
+    this.timeSpent = ko.observable(initialTime);
+    this.time = ko.observable(formatMsToDuration(initialTime));
+    this.entryNumber = ko.computed(() => model.newEntryForms.indexOf(this) + 1);
+    this.taskId = ko.observable(source.taskId ? source.taskId() : null);
+    this.ticketId = ko.observable(source.ticketId ? source.ticketId() : null);
+    this.tasks = ko.observableArray([]);
+    this.tickets = ko.observableArray([]);
+    this.taskStatusFilter = ko.observable(source.taskStatusFilter ? source.taskStatusFilter() : 'all');
+    this.taskStatusOptions = [
+        { value: 'all', text: 'All' },
+        { value: 'new', text: 'New' },
+        { value: 'toDo', text: 'To Do' },
+        { value: 'inProgress', text: 'In Progress' },
+        { value: 'inReview', text: 'In Review' },
+        { value: 'completed', text: 'Completed' },
+        { value: 'staging', text: 'Staging' },
+        { value: 'released', text: 'Released' },
+    ];
+    this.onlyAssignedToMe = ko.observable(source.onlyAssignedToMe ? source.onlyAssignedToMe() : true);
+    this.optionsLoading = ko.observable(false);
+    this.scopeOptionsRequest = 0;
+    this.isLoggable = ko.computed(() => {
+        if (!this.project() || !this.notes().trim()) return false;
+        if (this.scope() === 'task' && !this.taskId()) return false;
+        if (this.scope() === 'supportTicket' && !this.ticketId()) return false;
+        return true;
+    });
+    this.updateTimeSpentInModal = (amount) => {
+        const next = this.timeSpent() + amount;
+        const maxTime = model.dailyWorkHours() * 60 * 60 * 1000;
+        if (next >= 1800000 && next <= maxTime) this.timeSpent(next);
+    };
+    this.updateTimeFromInput = () => {
+        const durationMs = parseDurationToMs(this.time());
+        if (durationMs <= 0) {
+            this.time(formatMsToDuration(this.timeSpent()));
+            return;
+        }
+        const step = 1800000;
+        const roundedMs = Math.round(durationMs / step) * step;
+        const maxTime = model.dailyWorkHours() * 60 * 60 * 1000;
+        this.timeSpent(Math.max(step, Math.min(roundedMs, maxTime)));
+    };
+    this.loadScopeOptions = async () => {
+        const requestId = ++this.scopeOptionsRequest;
+        const project = this.project();
+        const scope = this.scope();
+        this.tasks([]);
+        this.tickets([]);
+        if (!project || !scope || scope === 'global') {
+            this.optionsLoading(false);
+            return;
+        }
+
+        this.optionsLoading(true);
+        try {
+            const taskScope = scope === 'task';
+            const entity = taskScope ? 'dev.tasks' : 'support.tickets';
+            const params = {
+                project: project.id,
+                _size: 1000,
+                _fields: 'id,label,number',
+                ...(taskScope
+                    ? { _sortField: 'createdAt', _sortType: 'desc' }
+                    : { _sortField: 'draftTimestamp', _sortType: 'desc' }),
+            };
+            if (this.onlyAssignedToMe()) {
+                if (taskScope) params.assignees = model.slingr.user.id;
+                else params.assignee = model.slingr.user.id;
+            }
+            if (taskScope && this.taskStatusFilter() !== 'all') params.status = this.taskStatusFilter();
+            const { items } = await model.slingr.get(`/data/${entity}`, params);
+            if (requestId === this.scopeOptionsRequest) {
+                const options = items.map(item => ({ id: item.id, name: item.label }));
+                if (taskScope) this.tasks(options);
+                else this.tickets(options);
+            }
+        } catch (error) {
+            if (requestId === this.scopeOptionsRequest) {
+                console.error('Error loading scope options', error);
+                model.addToast('Error loading tasks/tickets for an entry form.', 'error');
+            }
+        } finally {
+            if (requestId === this.scopeOptionsRequest) this.optionsLoading(false);
+        }
+    };
+
+    const subscriptions = [
+        this.project.subscribe(() => {
+            this.taskId(null);
+            this.ticketId(null);
+            this.loadScopeOptions();
+        }),
+        this.scope.subscribe(scope => {
+            model.defaultScope(scope);
+            this.taskId(null);
+            this.ticketId(null);
+            this.loadScopeOptions();
+        }),
+        this.taskStatusFilter.subscribe(() => {
+            this.taskId(null);
+            this.loadScopeOptions();
+        }),
+        this.onlyAssignedToMe.subscribe(() => {
+            this.taskId(null);
+            this.ticketId(null);
+            this.loadScopeOptions();
+        }),
+        this.timeSpent.subscribe(value => this.time(formatMsToDuration(value))),
+    ];
+    this.dispose = () => {
+        this.scopeOptionsRequest++;
+        subscriptions.forEach(subscription => subscription.dispose());
+        this.isLoggable.dispose();
+        this.entryNumber.dispose();
+    };
+
+    if (this.scope() !== 'global') this.loadScopeOptions();
+}
+
 function Day (date, entries, week) {
     const getMaxTimeSpent = () => model.dailyWorkHours() * 60 * 60 * 1000;
     let dateStr = getDateString(date);
@@ -2609,64 +2978,6 @@ function Day (date, entries, week) {
                 model.loading(false);
             }
         },
-        logEntry: async (day) => {
-            model.loading(true);
-            try {
-                // Ensure project is selected before logging
-                if (!day.project()) {
-                    model.addToast('Please select a project.', 'error');
-                    model.loading(false);
-                    return;
-                }
-                // Ensure task/ticket is selected if scope is task/ticket
-                if (day.scope() === 'task' && !day.taskId()) {
-                    model.addToast('Please select a task.', 'error');
-                    model.loading(false);
-                    return;
-                }
-                if (day.scope() === 'supportTicket' && !day.ticketId()) {
-                    model.addToast('Please select a ticket.', 'error');
-                    model.loading(false);
-                    return;
-                }
-
-                await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/logTime`, {
-                    project: day.project().id,
-                    scope: day.scope(),
-                    task: day.scope() === 'task' ? day.taskId() : null,
-                    ticket: day.scope() === 'supportTicket' ? day.ticketId() : null,
-                    forMe: true,
-                    date: day.dateStr(),
-                    timeSpent: parseInt(day.timeSpent()),
-                    notes: day.notes(),
-                });
-
-                await day.updateDay();
-
-                // Update selection for keybindings
-                if (model.keybindingsEnabled() && model.navigationMode() === 'entry') {
-                    const newEntry = day.entries()[day.entries().length - 1];
-                    if (newEntry) {
-                        model.selectedEntry(newEntry);
-                        setTimeout(() => model.scrollToEntry(newEntry), 50);
-                    }
-                }
-
-                // Reset form fields after successful log
-                day.notes('');
-                day.timeSpent(1 * 60 * 60 * 1000); // Reset to 1 hour
-                day.scope(model.defaultScope()); // Keep the chosen default for the next entry.
-                day.taskId(null); // Clear task selection
-                day.ticketId(null); // Clear ticket selection
-
-                model.newEntryModal.hide();
-                await model.updateStats();
-            } catch(e) {
-                console.error(e);
-                model.addToast('Error logging entry.', 'error');
-            }
-            model.loading(false);
-        },
         showNotes: (day, a) => {
             day.visibleNotes(! day.visibleNotes());
         }
@@ -2713,13 +3024,6 @@ function Day (date, entries, week) {
             return false;
         }
         return true;
-    });
-
-    day.newEntryTargetWarning = ko.computed(function() {
-        const targetMs = getMaxTimeSpent();
-        const projectedMs = day.durationMs() + day.timeSpent();
-        if (projectedMs <= targetMs) return '';
-        return `If logged, this would bring the day to ${formatMsToDuration(projectedMs)}, ${formatMsToDuration(projectedMs - targetMs)} above the ${model.dailyWorkHours()}h daily target.`;
     });
 
     day.filteredEntries = ko.computed(function() {
@@ -3300,6 +3604,30 @@ function getDateString(date) {
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
 }
+
+function buildBusinessDatesThroughMonthEnd(startDate, holidayDates, leaveDates) {
+    if (!(startDate instanceof Date)) return [];
+    const dates = [];
+    const date = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const monthEnd = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0);
+    while (date <= monthEnd) {
+        const dateStr = getDateString(date);
+        const isWeekday = date.getDay() !== 0 && date.getDay() !== 6;
+        if (isWeekday && !holidayDates.has(dateStr) && !leaveDates.has(dateStr)) {
+            dates.push(dateStr);
+        }
+        date.setDate(date.getDate() + 1);
+    }
+    return dates;
+}
+
+function formatEntryDateLabel(dateStr) {
+    const [year, month, date] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, date).toLocaleDateString(undefined, {
+        weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+    });
+}
+
 function formatMsToHours(ms) {
     let n = (ms / 1000 / 60 / 60);
     n = n % 1 === 0 ? n.toString() : n.toFixed(1);

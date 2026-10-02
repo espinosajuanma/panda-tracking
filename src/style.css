@@ -164,6 +164,14 @@ header .navbar > .container {
     min-height: 2.75rem;
 }
 
+.new-entry-form-card .card-header {
+    background-color: var(--bs-tertiary-bg);
+}
+
+.new-entry-form-card .card-body {
+    padding: 1rem;
+}
+
 .timer-floating-panel {
     position: fixed;
     right: 1rem;
