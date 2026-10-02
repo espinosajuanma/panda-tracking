@@ -53,7 +53,7 @@
                         <button data-bind="click: $root.startTimer.bind($root, $data), visible: day.isToday() && !$root.hasTimerFor($data), attr: { disabled: $root.timerStopping() }" class="btn btn-outline-success" type="button" title="Start timer" aria-label="Start timer">
                             <i class="bi bi-play-fill"></i>
                         </button>
-                        <button data-bind="click: updateTime.bind($data, -1800000)" class="btn btn-secondary" title="Subtract 30m" aria-label="Subtract 30 minutes"><i class="bi bi-dash" aria-hidden="true"></i></button>
+                        <button data-bind="click: updateTime.bind($data, -1800000), css: { 'rounded-start': !day.isToday() || $root.hasTimerFor($data) }" class="btn btn-secondary" title="Subtract 30m" aria-label="Subtract 30 minutes"><i class="bi bi-dash" aria-hidden="true"></i></button>
                         <button data-bind="click: updateTime.bind($data, 1800000)" class="btn btn-secondary" title="Add 30m" aria-label="Add 30 minutes"><i class="bi bi-plus" aria-hidden="true"></i></button>
                         <div class="btn-group" role="group">
                             <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="More actions" aria-label="More entry actions"></button>
@@ -96,7 +96,7 @@
                         <button data-bind="click: $root.startTimer.bind($root, $data), visible: day.isToday() && !$root.hasTimerFor($data), attr: { disabled: $root.timerStopping() }" class="btn btn-outline-success" type="button" title="Start timer" aria-label="Start timer">
                             <i class="bi bi-play-fill"></i>
                         </button>
-                        <button data-bind="click: confirmTodo" class="btn btn-success" title="Log time for this To-Do" aria-label="Log time for this To-Do"><i class="bi bi-check-lg me-1" aria-hidden="true"></i></button>
+                        <button data-bind="click: confirmTodo, css: { 'rounded-start': !day.isToday() || $root.hasTimerFor($data) }" class="btn btn-success" title="Log time for this To-Do" aria-label="Log time for this To-Do"><i class="bi bi-check-lg me-1" aria-hidden="true"></i></button>
                         <button data-bind="click: edit" class="btn btn-secondary" title="Edit To-Do" aria-label="Edit To-Do"><i class="bi bi-pencil-square" aria-hidden="true"></i></button>
                         <button data-bind="click: move" class="btn btn-secondary" title="Reschedule To-Do" aria-label="Reschedule To-Do"><i class="bi bi-calendar-event me-1" aria-hidden="true"></i></button>
                         <button data-bind="click: remove" class="btn btn-danger" title="Discard To-Do" aria-label="Discard To-Do"><i class="bi bi-trash me-1" aria-hidden="true"></i></button>
