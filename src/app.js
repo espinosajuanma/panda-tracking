@@ -297,9 +297,24 @@ class ViewModel {
                 this.addToast('Default project saved.', 'success');
             } 
         });
+        const storedDefaultScope = localStorage.getItem('solutions:timetracking:defaultScope');
+        this.defaultScope = ko.observable(['global', 'task', 'supportTicket'].includes(storedDefaultScope) ? storedDefaultScope : 'global');
+        this.defaultScope.subscribe(scope => localStorage.setItem('solutions:timetracking:defaultScope', scope));
 
         this.visibleProjects = ko.computed(() => {
             return this.projects().filter(project => project.isVisible());
+        });
+        this.projectHoursSummary = ko.computed(() => {
+            const totals = this.visibleProjects().map(project => {
+                const ms = this.weeks().flatMap(week => week.days())
+                    .flatMap(day => day.entries())
+                    .filter(entry => !entry.isTodo() && entry.raw?.project?.id === project.id)
+                    .reduce((sum, entry) => sum + entry.timeSpent(), 0);
+                return { name: project.name, ms };
+            }).filter(project => project.ms > 0).sort((a, b) => b.ms - a.ms).slice(0, 5);
+            return totals.length
+                ? `Project chart, top tracked projects: ${totals.map(project => `${project.name}, ${formatMsToDuration(project.ms)}`).join('; ')}.`
+                : 'No project hours logged for this month.';
         });
 
         this.viewRange.subscribe(val => {
@@ -500,10 +515,13 @@ class ViewModel {
         this.submitRemove = async () => {
             const entryToRemove = this.entryForRemoval();
             if (!entryToRemove) return;
+            const removedEntryId = entryToRemove.id();
+            const timerWillBeDiscarded = Boolean(this.getTimerFor(removedEntryId));
 
             this.loading(true);
             try {
-                await this.slingr.delete(`/data/${TIME_TRACKING_ENTITY}/${entryToRemove.id()}`);
+                await this.slingr.delete(`/data/${TIME_TRACKING_ENTITY}/${removedEntryId}`);
+                this.timerRecords(this.timerRecords().filter(timer => String(timer.entryId) !== String(removedEntryId)));
 
                 const day = entryToRemove.day;
                 day.entries.remove(entryToRemove);
@@ -527,7 +545,9 @@ class ViewModel {
 
                 await this.updateStats();
 
-                this.addToast('Entry removed successfully.', 'success');
+                this.addToast(timerWillBeDiscarded
+                    ? 'Entry removed and its timer discarded without logging time.'
+                    : 'Entry removed successfully.', 'success');
                 this.removeConfirmModal.hide();
                 this.entryForRemoval(null);
             } catch (e) {
@@ -1378,7 +1398,15 @@ class ViewModel {
             day.project(selectedProject);
         }
 
-        const modal = this.initializeModal('newEntryModal', 'newEntryModal');
+        const modal = this.initializeModal('newEntryModal', 'newEntryModal', {
+            onShown: () => {
+                const currentDay = this.selectedDayForNewEntry();
+                const firstRequiredField = currentDay?.project()
+                    ? document.querySelector('#newEntryModal textarea[name="notes"]')
+                    : document.querySelector('#newEntryModal select[aria-label="Project"]');
+                firstRequiredField?.focus();
+            },
+        });
         if (modal) modal.show();
     }
 
@@ -1401,7 +1429,9 @@ class ViewModel {
 
     openEditEntryModal = (entry) => {
         this.selectedEntryForEdit(entry);
-        const modal = this.initializeModal('editEntryModal', 'editEntryModal');
+        const modal = this.initializeModal('editEntryModal', 'editEntryModal', {
+            onShown: () => document.querySelector('#editEntryModal textarea[name="notes"]')?.focus(),
+        });
         if (modal) modal.show();
     }
 
@@ -2306,7 +2336,7 @@ function Day (date, entries, week) {
         durationNonBillable: 0,
         visibleNotes: ko.observable(true),
         // Form
-        scope: ko.observable('global'),
+        scope: ko.observable(model.defaultScope()),
         notes: ko.observable(''),
         timeSpent: ko.observable(1 * 60 * 60 * 1000),
         time: ko.observable('1h'),
@@ -2463,7 +2493,7 @@ function Day (date, entries, week) {
                 // Reset form fields after successful log
                 day.notes('');
                 day.timeSpent(1 * 60 * 60 * 1000); // Reset to 1 hour
-                day.scope('global'); // Reset scope to global
+                day.scope(model.defaultScope()); // Keep the chosen default for the next entry.
                 day.taskId(null); // Clear task selection
                 day.ticketId(null); // Clear ticket selection
 
@@ -2521,6 +2551,13 @@ function Day (date, entries, week) {
             return false;
         }
         return true;
+    });
+
+    day.newEntryTargetWarning = ko.computed(function() {
+        const targetMs = getMaxTimeSpent();
+        const projectedMs = day.durationMs() + day.timeSpent();
+        if (projectedMs <= targetMs) return '';
+        return `If logged, this would bring the day to ${formatMsToDuration(projectedMs)}, ${formatMsToDuration(projectedMs - targetMs)} above the ${model.dailyWorkHours()}h daily target.`;
     });
 
     day.filteredEntries = ko.computed(function() {
@@ -2625,6 +2662,7 @@ function Day (date, entries, week) {
 
     day.project.subscribe(async () => await loadScopeOptions());
     day.scope.subscribe(async () => {
+        model.defaultScope(day.scope());
         day.taskId(null);
         day.ticketId(null);
         await loadScopeOptions();
@@ -2993,6 +3031,13 @@ function Entry (entry, day) {
             model.openMoveEntryModal(entry);
         },
     };
+
+    self.editTargetWarning = ko.computed(function() {
+        const targetMs = model.dailyWorkHours() * 60 * 60 * 1000;
+        const projectedMs = self.day.durationMs() - self.raw.timeSpent + self.edit_timeSpent();
+        if (!Number.isFinite(projectedMs) || projectedMs <= targetMs) return '';
+        return `After saving, the day's total would be ${formatMsToDuration(projectedMs)}, ${formatMsToDuration(projectedMs - targetMs)} above the ${model.dailyWorkHours()}h daily target.`;
+    });
 
     self.labels = ko.computed(function() {
         const notesText = self.notes() || '';
