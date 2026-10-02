@@ -59,6 +59,102 @@ header .navbar > .container {
     margin-top: 0.35rem;
 }
 
+.focus-modal-dialog {
+    max-width: 30rem;
+}
+
+.focus-modal-content {
+    overflow: hidden;
+    border-radius: 1rem;
+    box-shadow: 0 1rem 3rem rgb(0 0 0 / 22%);
+}
+
+.focus-modal-header {
+    gap: 0.9rem;
+    padding: 1.25rem 1.5rem;
+    background-color: var(--bs-tertiary-bg);
+}
+
+.focus-modal-icon {
+    display: inline-flex;
+    width: 2.75rem;
+    height: 2.75rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.85rem;
+    background-color: var(--bs-danger-bg-subtle);
+    color: var(--bs-danger);
+    font-size: 1.25rem;
+}
+
+.focus-modal-header .modal-title {
+    font-weight: 650;
+}
+
+.focus-modal-body {
+    padding: 1.75rem 1.5rem 1.5rem;
+}
+
+.focus-timer-label {
+    margin-bottom: 0.15rem;
+    color: var(--bs-secondary-color);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.focus-timer-value {
+    color: var(--bs-emphasis-color);
+    font-size: clamp(4rem, 17vw, 5.75rem);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    letter-spacing: -0.055em;
+    line-height: 1.05;
+}
+
+.focus-timer-value.is-finished {
+    color: var(--bs-danger);
+}
+
+.focus-progress {
+    width: min(18rem, 90%);
+    height: 0.5rem;
+    margin-top: 1.1rem;
+    border-radius: var(--bs-border-radius-pill);
+    background-color: var(--bs-secondary-bg);
+}
+
+.focus-progress .progress-bar {
+    border-radius: inherit;
+    transition: width 0.8s linear;
+}
+
+.focus-duration-panel {
+    max-width: 18rem;
+    margin-top: 1.75rem;
+    text-align: left;
+}
+
+.focus-duration-panel .form-label {
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+}
+
+.focus-duration-panel .input-group-text {
+    color: var(--bs-secondary-color);
+}
+
+.focus-modal-footer {
+    justify-content: center;
+    gap: 0.65rem;
+    padding: 0 1.5rem 1.5rem;
+    border: 0;
+}
+
+.focus-modal-footer > .btn {
+    min-height: 2.75rem;
+}
+
 .timer-floating-panel {
     position: fixed;
     right: 1rem;

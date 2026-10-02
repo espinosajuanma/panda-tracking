@@ -503,10 +503,21 @@ class ViewModel {
         this.pomodoroModal = null;
         this.isPomodoroModalVisible = ko.observable(false);
         this.pomodoroDurationMinutes = ko.observable(50);
+        this.pomodoroDurationInput = ko.observable(formatMsToDuration(this.pomodoroDurationMinutes() * 60 * 1000));
+        this.pomodoroDurationValid = ko.computed(() => {
+            const duration = Number(this.pomodoroDurationMinutes());
+            return Number.isInteger(duration) && duration >= 1 && duration <= 480;
+        });
         this.pomodoroRemainingTime = ko.observable(50 * 60);
         this.pomodoroTimerId = null;
         this.pomodoroIsRunning = ko.observable(false);
         this.pomodoroFinished = ko.observable(false);
+        this.pomodoroAudioContext = null;
+        this.pomodoroProgress = ko.computed(() => {
+            const durationSeconds = Number(this.pomodoroDurationMinutes()) * 60;
+            if (durationSeconds <= 0) return 0;
+            return Math.max(0, Math.min(100, Math.round((1 - this.pomodoroRemainingTime() / durationSeconds) * 100)));
+        });
         this.faviconBlinkerId = null;
         this.originalFavicon = null; // will be set later
         this.blankFavicon = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
@@ -658,9 +669,111 @@ class ViewModel {
         if (modal) modal.show();
     }
 
-    startPomodoro = () => {
-        if (this.pomodoroIsRunning()) return;
+    adjustPomodoroDuration = (amount) => {
+        const minutes = Math.max(1, Math.min(480, this.pomodoroDurationMinutes() + amount));
+        this.pomodoroDurationMinutes(minutes);
+        this.pomodoroDurationInput(formatMsToDuration(minutes * 60 * 1000));
+    }
 
+    updatePomodoroDurationFromInput = () => {
+        const durationMs = parseDurationToMs(this.pomodoroDurationInput());
+        if (durationMs <= 0) {
+            this.pomodoroDurationInput(formatMsToDuration(this.pomodoroDurationMinutes() * 60 * 1000));
+            return;
+        }
+
+        const minuteMs = 60 * 1000;
+        const roundedMs = Math.round(durationMs / minuteMs) * minuteMs;
+        const clampedMs = Math.max(minuteMs, Math.min(roundedMs, 480 * 60 * 1000));
+        const minutes = clampedMs / 60 / 1000;
+        this.pomodoroDurationMinutes(minutes);
+        this.pomodoroDurationInput(formatMsToDuration(clampedMs));
+    }
+
+    preparePomodoroAudio = () => {
+        try {
+            const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextConstructor) return;
+            if (!this.pomodoroAudioContext) {
+                this.pomodoroAudioContext = new AudioContextConstructor();
+            }
+            if (this.pomodoroAudioContext.state === 'suspended') {
+                this.pomodoroAudioContext.resume().catch(() => {});
+            }
+        } catch (error) {
+            this.pomodoroAudioContext = null;
+        }
+    }
+
+    playPomodoroChime = () => {
+        const context = this.pomodoroAudioContext;
+        if (!context) return;
+
+        const play = () => {
+            if (context.state !== 'running') return;
+            const now = context.currentTime;
+            [659.25, 783.99, 1046.5].forEach((frequency, index) => {
+                const startAt = now + index * 0.16;
+                const oscillator = context.createOscillator();
+                const volume = context.createGain();
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(frequency, startAt);
+                volume.gain.setValueAtTime(0.0001, startAt);
+                volume.gain.exponentialRampToValueAtTime(0.12, startAt + 0.025);
+                volume.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.55);
+                oscillator.connect(volume);
+                volume.connect(context.destination);
+                oscillator.start(startAt);
+                oscillator.stop(startAt + 0.56);
+            });
+        };
+
+        if (context.state === 'suspended') {
+            context.resume().then(play).catch(() => {});
+        } else {
+            play();
+        }
+    }
+
+    requestPomodoroNotificationPermission = () => {
+        const NotificationApi = window.Notification;
+        if (!NotificationApi || NotificationApi.permission !== 'default') return;
+        try {
+            const permissionRequest = NotificationApi.requestPermission();
+            if (permissionRequest && typeof permissionRequest.catch === 'function') {
+                permissionRequest.catch(() => {});
+            }
+        } catch (error) {
+            // Notifications may be unavailable in this browser or context.
+        }
+    }
+
+    notifyPomodoroFinished = () => {
+        const NotificationApi = window.Notification;
+        if (!NotificationApi || NotificationApi.permission !== 'granted') return;
+        try {
+            const notification = new NotificationApi('Focus session complete', {
+                body: 'Your focus timer has reached zero.',
+                icon: '/img/hourglass-done.png',
+                tag: 'panda-tracking-focus-session',
+            });
+            notification.onclick = () => {
+                window.focus();
+                if (!this.isPomodoroModalVisible() && this.pomodoroModal) {
+                    this.pomodoroModal.show();
+                }
+                notification.close();
+            };
+        } catch (error) {
+            // The browser can deny notifications even after permission was granted.
+        }
+    }
+
+    startPomodoro = () => {
+        if (this.pomodoroIsRunning() || !this.pomodoroDurationValid()) return;
+
+        this.preparePomodoroAudio();
+        this.requestPomodoroNotificationPermission();
         this.pomodoroRemainingTime(this.pomodoroDurationMinutes() * 60);
         this.pomodoroIsRunning(true);
         this.pomodoroFinished(false);
@@ -671,6 +784,8 @@ class ViewModel {
             this.pomodoroRemainingTime(remaining);
             if (remaining === 0) {
                 this.pomodoroFinished(true);
+                this.playPomodoroChime();
+                this.notifyPomodoroFinished();
                 this.startFaviconBlinking();
                 if (!this.isPomodoroModalVisible()) {
                     this.pomodoroModal.show();
