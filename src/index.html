@@ -390,8 +390,13 @@
                                         <span data-bind="text: title"></span>
                                 </h6>
                                 <div class="d-flex align-items-center">
-                                    <div class="progress" role="progressbar" style="width: 100px; height: 20px;" data-bind="visible: durationMs() > 0, attr: { 'aria-valuenow': durationMs(), title: duration() + ' logged' }" aria-valuemin="0" aria-valuemax="28800000">
-                                        <div class="progress-bar overflow-visible text-light" data-bind="style: { width: durationPercentage() + '%' }, css: durationClass, text: duration"></div>
+                                    <div class="progress daily-progress" role="progressbar" style="width: 100px; height: 20px;" data-bind="visible: durationMs() > 0, attr: { 'aria-valuenow': durationMs(), title: durationScopeSummary }" aria-valuemin="0" aria-valuemax="28800000">
+                                        <div class="progress-bar daily-progress-fill text-light" data-bind="style: { width: durationPercentage() + '%' }, css: durationClass">
+                                            <span class="daily-progress-label" data-bind="text: duration"></span>
+                                            <div class="daily-progress-scopes" data-bind="foreach: durationScopes">
+                                                <span class="daily-progress-scope" data-bind="css: colorClass, style: { width: width }, text: duration, attr: { title: name + ': ' + duration }"></span>
+                                            </div>
+                                        </div>
                                     </div>
                                     <button class="btn btn-sm py-0 px-1 me-2" data-bind="click: toggleLeave, visible: canToggleLeave, attr: { title: isLeave() ? 'Unmark as Leave' : 'Mark as Leave' }">
                                         <i class="bi bi-person-slash" data-bind="css: { 'text-info': isLeave(), 'text-muted': !isLeave() }"></i>

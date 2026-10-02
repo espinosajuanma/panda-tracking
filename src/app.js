@@ -2534,6 +2534,38 @@ function Day (date, entries, week) {
         return Math.min(percentage, 100);
     });
 
+    day.durationScopes = ko.computed(function() {
+        const scopeDetails = {
+            global: { name: 'Global', colorClass: 'bg-primary', timeSpent: 0 },
+            task: { name: 'Task', colorClass: 'bg-success', timeSpent: 0 },
+            supportTicket: { name: 'Ticket', colorClass: 'bg-danger', timeSpent: 0 },
+        };
+        const totalTime = day.durationMs();
+        if (totalTime <= 0) {
+            return [];
+        }
+
+        for (const entry of day.entries()) {
+            const scope = entry.scope();
+            if (scopeDetails[scope]) {
+                scopeDetails[scope].timeSpent += entry.timeSpent();
+            }
+        }
+
+        return Object.values(scopeDetails)
+            .filter(scope => scope.timeSpent > 0)
+            .map(scope => ({
+                ...scope,
+                duration: formatMsToDuration(scope.timeSpent),
+                width: `${(scope.timeSpent / totalTime) * 100}%`,
+            }));
+    });
+
+    day.durationScopeSummary = ko.computed(function() {
+        const scopeSummary = day.durationScopes().map(scope => `${scope.name}: ${scope.duration}`);
+        return [day.duration() + ' logged', ...scopeSummary].join(' · ');
+    });
+
     day.durationClass = ko.computed(function() {
         const percentage = (day.durationMs() / getMaxTimeSpent()) * 100;
         if (percentage < 100) return 'bg-warning';

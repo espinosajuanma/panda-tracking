@@ -161,6 +161,44 @@ main {
     border-radius: 0;
 }
 
+.daily-progress .daily-progress-fill {
+    position: relative;
+    overflow: hidden;
+}
+
+.daily-progress-label {
+    position: relative;
+    z-index: 1;
+}
+
+.daily-progress-scopes {
+    position: absolute;
+    inset: 0;
+    display: none;
+    width: 100%;
+}
+
+.daily-progress-scope {
+    display: flex;
+    height: 100%;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    color: #fff;
+    font-size: 0.65rem;
+    text-shadow: 0 1px 2px rgb(0 0 0 / 75%);
+    white-space: nowrap;
+}
+
+.daily-progress:hover .daily-progress-label {
+    visibility: hidden;
+}
+
+.daily-progress:hover .daily-progress-scopes {
+    display: flex;
+}
+
 /* Select2 Dark Mode Overrides */
 [data-bs-theme="dark"] .select2-container--bootstrap-5 .select2-selection {
     background-color: var(--bs-body-bg);
