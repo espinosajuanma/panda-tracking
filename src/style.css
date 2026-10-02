@@ -6,6 +6,59 @@ main {
     min-height: calc(100vh - 120px); /* Adjust based on header/footer height */
 }
 
+header .navbar > .container {
+    gap: 0.75rem 1.25rem;
+}
+
+.navbar-controls {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.navbar-action {
+    display: inline-flex;
+    min-height: 2.35rem;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    padding-inline: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.navbar-action:focus-visible,
+.navbar-setting-toggle:focus-visible {
+    outline: 3px solid var(--bs-primary);
+    outline-offset: 2px;
+    box-shadow: none;
+}
+
+.navbar-settings-menu {
+    min-width: 12rem;
+    padding: 0.5rem;
+}
+
+.navbar-user-menu {
+    min-width: 9rem;
+}
+
+.navbar-setting-toggle {
+    display: inline-flex;
+    width: 100%;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.6rem;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.navbar-settings-menu li + li {
+    margin-top: 0.35rem;
+}
+
 .timer-floating-panel {
     position: fixed;
     right: 1rem;
@@ -238,17 +291,17 @@ main {
 @media (max-width: 575.98px) {
     header .navbar > .container {
         justify-content: center;
-        row-gap: 0.5rem;
+        row-gap: 0.75rem;
     }
 
     header .navbar > .container > .d-flex:first-child,
-    header .navbar > .container > .d-flex:last-child {
+    .navbar-controls {
         justify-content: center;
         width: 100%;
     }
 
-    header .navbar > .container > .d-flex:last-child {
-        flex-wrap: wrap;
+    .navbar-controls {
+        gap: 0.4rem;
     }
 
     .timer-floating-panel {
@@ -265,6 +318,18 @@ main {
     .navigation-mode-indicator {
         bottom: 0.5rem;
         left: 0.5rem;
+    }
+}
+
+@media (min-width: 576px) and (max-width: 767.98px) {
+    header .navbar > .container {
+        justify-content: center;
+    }
+
+    header .navbar > .container > .d-flex:first-child,
+    .navbar-controls {
+        justify-content: center;
+        width: 100%;
     }
 }
 

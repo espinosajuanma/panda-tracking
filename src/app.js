@@ -360,6 +360,7 @@ class ViewModel {
         // Keybindings
         const storedKeybindings = localStorage.getItem('solutions:timetracking:keybindingsEnabled');
         this.keybindingsEnabled = ko.observable(storedKeybindings ? JSON.parse(storedKeybindings) : false);
+        this.toggleKeybindings = () => this.keybindingsEnabled(!this.keybindingsEnabled());
         this.navigationMode = ko.observable('none'); // 'none', 'day', 'entry'
         this.selectedDay = ko.observable(null);
         this.selectedEntry = ko.observable(null);
@@ -586,6 +587,7 @@ class ViewModel {
             read: () => this.theme() === 'dark',
             write: (value) => this.theme(value ? 'dark' : 'light')
         });
+        this.toggleTheme = () => this.isDarkMode(!this.isDarkMode());
 
         this.theme.subscribe(newTheme => {
             localStorage.setItem('solutions:timetracking:theme', newTheme);
