@@ -150,8 +150,20 @@ class ViewModel {
         }, null, 'arrayChange');
         // Calendar
         this.holidays = ko.observableArray([]);
+        this.holidayCache = new Map();
+        this.holidaySettingsVersion = 0;
+        this.argentinaHolidaysEnabled = ko.observable(localStorage.getItem('solutions:timetracking:argentinaHolidaysEnabled') !== 'false');
+        this.argentinaHolidaysEnabled.subscribe(enabled => {
+            this.holidaySettingsVersion++;
+            localStorage.setItem('solutions:timetracking:argentinaHolidaysEnabled', JSON.stringify(enabled));
+            if (!enabled && this.filterHideHolidays) this.filterHideHolidays(false);
+            if (this.logged()) this.updateDashboard();
+        });
+        this.calendar = null;
         this.month = ko.observable(new Date().getMonth());
         this.year = ko.observable(new Date().getFullYear());
+        this.selectedMonthLabel = ko.computed(() => new Date(this.year(), this.month(), 1)
+            .toLocaleDateString(undefined, { month: 'long', year: 'numeric' }));
 
         // Time Tracking
         this.weeks = ko.observableArray([]);
@@ -190,19 +202,91 @@ class ViewModel {
         });
 
         // Filters
-        this.filterMissingHours = ko.observable(false);
-        this.filterHideLeaveDays = ko.observable(true);
-        this.hideWeekends = ko.observable(JSON.parse(localStorage.getItem('solutions:timetracking:hideWeekends') || 'true'));
-        this.filterHideCompleteDays = ko.observable(JSON.parse(localStorage.getItem('solutions:timetracking:hideCompleteDays') || 'false'));
+        const getStoredFilter = (key, fallback) => {
+            try {
+                const value = localStorage.getItem(`solutions:timetracking:${key}`);
+                return value === null ? fallback : JSON.parse(value);
+            } catch (e) {
+                return fallback;
+            }
+        };
+        const saveFilter = (key, value) => localStorage.setItem(`solutions:timetracking:${key}`, JSON.stringify(value));
+        const asBoolean = (value, fallback) => typeof value === 'boolean' ? value : fallback;
+        const storedScopeFilters = getStoredFilter('filterByScope', {}) || {};
+        this.filterMissingHours = ko.observable(asBoolean(getStoredFilter('filterMissingHours', false), false));
+        this.filterHideLeaveDays = ko.observable(asBoolean(getStoredFilter('filterHideLeaveDays', true), true));
+        this.filterHideHolidays = ko.observable(asBoolean(getStoredFilter('filterHideHolidays', false), false));
+        this.hideWeekends = ko.observable(asBoolean(getStoredFilter('hideWeekends', true), true));
         this.viewRange = ko.observable(localStorage.getItem('solutions:timetracking:viewRange') || 'month');
         this.preferredView = ko.observable(localStorage.getItem('solutions:timetracking:preferredView') || 'daily');
         this.hiddenProjectIds = ko.observableArray(JSON.parse(localStorage.getItem('solutions:timetracking:hiddenProjects') || '[]'));
-        this.filterByNotes = ko.observable('');
-        this.filterByProject = ko.observable(null);
+        const storedNotesFilter = getStoredFilter('filterByNotes', '');
+        const storedProjectFilter = getStoredFilter('filterByProject', null);
+        this.filterByNotes = ko.observable(typeof storedNotesFilter === 'string' ? storedNotesFilter : '');
+        this.filterByProject = ko.observable(typeof storedProjectFilter === 'string' ? storedProjectFilter : null);
         this.filterByScope = {
-            global: ko.observable(true),
-            task: ko.observable(true),
-            supportTicket: ko.observable(true),
+            global: ko.observable(asBoolean(storedScopeFilters.global, true)),
+            task: ko.observable(asBoolean(storedScopeFilters.task, true)),
+            supportTicket: ko.observable(asBoolean(storedScopeFilters.supportTicket, true)),
+        };
+        this.filterMissingHours.subscribe(value => saveFilter('filterMissingHours', value));
+        this.filterHideLeaveDays.subscribe(value => saveFilter('filterHideLeaveDays', value));
+        this.filterHideHolidays.subscribe(value => saveFilter('filterHideHolidays', value));
+        this.hideWeekends.subscribe(value => saveFilter('hideWeekends', value));
+        this.filterByNotes.subscribe(value => saveFilter('filterByNotes', value));
+        this.filterByProject.subscribe(value => saveFilter('filterByProject', value));
+        Object.values(this.filterByScope).forEach(enabled => {
+            enabled.subscribe(value => saveFilter('filterByScope', {
+                global: this.filterByScope.global(),
+                task: this.filterByScope.task(),
+                supportTicket: this.filterByScope.supportTicket(),
+            }));
+        });
+
+        this.activeFilterChips = ko.computed(() => {
+            const chips = [];
+            const projectId = this.filterByProject();
+            if (projectId) {
+                const project = this.projects().find(item => item.id === projectId);
+                chips.push({ label: `Project: ${project?.name || 'Selected'}`, clear: () => this.filterByProject(null) });
+            }
+            if (this.filterByNotes().trim()) {
+                chips.push({ label: `Search: ${this.filterByNotes().trim()}`, clear: () => this.filterByNotes('') });
+            }
+            const scopes = Object.entries(this.filterByScope).filter(([, enabled]) => enabled()).map(([name]) => ({
+                global: 'Global', task: 'Task', supportTicket: 'Ticket',
+            }[name]));
+            if (scopes.length !== 3) {
+                chips.push({ label: `Scopes: ${scopes.length ? scopes.join(', ') : 'None'}`, clear: () => {
+                    Object.values(this.filterByScope).forEach(enabled => enabled(true));
+                } });
+            }
+            if (this.filterMissingHours()) {
+                chips.push({ label: 'Missing hours', clear: () => this.filterMissingHours(false) });
+            }
+            if (this.filterHideLeaveDays()) {
+                chips.push({ label: 'Hiding leave days', clear: () => this.filterHideLeaveDays(false) });
+            }
+            if (this.filterHideHolidays()) {
+                chips.push({ label: 'Hiding holidays', clear: () => this.filterHideHolidays(false) });
+            }
+            if (this.hideWeekends()) {
+                chips.push({ label: 'Hiding weekends', clear: () => this.hideWeekends(false) });
+            }
+            return chips;
+        });
+        this.filteredEntryCount = ko.computed(() => this.weeks()
+            .flatMap(week => week.days())
+            .filter(day => day.isVisible())
+            .reduce((count, day) => count + day.filteredEntries().length, 0));
+        this.clearAllFilters = () => {
+            this.filterByProject(null);
+            this.filterByNotes('');
+            Object.values(this.filterByScope).forEach(enabled => enabled(true));
+            this.filterMissingHours(false);
+            this.filterHideLeaveDays(false);
+            this.filterHideHolidays(false);
+            this.hideWeekends(false);
         };
 
         // Default project
@@ -279,7 +363,7 @@ class ViewModel {
                     return false;
                 }
 
-                const hasActiveFilters = this.filterMissingHours() || this.filterByNotes().trim() || this.filterByProject() || !this.filterByScope.global() || !this.filterByScope.task() || !this.filterByScope.supportTicket();
+                const hasActiveFilters = this.filterMissingHours() || this.filterHideHolidays() || this.filterByNotes().trim() || this.filterByProject() || !this.filterByScope.global() || !this.filterByScope.task() || !this.filterByScope.supportTicket();
                 if (!hasActiveFilters) {
                     return true;
                 }
@@ -1160,6 +1244,30 @@ class ViewModel {
         this.activeView(view);
     }
 
+    handleViewTabKeydown = (view, event) => {
+        const views = ['daily', 'matrix', 'todo'];
+        const currentIndex = views.indexOf(view);
+        let nextIndex = currentIndex;
+        if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % views.length;
+        else if (event.key === 'ArrowLeft') nextIndex = (currentIndex + views.length - 1) % views.length;
+        else if (event.key === 'Home') nextIndex = 0;
+        else if (event.key === 'End') nextIndex = views.length - 1;
+        else return;
+
+        event.preventDefault();
+        this.activeView(views[nextIndex]);
+        const tabIds = { daily: 'detailsTab', matrix: 'matrixTab', todo: 'todoTab' };
+        document.getElementById(tabIds[views[nextIndex]])?.focus();
+    }
+
+    showMissingHours = () => {
+        this.viewRange('month');
+        this.activeView('daily');
+        this.filterMissingHours(true);
+        const entries = document.getElementById('entries');
+        if (entries) entries.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
     setViewRange = (range) => {
         if (['month', 'week', 'day'].includes(range)) {
             this.viewRange(range);
@@ -1276,7 +1384,18 @@ class ViewModel {
 
     openNewTodoModal = (day) => {
         this.selectedDayForNewEntry(day);
-        const modal = this.initializeModal('newTodoModal', 'newTodoModal');
+        const projectId = this.filterByProject() || this.defaultProject();
+        const selectedProject = this.projects().find(project => project.id === projectId);
+        if (day && selectedProject) day.project(selectedProject);
+        const modal = this.initializeModal('newTodoModal', 'newTodoModal', {
+            onShown: () => {
+                const currentDay = this.selectedDayForNewEntry();
+                const firstRequiredField = currentDay?.project()
+                    ? document.querySelector('#newTodoModal textarea[name="notes"]')
+                    : document.querySelector('#newTodoModal select[aria-label="Project"]');
+                firstRequiredField?.focus();
+            },
+        });
         if (modal) modal.show();
     }
 
@@ -1594,18 +1713,54 @@ class ViewModel {
     }
 
     updateDashboard = async () => {
-        this.loading(true);
-        try {
-            await this.updateHolidays();
-            await this.updateTimeTracking();
-        } catch (e) {
-            if (e instanceof AuthError) {
-                this.logout();
-                this.addToast('Your session expired. Please log in again.', 'warning');
-            }
-        } finally {
-            this.loading(false);
+        if (!this.logged() || !this.slingr.user) return;
+        if (this.dashboardRefreshPromise) {
+            this.dashboardRefreshPending = true;
+            return this.dashboardRefreshPromise;
         }
+
+        this.dashboardLoading(true);
+        this.loading(true);
+        this.statsWarning('');
+
+        this.dashboardRefreshPromise = (async () => {
+            try {
+                do {
+                    this.dashboardRefreshPending = false;
+                    this.dashboardRefreshSequence++;
+                    this.statsWarning('');
+                    try {
+                        await this.updateHolidays();
+                    } catch (error) {
+                        console.warn('Holiday data could not be refreshed:', error);
+                        if (this.argentinaHolidaysEnabled()) {
+                            this.holidayWarning('Argentina holiday data could not be loaded; missing-hours totals may include public holidays.');
+                        }
+                    }
+
+                    try {
+                        await this.updateTimeTracking();
+                        this.lastUpdatedAt(new Date());
+                    } catch (e) {
+                        if (e instanceof AuthError) {
+                            console.warn('Dashboard refresh stopped because the session expired:', e);
+                            this.logout(false);
+                            this.addToast('Your session expired. Please log in again.', 'warning');
+                            break;
+                        }
+                        console.error('Dashboard refresh attempt failed:', e);
+                    }
+                } while (this.dashboardRefreshPending && this.logged() && this.slingr.user);
+            } catch (error) {
+                console.error('Dashboard refresh failed unexpectedly:', error);
+            } finally {
+                this.dashboardLoading(false);
+                this.loading(false);
+                this.dashboardRefreshPromise = null;
+            }
+
+        })();
+        return this.dashboardRefreshPromise;
     }
 
     goToToday = async () => {
@@ -1637,18 +1792,50 @@ class ViewModel {
 
     // Get holidays of the month
     updateHolidays = async () => {
-        let query = {
-            // todo -> filter by country
-            day: `between(${this.getStartMonth().getTime()},${this.getEndMonth().getTime()})`,
-            _size: 1000,
-            _sortField: 'day',
-            _sortType: 'asc',
+        const settingsVersion = this.holidaySettingsVersion;
+        const year = this.year();
+        const month = this.month();
+        const applyLeaveDaysOnly = () => {
+            this.holidays([]);
+            this.calendar?.set?.({ selectedHolidays: this.leaveDays() });
+            this.holidayWarning('');
+        };
+        if (!this.argentinaHolidaysEnabled()) {
+            applyLeaveDaysOnly();
+            return;
         }
-        //let { items: holidays } = await this.slingr.get('/data/management.holidays', query);
-        let { items: holidays } = JSON.parse(`{"total":2,"offset":"6716b9119ecada7d9349a037","items":[{"id":"68482c459450ec084b4e4f39","version":0,"label":"June , 16 - Passing to Immortality of General Martín Güemes","entity":{"id":"5e84a6cb07081b50bd6c1bc6","name":"management.holidays"},"country":{"id":"5c617a71bbaa2e000c9a4740","label":"Argentina"},"day":"2025-06-16","title":"Passing to Immortality of General Martín Güemes","ignore":false},{"id":"6716b9119ecada7d9349a037","version":0,"label":"June , 20 - Anniversary of the Death of General Manuel Belgrano","entity":{"id":"5e84a6cb07081b50bd6c1bc6","name":"management.holidays"},"country":{"id":"5c617a71bbaa2e000c9a4740","label":"Argentina"},"day":"2025-06-20","title":"Anniversary of the Death of General Manuel Belgrano","ignore":false}]}`)
-        holidays.push({ day: '2025-06-02', label: 'Leave' });
-        this.calendar.set({ selectedHolidays: holidays.map(h => h.day) });
-        this.holidays(holidays)
+
+        try {
+            if (!this.holidayCache.has(year)) {
+                const response = await fetch(`https://api.argentinadatos.com/v1/feriados/${year}`);
+                if (!response.ok) throw new Error(`Holiday API returned ${response.status}`);
+                const items = await response.json();
+                if (!Array.isArray(items)) throw new Error('Unexpected holiday API response');
+                this.holidayCache.set(year, items);
+            }
+            if (settingsVersion !== this.holidaySettingsVersion || year !== this.year() || month !== this.month()) return;
+            if (!this.argentinaHolidaysEnabled()) {
+                applyLeaveDaysOnly();
+                return;
+            }
+            const monthPrefix = `${year}-${String(month + 1).padStart(2, '0')}-`;
+            const holidays = this.holidayCache.get(year)
+                .filter(item => item.fecha?.startsWith(monthPrefix) && item.nombre)
+                .map(item => ({ day: item.fecha, title: item.nombre, label: item.nombre }));
+            this.holidays(holidays);
+            this.calendar?.set?.({ selectedHolidays: [...holidays.map(item => item.day), ...this.leaveDays()] });
+            this.holidayWarning('');
+        } catch (e) {
+            if (settingsVersion !== this.holidaySettingsVersion || year !== this.year() || month !== this.month()) return;
+            if (!this.argentinaHolidaysEnabled()) {
+                applyLeaveDaysOnly();
+                return;
+            }
+            console.warn('Could not load holiday data:', e);
+            this.holidays([]);
+            this.calendar?.set?.({ selectedHolidays: this.leaveDays() });
+            this.holidayWarning('Argentina holiday data could not be loaded; missing-hours totals may include public holidays.');
+        }
     }
 
     updateTimeTracking = async () => {
@@ -2497,6 +2684,9 @@ function Day (date, entries, week) {
         }
 
         if (model.filterHideLeaveDays() && day.isLeave()) {
+            return false;
+        }
+        if (model.filterHideHolidays() && day.isHoliday()) {
             return false;
         }
         if (model.filterMissingHours() && !day.isMissingTime()) {
