@@ -1275,7 +1275,7 @@
     </footer>
 
     <!-- Toasts -->
-    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1090">
+    <div class="toast-container position-fixed end-0 p-3 app-toast-container" style="z-index: 1090">
         <!-- ko foreach: toasts -->
         <div class="toast" role="status" aria-live="polite" aria-atomic="true" data-bind="attr: { id: id, role: error ? 'alert' : 'status', 'aria-live': error ? 'assertive' : 'polite' }">
             <div class="toast-header">

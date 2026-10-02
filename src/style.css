@@ -18,6 +18,15 @@ header .navbar > .container {
     gap: 0.5rem;
 }
 
+.app-toast-container {
+    top: 3.5rem !important;
+    width: min(23rem, calc(100vw - 1rem));
+}
+
+.app-toast-container .toast {
+    width: 100%;
+}
+
 .navbar-action {
     display: inline-flex;
     min-height: 2.35rem;
@@ -426,6 +435,12 @@ header .navbar > .container {
     .navbar-controls {
         justify-content: center;
         width: 100%;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .app-toast-container {
+        top: 6.5rem !important;
     }
 }
 
