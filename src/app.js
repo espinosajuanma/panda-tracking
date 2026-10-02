@@ -88,6 +88,17 @@ class ViewModel {
         this.pass = ko.observable(null);
         this.logginIn = ko.observable(false);
         this.logged = ko.observable(false);
+        this.dashboardLoading = ko.observable(false);
+        this.dashboardRefreshSequence = 0;
+        this.dashboardRefreshPromise = null;
+        this.dashboardRefreshPending = false;
+        this.dashboardHasLoaded = ko.observable(false);
+        this.statsWarning = ko.observable('');
+        this.holidayWarning = ko.observable('');
+        this.lastUpdatedAt = ko.observable(null);
+        this.lastUpdatedLabel = ko.computed(() => this.lastUpdatedAt()
+            ? `Updated ${this.lastUpdatedAt().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+            : 'Not yet updated');
         this.logged.subscribe(val => {
             if (val) {
                 this.addToast('Logged in');
@@ -98,26 +109,29 @@ class ViewModel {
         this.dailyWorkHours = ko.observable(parseInt(localStorage.getItem('solutions:timetracking:dailyWorkHours'), 10) || 8);
         this.dailyWorkHours.subscribe(val => {
             localStorage.setItem('solutions:timetracking:dailyWorkHours', val);
-            this.updateDashboard();
+            if (this.logged()) this.updateDashboard();
         });
 
         let token = localStorage.getItem('solutions:timetracking:token');
         if (token) {
-            console.log('Using token', token);
             this.slingr.token = token;
             this.logginIn(true);
             this.slingr.getCurrentUser()
             .then(user => {
-                console.log('Logged in as', user);
                 this.logged(true);
                 localStorage.setItem('solutions:timetracking:token', this.slingr.token);
             })
             .catch(e => {
-                console.warn('Invalid token', e);
-                this.slingr.token = null;
-                localStorage.removeItem('solutions:timetracking:token');
                 this.logged(false);
-                this.addToast('Invalid token or expired', 'error');
+                if (e instanceof AuthError) {
+                    console.warn('Saved session is no longer valid:', e);
+                    this.slingr.token = null;
+                    localStorage.removeItem('solutions:timetracking:token');
+                    this.addToast('Your saved session expired. Please sign in again.', 'warning');
+                } else {
+                    console.warn('Could not verify saved session:', e);
+                    this.addToast('Could not reach Solutions. Your saved session is kept; check your connection and retry.', 'error');
+                }
             })
             .finally(e => {
                 this.logginIn(false);
@@ -441,6 +455,8 @@ class ViewModel {
         this.monthProgress = {
             scopes: ko.observableArray([]),
             total: ko.observable('0h'),
+            loggedToDate: ko.observable('0h'),
+            expectedToDate: ko.observable('0h'),
             missing: ko.observable(0),
         };
         this.monthScopeChart = null;
@@ -721,27 +737,39 @@ class ViewModel {
         this.slingr.token = null;
         try {
             await this.slingr.login(this.email(), this.pass());
-        } catch (e) {
-            this.addToast('Invalid email or password', 'error');
-        }
-        if (this.slingr.token) {
+            const user = await this.slingr.getCurrentUser();
             localStorage.setItem('solutions:timetracking:email', this.email());
-            let user = await this.slingr.getCurrentUser();
             localStorage.setItem('solutions:timetracking:token', this.slingr.token);
-            console.log('Logged', user);
+            this.slingr.user = user;
             this.logged(true);
+        } catch (e) {
+            console.error('Login failed:', e);
+            this.slingr.token = null;
+            localStorage.removeItem('solutions:timetracking:token');
+            const message = e instanceof TypeError
+                ? 'Could not connect to Solutions. Check your connection and try again.'
+                : e instanceof AuthError
+                    ? 'Your session could not be verified. Please sign in again.'
+                    : 'Login failed. Check your credentials and try again.';
+            this.addToast(message, 'error');
+        } finally {
+            this.pass(null);
+            this.logginIn(false);
         }
-        this.pass(null);
-        this.logginIn(false);
     }
 
-    logout = () => {
-        this.slingr.post('/auth/logout');
+    logout = (notify = true) => {
+        if (this.slingr.token) {
+            this.slingr.post('/auth/logout').catch(() => {});
+        }
         this.slingr.token = null;
         this.slingr.user = null;
         localStorage.removeItem('solutions:timetracking:token');
         this.logged(false);
-        this.addToast('Logged out successfully.', 'success');
+        this.dashboardHasLoaded(false);
+        this.weeks([]);
+        this.projects([]);
+        if (notify) this.addToast('Logged out successfully.', 'success');
     }
 
     getTimerFor = (entryId) => {
@@ -1882,8 +1910,19 @@ class ViewModel {
         let weeks = this.listWeeksBetweenMonth()
             .map(week => new Week(week, entries));
         this.weeks(weeks);
+        this.dashboardHasLoaded(true);
 
-        await this.updateStats();
+        const refreshId = this.dashboardRefreshSequence;
+        this.updateStats().catch(error => {
+            if (refreshId !== this.dashboardRefreshSequence) return;
+            if (error instanceof AuthError) {
+                this.logout(false);
+                this.addToast('Your session expired. Please log in again.', 'warning');
+                return;
+            }
+            console.warn('Time entries loaded, but dashboard statistics could not be refreshed:', error);
+            this.statsWarning('Time entries loaded, but one or more summary charts could not be refreshed.');
+        });
     }
 
     updateStats = async () => {
@@ -1947,6 +1986,8 @@ class ViewModel {
  
         this.monthProgress.scopes(scopeProgress);
         this.monthProgress.total(formatMsToDuration(totalTimeSpent));
+        this.monthProgress.loggedToDate(formatMsToDuration(totalTimeSpentMtd));
+        this.monthProgress.expectedToDate(formatMsToDuration(expectedMtdMs));
 
         const missingMs = expectedMtdMs - totalTimeSpentMtd;
         this.monthProgress.missing(missingMs > 0 ? missingMs : 0);
@@ -3138,7 +3179,10 @@ function Entry (entry, day) {
 /* Date Utils */
 
 function getDateString(date) {
-    return date.toISOString().split('T')[0];
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 function formatMsToHours(ms) {
     let n = (ms / 1000 / 60 / 60);
