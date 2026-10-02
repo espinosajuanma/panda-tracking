@@ -152,7 +152,10 @@ class ViewModel {
                     setTimeout(() => {
                         const toastEl = document.getElementById(toastData.id);
                         if (toastEl) {
-                            const toast = new bootstrap.Toast(toastEl);
+                            const toast = new bootstrap.Toast(toastEl, {
+                                autohide: !toastData.error,
+                                delay: toastData.error ? 10000 : 5000,
+                            });
                             toast.show();
                             toastEl.addEventListener('hidden.bs.toast', () => {
                                 this.toasts.remove(toastData);
