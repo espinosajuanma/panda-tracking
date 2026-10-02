@@ -341,13 +341,6 @@ class ViewModel {
             localStorage.setItem('solutions:timetracking:preferredView', val);
             this.activeView(val);
         });
-        this.hideWeekends.subscribe(val => {
-            localStorage.setItem('solutions:timetracking:hideWeekends', JSON.stringify(val));
-        });
-        this.filterHideCompleteDays.subscribe(val => {
-            localStorage.setItem('solutions:timetracking:hideCompleteDays', JSON.stringify(val));
-        });
-
         this.isCurrentMonth = ko.computed(() => {
             const today = new Date();
             return this.month() === today.getMonth() && this.year() === today.getFullYear();
@@ -377,8 +370,7 @@ class ViewModel {
 
         this.todoEntries = ko.computed(() => {
             return this.weeks()
-                .map(week => week.days())
-                .flat()
+                .flatMap(week => week.days().filter(day => day.isVisible()))
                 .map(day => day.filteredEntries())
                 .flat()
                 .filter(entry => entry.isTodo());
@@ -402,15 +394,18 @@ class ViewModel {
 
                 return day.filteredEntries().length > 0;
             }).map(day => {
+                const dayStatus = this.getMatrixDayStatus(day);
+                const isNonWorkingDay = Boolean(dayStatus);
                 const cells = projects.map(project => {
                     const matchingEntries = day.filteredEntries().filter(entry => !entry.isTodo() && entry.raw?.project?.id === project.id);
                     const ms = matchingEntries.reduce((sum, entry) => sum + entry.raw.timeSpent, 0);
+                    const duration = ms > 0 ? formatMsToHours(ms) : isNonWorkingDay ? '—' : '0h';
                     return {
                         project,
-                        value: ms > 0 ? formatMsToHours(ms) : '0h',
+                        value: duration,
                         ms,
                         cellClass: this.getMatrixCellClass(ms, day),
-                        tooltip: `${project.name}: ${ms > 0 ? formatMsToHours(ms) : '0h'}`,
+                        tooltip: `${dayStatus ? `${dayStatus.title} · ` : ''}${project.name}: ${duration}`,
                     };
                 });
 
@@ -423,9 +418,11 @@ class ViewModel {
                 return {
                     day,
                     dayLabel: this.formatMatrixDayLabel(day),
+                    dayStatus: dayStatus?.label || '',
+                    dayStatusTitle: dayStatus?.title || '',
                     cells,
                     totalMs,
-                    totalLabel: formatMsToHours(totalMs),
+                    totalLabel: totalMs > 0 ? formatMsToHours(totalMs) : isNonWorkingDay ? '—' : '0h',
                     totalCellClass: this.getMatrixCellClass(totalMs, day),
                     totalPercentage,
                     totalProgressVisible,
@@ -470,6 +467,9 @@ class ViewModel {
         this.leaveDays = ko.observableArray(JSON.parse(localStorage.getItem('solutions:timetracking:leavedays')) || []);
         this.leaveDays.subscribe(val => {
             localStorage.setItem('solutions:timetracking:leavedays', JSON.stringify(val));
+            if (this.calendar) {
+                this.calendar.set({ selectedHolidays: [...this.holidays().map(item => item.day), ...val] });
+            }
         });
 
         this.selectedDayForNewEntry = ko.observable(null);
@@ -578,7 +578,9 @@ class ViewModel {
         }
 
         // Theme
-        const storedTheme = localStorage.getItem('solutions:timetracking:theme') || 'dark';
+        const storedTheme = localStorage.getItem('solutions:timetracking:theme')
+            || document.documentElement.getAttribute('data-bs-theme')
+            || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
         this.theme = ko.observable(storedTheme);
         this.isDarkMode = ko.computed({
             read: () => this.theme() === 'dark',
@@ -623,6 +625,9 @@ class ViewModel {
 
         if (options.onShow) {
             modalElement.addEventListener('show.bs.modal', options.onShow);
+        }
+        if (options.onShown) {
+            modalElement.addEventListener('shown.bs.modal', options.onShown);
         }
 
         return modal;
@@ -1353,24 +1358,20 @@ class ViewModel {
     }
 
     getMatrixCellClass = (ms, day) => {
-        if (!day || day.isLeave() || day.isHoliday()) {
-            return 'text-muted';
-        }
-        if (ms <= 0) {
-            return 'text-muted';
-        }
-
-        return 'text-success';
+        if (ms > 0) return 'text-success';
+        return 'text-muted';
     }
 
     getMatrixRowClass = (day) => {
-        if (!day || day.isLeave() || day.isHoliday()) {
-            return 'table-secondary';
-        }
-        if (day.isWeekend()) {
-            return 'table-light';
-        }
-        return '';
+        return this.getMatrixDayStatus(day) ? 'matrix-non-working-day' : '';
+    }
+
+    getMatrixDayStatus = (day) => {
+        if (!day) return null;
+        if (day.isLeave()) return { label: 'Leave', title: 'Marked as leave' };
+        if (day.isHoliday()) return { label: 'Holiday', title: day.holidayDetail() || 'Public holiday' };
+        if (day.isWeekend()) return { label: 'Weekend', title: 'Weekend' };
+        return null;
     }
 
     formatMatrixDayLabel = (day) => {
@@ -1703,7 +1704,7 @@ class ViewModel {
     }
 
     addToast = (msg, type = 'info', title = null) => {
-        let id = 'toast-' + new Date().getTime();
+        let id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         if (title === null) {
             switch (type) {
                 case 'error':
@@ -2556,7 +2557,7 @@ function Day (date, entries, week) {
 
     day.fillMissingHours = function() {
         day.timeSpent(getMaxTimeSpent() - day.durationMs());
-        day.notes('-');
+        day.notes('');
         model.openNewEntryModal(day);
     }
 
@@ -2626,8 +2627,8 @@ function Day (date, entries, week) {
         if (filterText) {
             const filterTerms = filterText.split(',').map(term => term.trim()).filter(term => term);
             entries = entries.filter(entry => {
-                const notes = (entry.notes() || '').toLowerCase();
-                return filterTerms.some(term => notes.includes(term));
+                const searchableText = [entry.notes(), entry.project(), entry.task()].join(' ').toLowerCase();
+                return filterTerms.some(term => searchableText.includes(term));
             });
         }
         return entries;
@@ -2743,7 +2744,6 @@ function Day (date, entries, week) {
     day.isVisible = ko.computed(function() {
         const range = model.viewRange();
         const today = new Date();
-        const todayStr = getDateString(today);
 
         if (range === 'day' && !day.isToday()) {
             return false;
@@ -2776,14 +2776,6 @@ function Day (date, entries, week) {
         }
         if (model.hideWeekends() && day.isWeekend() && !day.isLeave()) {
             return false;
-        }
-        if (model.filterHideCompleteDays()) {
-            if (day.dateStr() > todayStr) {
-                return false;
-            }
-            if (day.isBussinessDay() && day.durationMs() >= getMaxTimeSpent()) {
-                return false;
-            }
         }
         return true;
     });
@@ -3091,7 +3083,10 @@ function Entry (entry, day) {
 
     self.formattedNotes = ko.computed(function() {
         const notesText = self.notes() || '';
-        return notesText.replace(/#(\w+)/g, (match, word) => {
+        const escapedNotes = notesText.replace(/[&<>"']/g, character => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+        }[character]));
+        return escapedNotes.replace(/#(\w+)/g, (match, word) => {
             return `<span class="badge bg-secondary text-dark me-1">#${word}</span>`;
         });
     });
@@ -3147,7 +3142,7 @@ function Entry (entry, day) {
         if (self.edit_scope() === 'supportTicket' && !self.edit_ticketId()) {
             return false;
         }
-        if (self.edit_notes() && self.edit_notes().trim() === '') {
+        if (!self.edit_notes() || self.edit_notes().trim() === '') {
             return false;
         }
         return true;

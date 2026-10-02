@@ -23,7 +23,7 @@
     <script>
         // Set theme from localStorage to prevent FOUC (Flash of Unstyled Content)
         (function() {
-            const theme = localStorage.getItem('solutions:timetracking:theme') || 'dark';
+            const theme = localStorage.getItem('solutions:timetracking:theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
             document.documentElement.setAttribute('data-bs-theme', theme);
         })();
     </script>
@@ -93,15 +93,15 @@
                 <div class="flex-shrink-0 text-end">
                     <span class="badge d-block mb-1 ms-auto" style="width: fit-content;" data-bind="visible: $root.hasTimerFor($data), css: { 'text-bg-warning': $root.isTimerRunningFor($data), 'text-bg-secondary': $root.isTimerPausedFor($data) }, text: $root.getEntryTimerLabel($data)"></span>
                     <div class="btn-group btn-group-sm">
-                        <button data-bind="click: $root.startTimer.bind($root, $data), visible: day.isToday() && !$root.hasTimerFor($data), attr: { disabled: $root.timerStopping() }" class="btn btn-outline-success" type="button" title="Start timer">
+                        <button data-bind="click: $root.startTimer.bind($root, $data), visible: day.isToday() && !$root.hasTimerFor($data), attr: { disabled: $root.timerStopping() }" class="btn btn-outline-success" type="button" title="Start timer" aria-label="Start timer">
                             <i class="bi bi-play-fill"></i>
                         </button>
-                        <button data-bind="click: confirmTodo" class="btn btn-success" title="Confirm"><i class="bi bi-check-lg me-1"></i></button>
-                        <button data-bind="click: edit" class="btn btn-secondary" title="Edit"><i class="bi bi-pencil-square"></i></button>
-                        <button data-bind="click: move" class="btn btn-secondary" title="Reschedule"><i class="bi bi-calendar-event me-1"></i></button>
-                        <button data-bind="click: remove" class="btn btn-danger" title="Discard"><i class="bi bi-trash me-1"></i></button>
+                        <button data-bind="click: confirmTodo" class="btn btn-success" title="Log time for this To-Do" aria-label="Log time for this To-Do"><i class="bi bi-check-lg me-1" aria-hidden="true"></i></button>
+                        <button data-bind="click: edit" class="btn btn-secondary" title="Edit To-Do" aria-label="Edit To-Do"><i class="bi bi-pencil-square" aria-hidden="true"></i></button>
+                        <button data-bind="click: move" class="btn btn-secondary" title="Reschedule To-Do" aria-label="Reschedule To-Do"><i class="bi bi-calendar-event me-1" aria-hidden="true"></i></button>
+                        <button data-bind="click: remove" class="btn btn-danger" title="Discard To-Do" aria-label="Discard To-Do"><i class="bi bi-trash me-1" aria-hidden="true"></i></button>
                         <div class="btn-group" role="group" data-bind="visible: !day.isToday()">
-                            <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="More actions"></button>
+                            <button type="button" class="btn btn-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false" title="More actions" aria-label="More To-Do actions"></button>
                             <ul class="dropdown-menu dropdown-menu-end">
                                 <li>
                                     <button class="dropdown-item" data-bind="click: $root.toggleTimer.bind($root, $data), attr: { disabled: $root.timerStopping() }">
@@ -134,11 +134,11 @@
                     </a>
                 </div>
                 <div class="d-flex align-items-center">
-                    <div class="form-check form-switch me-3" title="Toggle Vim Keybindings">
+                    <div class="form-check form-switch me-3">
                         <input class="form-check-input" type="checkbox" role="switch" id="keybindingsSwitch" data-bind="checked: keybindingsEnabled">
-                        <label class="form-check-label" for="keybindingsSwitch"><i class="bi bi-keyboard"></i></label>
+                        <label class="form-check-label" for="keybindingsSwitch" title="Toggle keyboard shortcuts"><i class="bi bi-keyboard" aria-hidden="true"></i><span class="visually-hidden">Keyboard shortcuts</span></label>
                     </div>
-                    <button class="btn btn-sm me-3" data-bind="click: showPomodoroModal, css: { 'btn-warning': pomodoroIsRunning() && !pomodoroFinished(), 'btn-danger': pomodoroFinished(), 'btn-outline-light': !pomodoroIsRunning() && isDarkMode(), 'btn-outline-dark': !pomodoroIsRunning() && !isDarkMode() }" title="Focus Mode (Pomodoro)">
+                    <button class="btn btn-sm me-3" data-bind="click: showPomodoroModal, css: { 'btn-warning': pomodoroIsRunning() && !pomodoroFinished(), 'btn-danger': pomodoroFinished(), 'btn-outline-light': !pomodoroIsRunning() && isDarkMode(), 'btn-outline-dark': !pomodoroIsRunning() && !isDarkMode() }" title="Focus Mode (Pomodoro)" aria-label="Open focus timer">
                         <i class="bi bi-stopwatch" data-bind="css: { 'me-1': pomodoroIsRunning() && !isPomodoroModalVisible() }"></i>
                         <span data-bind="visible: pomodoroIsRunning() && !isPomodoroModalVisible(), text: pomodoroDisplayTime"></span>
                     </button>
@@ -163,7 +163,7 @@
             <strong><i class="bi bi-stopwatch me-2"></i>Timers</strong>
             <div class="d-flex align-items-center gap-2">
                 <span class="badge text-bg-secondary" data-bind="text: timerRecords().length"></span>
-                <button type="button" class="btn btn-sm btn-outline-secondary py-0" data-bind="click: toggleTimerPanelMinimized, attr: { title: timerPanelMinimized() ? 'Expand timers' : 'Minimize timers', 'aria-expanded': !timerPanelMinimized() }" aria-label="Minimize timers">
+                <button type="button" class="btn btn-sm btn-outline-secondary py-0" data-bind="click: toggleTimerPanelMinimized, attr: { title: timerPanelMinimized() ? 'Expand timers' : 'Minimize timers', 'aria-label': timerPanelMinimized() ? 'Expand timers' : 'Minimize timers', 'aria-expanded': !timerPanelMinimized() }">
                     <i class="bi" data-bind="css: timerPanelMinimized() ? 'bi-chevron-up' : 'bi-dash-lg'"></i>
                 </button>
             </div>
@@ -176,11 +176,11 @@
                     <span class="badge ms-1" data-bind="text: startedAt === null ? 'Paused' : 'Running', css: { 'text-bg-secondary': startedAt === null, 'text-bg-warning': startedAt !== null }"></span>
                 </div>
                 <div class="btn-group btn-group-sm flex-shrink-0">
-                    <button class="btn" type="button" data-bind="click: $root.toggleTimerById.bind($root, entryId), css: { 'btn-outline-primary': startedAt !== null, 'btn-outline-success': startedAt === null }, attr: { disabled: $root.timerStopping(), title: startedAt === null ? 'Resume timer' : 'Pause timer' }">
+                    <button class="btn" type="button" data-bind="click: $root.toggleTimerById.bind($root, entryId), css: { 'btn-outline-primary': startedAt !== null, 'btn-outline-success': startedAt === null }, attr: { disabled: $root.timerStopping(), title: startedAt === null ? 'Resume timer' : 'Pause timer', 'aria-label': startedAt === null ? 'Resume timer' : 'Pause timer' }">
                         <i class="bi" data-bind="css: startedAt === null ? 'bi-play-fill' : 'bi-pause-fill'"></i>
                     </button>
-                    <button class="btn btn-outline-danger" type="button" title="Stop timer and add time" data-bind="click: $root.stopTimer.bind($root, entryId), attr: { disabled: $root.timerStopping() }"><i class="bi bi-stop-fill"></i></button>
-                    <button class="btn btn-outline-secondary" type="button" title="Discard timer without adding time" data-bind="click: $root.discardTimer.bind($root, entryId), attr: { disabled: $root.timerStopping() }"><i class="bi bi-x-circle"></i></button>
+                    <button class="btn btn-outline-danger" type="button" title="Stop timer and add time" aria-label="Stop timer and add time" data-bind="click: $root.stopTimer.bind($root, entryId), attr: { disabled: $root.timerStopping() }"><i class="bi bi-stop-fill" aria-hidden="true"></i></button>
+                    <button class="btn btn-outline-secondary" type="button" title="Discard timer without adding time" aria-label="Discard timer without adding time" data-bind="click: $root.discardTimer.bind($root, entryId), attr: { disabled: $root.timerStopping() }"><i class="bi bi-x-circle" aria-hidden="true"></i></button>
                 </div>
             </li>
         </ul>
@@ -328,8 +328,8 @@
                 </div>
                 <div class="col-md-2" data-bind="visible: isCurrentMonth">
                     <div class="input-group input-group-sm" style="max-width: 300px;">
-                        <span class="input-group-text small">Current</span>
-                        <select class="form-select form-select-sm" data-bind="value: viewRange">
+                        <label class="input-group-text small" for="viewRangeSelect">Current</label>
+                        <select id="viewRangeSelect" class="form-select form-select-sm" aria-label="Current time range" data-bind="value: viewRange">
                             <option value="month">Month</option>
                             <option value="week">Week</option>
                             <option value="day">Day</option>
@@ -417,7 +417,7 @@
                                         <span data-bind="text: title"></span>
                                 </h6>
                                 <div class="d-flex align-items-center">
-                                    <div class="progress daily-progress" role="progressbar" style="width: 100px; height: 20px;" data-bind="visible: durationMs() > 0, attr: { 'aria-valuenow': durationMs(), title: durationScopeSummary }" aria-valuemin="0" aria-valuemax="28800000">
+                                    <div class="progress daily-progress" role="progressbar" style="width: 100px; height: 20px;" data-bind="visible: durationMs() > 0, attr: { 'aria-valuenow': durationPercentage(), 'aria-valuemax': 100, 'aria-valuetext': durationScopeSummary, title: durationScopeSummary, 'aria-label': 'Logged time for ' + title }" aria-valuemin="0">
                                         <div class="progress-bar daily-progress-fill text-light" data-bind="style: { width: durationPercentage() + '%' }, css: durationClass">
                                             <span class="daily-progress-label" data-bind="text: duration"></span>
                                             <div class="daily-progress-scopes" data-bind="foreach: durationScopes">
@@ -425,17 +425,17 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <button class="btn btn-sm py-0 px-1 me-2" data-bind="click: toggleLeave, visible: canToggleLeave, attr: { title: isLeave() ? 'Unmark as Leave' : 'Mark as Leave' }">
+                                    <button class="btn btn-sm py-0 px-1 me-2" data-bind="click: toggleLeave, visible: canToggleLeave, attr: { title: isLeave() ? 'Unmark as Leave' : 'Mark as Leave', 'aria-label': (isLeave() ? 'Unmark ' : 'Mark ') + title + ' as leave' }">
                                         <i class="bi bi-person-slash" data-bind="css: { 'text-info': isLeave(), 'text-muted': !isLeave() }"></i>
                                     </button>
                                     <!-- ko if: isBussinessDay -->
-                                    <button class="btn btn-sm btn-outline-primary ms-2" type="button" title="Fill Missing Hours" data-bind="click: fillMissingHours, visible: isMissingTime">
+                                    <button class="btn btn-sm btn-outline-primary ms-2" type="button" title="Fill Missing Hours" data-bind="click: fillMissingHours, visible: isMissingTime, attr: { 'aria-label': 'Fill missing hours for ' + title + ': ' + missingDuration() + ' remaining' }">
                                         <i class="bi bi-battery-charging"></i> 
                                     </button>
-                                    <button data-bind="click: $root.openNewTodoModal" class="btn btn-sm btn-outline-secondary ms-2" type="button" title="New To-Do">
+                                    <button data-bind="click: $root.openNewTodoModal" class="btn btn-sm btn-outline-secondary ms-2" type="button" title="New To-Do" aria-label="Add a To-Do">
                                         <i class="bi bi-check2-square"></i>
                                     </button>
-                                    <button data-bind="click: $root.openNewEntryModal" class="btn btn-sm btn-primary ms-2" type="button" title="New Entry">
+                                    <button data-bind="click: $root.openNewEntryModal" class="btn btn-sm btn-primary ms-2" type="button" title="New Entry" aria-label="Add a time entry">
                                         <i class="bi bi-plus-lg"></i>
                                     </button>
                                     <!-- /ko -->
@@ -456,11 +456,9 @@
                 </div>
                 <!-- /ko -->
             </div>
-        </div>
-
             </div>
 
-            <div data-bind="visible: logged() && activeView() === 'matrix'" class="card shadow-sm">
+            <div id="matrixPanel" role="tabpanel" aria-labelledby="matrixTab" tabindex="0" data-bind="visible: logged() && activeView() === 'matrix'" class="card shadow-sm">
                 <div class="card-body">
                     <div class="small text-muted mb-3">
                         <i class="bi bi-info-circle me-2"></i>
@@ -472,7 +470,7 @@
                                 <tr>
                                     <th scope="col">Day</th>
                                     <!-- ko foreach: visibleProjects -->
-                                    <th scope="col" class="text-center" data-bind="attr: { title: name }, text: shortName"></th>
+                                    <th scope="col" class="text-center" data-bind="attr: { title: name, 'aria-label': name }, text: shortName"></th>
                                     <!-- /ko -->
                                     <th scope="col" class="text-center">Total</th>
                                     <th scope="col" class="text-nowrap">Actions</th>
@@ -509,8 +507,8 @@
                                     </td>
                                     <td class="text-nowrap monthly-matrix-actions">
                                         <div class="dropdown">
-                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Day actions">
-                                                <i class="bi bi-three-dots-vertical"></i>
+                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Day actions" data-bind="attr: { 'aria-label': 'Actions for ' + dayLabel }">
+                                                <i class="bi bi-three-dots-vertical" aria-hidden="true"></i>
                                             </button>
                                             <ul class="dropdown-menu dropdown-menu-end">
                                                 <!-- ko if: day.isMissingTime() -->
@@ -547,7 +545,7 @@
                 </div>
             </div>
 
-            <div data-bind="visible: logged() && activeView() === 'todo'" class="card shadow-sm">
+            <div id="todoPanel" role="tabpanel" aria-labelledby="todoTab" tabindex="0" data-bind="visible: logged() && activeView() === 'todo'" class="card shadow-sm">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="card-title mb-0"><i class="bi bi-list-check me-2"></i>To Do List</h5>
                     <button data-bind="click: openNewTodoToday, attr: { disabled: loading }" class="btn btn-sm btn-outline-primary" type="button">
@@ -1225,7 +1223,7 @@
         </div>
     </main>
 
-    <button type="button" class="btn btn-primary rounded-circle shadow-lg" id="back-to-top-btn" title="Back to top">
+    <button type="button" class="btn btn-primary rounded-circle shadow-lg" id="back-to-top-btn" title="Back to top" aria-label="Back to top">
         <i class="bi bi-arrow-up fs-5"></i>
     </button>
 
