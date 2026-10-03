@@ -2141,8 +2141,7 @@ class ViewModel {
                 if (this.keybindingsEnabled()) {
                     this.activateDayNavigation();
                 }
-                this.calendar.selectedMonth = calendar.context.selectedMonth;
-                this.calendar.update();
+                this.calendar.set({ selectedMonth: this.month(), selectedYear: this.year() });
             },
             onClickYear: async (calendar, event) => {
                 this.year(calendar.context.selectedYear);
@@ -2150,9 +2149,7 @@ class ViewModel {
                 if (this.keybindingsEnabled()) {
                     this.activateDayNavigation();
                 }
-                this.calendar.selectedMonth = calendar.context.selectedMonth;
-                this.calendar.selectedYear = calendar.context.selectedYear;
-                this.calendar.update();
+                this.calendar.set({ selectedMonth: this.month(), selectedYear: this.year() });
             },
             onClickArrow: async (calendar, event) => {
                 this.month(calendar.context.selectedMonth);
