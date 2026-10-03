@@ -314,12 +314,14 @@ class ViewModel {
         };
 
         // Default project
-        this.defaultProject = ko.observable(null);
+        this.defaultProject = ko.observable(localStorage.getItem('solutions:timetracking:defaultProject') || null);
         this.defaultProject.subscribe(val => {
             if (val) {
                 localStorage.setItem('solutions:timetracking:defaultProject', val);
                 this.addToast('Default project saved.', 'success');
-            } 
+            } else {
+                localStorage.removeItem('solutions:timetracking:defaultProject');
+            }
         });
         const storedDefaultScope = localStorage.getItem('solutions:timetracking:defaultScope');
         this.defaultScope = ko.observable(['global', 'task', 'supportTicket'].includes(storedDefaultScope) ? storedDefaultScope : 'global');
@@ -1633,19 +1635,23 @@ class ViewModel {
 
     openNewEntryModal = (day, project = null) => {
         const isNewDay = this.selectedDayForNewEntry() !== day;
-        if (isNewDay || this.newEntryForms().length === 0) {
+        const createDraft = isNewDay || this.newEntryForms().length === 0;
+        const projectId = project?.id || this.filterByProject() || this.defaultProject();
+        const selectedProject = this.projects().find(project => project.id === projectId) || null;
+        if (createDraft) {
             this.clearNewEntryForms();
-            this.newEntryForms([new NewEntryDraft(day, false, day.date)]);
+            const form = new NewEntryDraft(day, false, day.date);
+            form.project(selectedProject);
+            form.scope(this.defaultScope());
+            form.taskId(null);
+            form.ticketId(null);
+            this.newEntryForms([form]);
             this.newEntrySubmissionStatus('');
         }
         this.selectedDayForNewEntry(day);
 
-        // Prefer an explicit project, then the active filter, then the default.
-        const projectId = project?.id || this.filterByProject() || this.defaultProject();
-        const selectedProject = this.projects().find(project => project.id === projectId);
-        if (day && selectedProject && (isNewDay || project)) {
+        if (day && (createDraft || project)) {
             day.project(selectedProject);
-            this.newEntryForms()[0]?.project(selectedProject);
         }
 
         const modal = this.initializeModal('newEntryModal', 'newEntryModal', {
@@ -1836,8 +1842,8 @@ class ViewModel {
     openNewTodoModal = (day) => {
         this.selectedDayForNewEntry(day);
         const projectId = this.filterByProject() || this.defaultProject();
-        const selectedProject = this.projects().find(project => project.id === projectId);
-        if (day && selectedProject) day.project(selectedProject);
+        const selectedProject = this.projects().find(project => project.id === projectId) || null;
+        if (day) day.project(selectedProject);
         const modal = this.initializeModal('newTodoModal', 'newTodoModal', {
             onShown: () => {
                 const currentDay = this.selectedDayForNewEntry();

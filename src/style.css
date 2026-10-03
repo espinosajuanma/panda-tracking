@@ -68,6 +68,62 @@ header .navbar > .container {
     margin-top: 0.35rem;
 }
 
+.settings-modal-body {
+    padding: 1.25rem 1.5rem;
+}
+
+.settings-section + .settings-section {
+    margin-top: 1.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--bs-border-color-translucent);
+}
+
+.settings-section-heading {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.settings-section-icon {
+    display: inline-flex;
+    width: 2.25rem;
+    height: 2.25rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border-radius: 0.65rem;
+    background-color: var(--bs-primary-bg-subtle);
+    color: var(--bs-primary-text-emphasis);
+}
+
+.settings-option-card {
+    height: 100%;
+    padding: 1rem;
+    border: 1px solid var(--bs-border-color-translucent);
+    border-radius: var(--bs-border-radius);
+    background-color: var(--bs-tertiary-bg);
+}
+
+.settings-option-card .form-label {
+    font-weight: 600;
+}
+
+.settings-option-card .form-text {
+    margin-top: 0.5rem;
+}
+
+.settings-project-list {
+    max-height: 18rem;
+    overflow-y: auto;
+    border: 1px solid var(--bs-border-color);
+    border-radius: var(--bs-border-radius);
+}
+
+.settings-project-list .list-group-item {
+    background-color: var(--bs-body-bg);
+}
+
 .focus-modal-dialog {
     max-width: 30rem;
 }

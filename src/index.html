@@ -747,66 +747,124 @@
             <div class="modal-dialog modal-lg modal-fullscreen-md-down">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h5 class="modal-title" id="settingsModalLabel"><i class="bi bi-sliders me-2"></i>Settings</h5>
+                        <div>
+                            <h5 class="modal-title mb-1" id="settingsModalLabel"><i class="bi bi-sliders me-2"></i>Settings</h5>
+                            <p class="small text-body-secondary mb-0">Personalize your time-tracking workspace.</p>
+                        </div>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
-                    <div class="modal-body">
-                        <div class="row g-3">
-                            <div class="col-md-6">
-                                <label for="defaultProject" class="form-label small">Default Project</label>
-                                <select id="defaultProject" class="form-select form-select-sm" 
-                                        data-bind="options: projects, optionsText: 'name', optionsValue: 'id', value: defaultProject, optionsCaption: 'Choose...'"></select>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="defaultScope" class="form-label small">Default Scope for New Entries</label>
-                                <select id="defaultScope" class="form-select form-select-sm" data-bind="value: defaultScope">
-                                    <option value="global">Global</option>
-                                    <option value="task">Task</option>
-                                    <option value="supportTicket">Support ticket</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="dailyWorkHours" class="form-label small">Daily Work Hours</label>
-                                <select id="dailyWorkHours" class="form-select form-select-sm" data-bind="value: dailyWorkHours">
-                                    <option value="8">8 Hours</option>
-                                    <option value="6">6 Hours</option>
-                                    <option value="4">4 Hours</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" role="switch" id="argentinaHolidaysEnabled" data-bind="checked: argentinaHolidaysEnabled" aria-describedby="argentinaHolidaysHelp">
-                                    <label class="form-check-label small" for="argentinaHolidaysEnabled">Use Argentina public holidays</label>
-                                </div>
-                                <div id="argentinaHolidaysHelp" class="form-text">When enabled, Argentine holidays are marked in the calendar and excluded from expected workdays.</div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="form-check form-switch">
-                                    <input class="form-check-input" type="checkbox" role="switch" id="suggestionsEnabled" data-bind="checked: suggestionsEnabled" aria-describedby="suggestionsHelp">
-                                    <label class="form-check-label small" for="suggestionsEnabled">Suggest entries from today’s work</label>
-                                </div>
-                                <div id="suggestionsHelp" class="form-text">Suggests eligible tasks and support tickets you have not logged today while you still have time left to log.</div>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="preferredView" class="form-label small">Preferred View</label>
-                                <select id="preferredView" class="form-select form-select-sm" data-bind="value: preferredView">
-                                    <option value="daily">Details</option>
-                                    <option value="matrix">Matrix</option>
-                                    <option value="todo">To Do</option>
-                                </select>
-                            </div>
-                            <div class="col-12">
-                                <label class="form-label small">Project visibility</label>
-                                <div class="list-group list-group-flush">
-                                    <!-- ko foreach: projects -->
-                                    <label class="list-group-item d-flex justify-content-between align-items-center">
-                                        <span data-bind="text: name"></span>
-                                        <input class="form-check-input ms-2" type="checkbox" data-bind="checked: isVisible">
-                                    </label>
-                                    <!-- /ko -->
+                    <div class="modal-body settings-modal-body">
+                        <section class="settings-section" aria-labelledby="entryDefaultsHeading">
+                            <div class="settings-section-heading">
+                                <span class="settings-section-icon"><i class="bi bi-pencil-square" aria-hidden="true"></i></span>
+                                <div>
+                                    <h6 id="entryDefaultsHeading" class="mb-1">Entry defaults</h6>
+                                    <p class="small text-body-secondary mb-0">Choose what to prefill when you add an entry or To-Do.</p>
                                 </div>
                             </div>
-                        </div>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="settings-option-card">
+                                        <label for="defaultProject" class="form-label">Default project</label>
+                                        <select id="defaultProject" class="form-select" data-bind="options: projects, optionsText: 'name', optionsValue: 'id', value: defaultProject, optionsCaption: 'Select a project'"></select>
+                                        <div class="form-text">Used when opening a new entry or To-Do.</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="settings-option-card">
+                                        <label for="defaultScope" class="form-label">Default scope</label>
+                                        <select id="defaultScope" class="form-select" data-bind="value: defaultScope">
+                                            <option value="global">Global</option>
+                                            <option value="task">Task</option>
+                                            <option value="supportTicket">Support ticket</option>
+                                        </select>
+                                        <div class="form-text">Used when opening a new time entry. To-Dos remain project-wide.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="settings-section" aria-labelledby="workdayHeading">
+                            <div class="settings-section-heading">
+                                <span class="settings-section-icon"><i class="bi bi-calendar-week" aria-hidden="true"></i></span>
+                                <div>
+                                    <h6 id="workdayHeading" class="mb-1">Workday</h6>
+                                    <p class="small text-body-secondary mb-0">Set your daily target and calendar rules.</p>
+                                </div>
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="settings-option-card">
+                                        <label for="dailyWorkHours" class="form-label">Daily target</label>
+                                        <select id="dailyWorkHours" class="form-select" data-bind="value: dailyWorkHours">
+                                            <option value="8">8 hours</option>
+                                            <option value="6">6 hours</option>
+                                            <option value="4">4 hours</option>
+                                        </select>
+                                        <div class="form-text">Used for progress and missing-hours calculations.</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="settings-option-card h-100">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" role="switch" id="argentinaHolidaysEnabled" data-bind="checked: argentinaHolidaysEnabled" aria-describedby="argentinaHolidaysHelp">
+                                            <label class="form-check-label fw-semibold" for="argentinaHolidaysEnabled">Argentina public holidays</label>
+                                        </div>
+                                        <div id="argentinaHolidaysHelp" class="form-text">Mark holidays in the calendar and exclude them from expected workdays.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="settings-section" aria-labelledby="workspaceHeading">
+                            <div class="settings-section-heading">
+                                <span class="settings-section-icon"><i class="bi bi-grid-1x2" aria-hidden="true"></i></span>
+                                <div>
+                                    <h6 id="workspaceHeading" class="mb-1">Workspace</h6>
+                                    <p class="small text-body-secondary mb-0">Customize the dashboard and entry suggestions.</p>
+                                </div>
+                            </div>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <div class="settings-option-card">
+                                        <label for="preferredView" class="form-label">Open dashboard to</label>
+                                        <select id="preferredView" class="form-select" data-bind="value: preferredView">
+                                            <option value="daily">Details</option>
+                                            <option value="matrix">Matrix</option>
+                                            <option value="todo">To Do</option>
+                                        </select>
+                                        <div class="form-text">Choose which time-entry view opens by default.</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="settings-option-card h-100">
+                                        <div class="form-check form-switch">
+                                            <input class="form-check-input" type="checkbox" role="switch" id="suggestionsEnabled" data-bind="checked: suggestionsEnabled" aria-describedby="suggestionsHelp">
+                                            <label class="form-check-label fw-semibold" for="suggestionsEnabled">Suggest entries</label>
+                                        </div>
+                                        <div id="suggestionsHelp" class="form-text">Show eligible tasks and tickets you haven’t logged today while you have time remaining.</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section class="settings-section" aria-labelledby="projectVisibilityHeading">
+                            <div class="settings-section-heading">
+                                <span class="settings-section-icon"><i class="bi bi-eye" aria-hidden="true"></i></span>
+                                <div>
+                                    <h6 id="projectVisibilityHeading" class="mb-1">Visible projects</h6>
+                                    <p class="small text-body-secondary mb-0">Choose which projects appear in charts and project filters.</p>
+                                </div>
+                            </div>
+                            <div class="settings-project-list list-group">
+                                <!-- ko foreach: projects -->
+                                <label class="list-group-item d-flex justify-content-between align-items-center gap-3">
+                                    <span class="text-truncate" data-bind="text: name"></span>
+                                    <input class="form-check-input flex-shrink-0" type="checkbox" data-bind="checked: isVisible, attr: { 'aria-label': 'Show project ' + name }">
+                                </label>
+                                <!-- /ko -->
+                            </div>
+                        </section>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
