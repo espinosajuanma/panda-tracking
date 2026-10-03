@@ -172,6 +172,10 @@ header .navbar > .container {
     padding: 1rem;
 }
 
+.suggested-entry {
+    opacity: 0.6;
+}
+
 .timer-floating-panel {
     position: fixed;
     right: 1rem;

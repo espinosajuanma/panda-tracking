@@ -124,6 +124,36 @@
         </li>
     </script>
 
+    <script type="text/html" id="suggestion-entry-template">
+        <li class="list-group-item px-0 suggested-entry">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="fw-bold">
+                        <i class="bi bi-lightbulb-fill text-warning me-2" title="Suggested entry" aria-label="Suggested entry"></i>
+                        <span data-bind="text: projectName"></span>
+                        <span class="text-muted small ms-2" data-bind="text: targetName"></span>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center flex-shrink-0">
+                    <i class="bi bi-stopwatch me-1" aria-hidden="true"></i><strong>1h</strong>
+                </div>
+            </div>
+            <div class="d-flex justify-content-between align-items-start mt-2">
+                <p style="white-space: pre-wrap;" data-bind="text: note" class="text-muted small mb-0 me-3"></p>
+                <div class="flex-shrink-0">
+                    <div class="btn-group btn-group-sm" role="group" data-bind="attr: { 'aria-label': 'Actions for suggestion ' + targetName }">
+                        <button type="button" class="btn btn-outline-success" data-bind="click: $root.logSuggestion.bind($root, $data), attr: { disabled: $root.loading(), title: 'Log one hour for ' + targetName, 'aria-label': 'Log one hour for ' + targetName }">
+                            <i class="bi bi-plus-circle" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" data-bind="click: $root.discardSuggestion.bind($root, $data), attr: { disabled: $root.loading(), title: 'Discard suggestion for ' + targetName, 'aria-label': 'Discard suggestion for ' + targetName }">
+                            <i class="bi bi-x-circle" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </li>
+    </script>
+
     <script type="text/html" id="new-entry-form-template">
         <div class="card new-entry-form-card mb-3">
             <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-2 py-2">
@@ -565,10 +595,15 @@
                             </div>
                             <div class="card-body">
                                 <!-- ENTRIES -->
-                                <ul data-bind="foreach: filteredEntries, visible: filteredEntries().length > 0" class="list-group list-group-flush">
+                                <ul data-bind="visible: filteredEntries().length > 0 || suggestions().length > 0" class="list-group list-group-flush">
+                                    <!-- ko foreach: filteredEntries -->
                                     <!-- ko template: { name: 'entry-template', data: $data } --><!-- /ko -->
+                                    <!-- /ko -->
+                                    <!-- ko foreach: suggestions -->
+                                    <!-- ko template: { name: 'suggestion-entry-template', data: $data } --><!-- /ko -->
+                                    <!-- /ko -->
                                 </ul>
-                                <div data-bind="visible: filteredEntries().length === 0" class="text-center text-body-secondary p-3">
+                                <div data-bind="visible: filteredEntries().length === 0 && suggestions().length === 0" class="text-center text-body-secondary p-3">
                                     <span data-bind="text: $root.activeFilterChips().length ? 'No entries match the current filters.' : 'No entries logged for this day yet.'"></span>
                                 </div>
                             </div>
@@ -744,6 +779,13 @@
                                     <label class="form-check-label small" for="argentinaHolidaysEnabled">Use Argentina public holidays</label>
                                 </div>
                                 <div id="argentinaHolidaysHelp" class="form-text">When enabled, Argentine holidays are marked in the calendar and excluded from expected workdays.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="suggestionsEnabled" data-bind="checked: suggestionsEnabled" aria-describedby="suggestionsHelp">
+                                    <label class="form-check-label small" for="suggestionsEnabled">Suggest entries from today’s work</label>
+                                </div>
+                                <div id="suggestionsHelp" class="form-text">Suggests eligible tasks and support tickets you have not logged today while you still have time left to log.</div>
                             </div>
                             <div class="col-md-6">
                                 <label for="preferredView" class="form-label small">Preferred View</label>
