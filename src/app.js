@@ -239,7 +239,7 @@ class ViewModel {
         const storedScopeFilters = getStoredFilter('filterByScope', {}) || {};
         this.filterMissingHours = ko.observable(asBoolean(getStoredFilter('filterMissingHours', false), false));
         this.filterHideLeaveDays = ko.observable(asBoolean(getStoredFilter('filterHideLeaveDays', true), true));
-        this.filterHideHolidays = ko.observable(asBoolean(getStoredFilter('filterHideHolidays', false), false));
+        this.filterHideHolidays = ko.observable(asBoolean(getStoredFilter('filterHideHolidays', true), true));
         this.hideWeekends = ko.observable(asBoolean(getStoredFilter('hideWeekends', true), true));
         this.viewRange = ko.observable(localStorage.getItem('solutions:timetracking:viewRange') || 'month');
         this.preferredView = ko.observable(localStorage.getItem('solutions:timetracking:preferredView') || 'daily');
