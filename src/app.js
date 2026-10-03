@@ -186,6 +186,12 @@ class ViewModel {
         // Time Tracking
         this.weeks = ko.observableArray([]);
         this.projects = ko.observableArray([]);
+        this.suggestions = ko.observableArray([]);
+        this.suggestionsEnabled = ko.observable(localStorage.getItem('solutions:timetracking:suggestionsEnabled') !== 'false');
+        this.suggestionsEnabled.subscribe(enabled => {
+            localStorage.setItem('solutions:timetracking:suggestionsEnabled', JSON.stringify(enabled));
+            if (this.logged()) this.updateDashboard();
+        });
         this.activeView = ko.observable('daily');
         this.matrixModalTitle = ko.observable('Entries');
         this.matrixModalEntries = ko.observableArray([]);
@@ -1654,6 +1660,61 @@ class ViewModel {
         if (modal) modal.show();
     }
 
+    getSuggestionDismissalKey = (suggestion) => `solutions:timetracking:dismissedSuggestion:${this.slingr.user?.id}:${suggestion.date}:${suggestion.scope}:${suggestion.targetId}:${suggestion.note}`;
+
+    dismissSuggestion = (suggestion) => {
+        try {
+            sessionStorage.setItem(this.getSuggestionDismissalKey(suggestion), 'true');
+        } catch (error) {
+            console.warn('Could not save dismissed suggestion for this session:', error);
+        }
+        this.suggestions.remove(suggestion);
+    }
+
+    discardSuggestion = (suggestion) => this.dismissSuggestion(suggestion);
+
+    logSuggestion = async (suggestion) => {
+        if (!suggestion || this.loading()) return;
+        await this.goToToday();
+        const date = parseLocalDate(suggestion.date);
+        const day = this.weeks().flatMap(week => week.days()).find(item => item.dateStr() === suggestion.date);
+        if (!day || !date) {
+            this.addToast('Could not open today to log this suggestion. Refresh the dashboard and try again.', 'warning');
+            return;
+        }
+
+        let project = this.projects().find(item => item.id === suggestion.projectId);
+        if (!project) {
+            await this.updateStats();
+            project = this.projects().find(item => item.id === suggestion.projectId);
+        }
+        if (!project) {
+            this.addToast('The project for this suggestion is unavailable.', 'error');
+            return;
+        }
+
+        this.clearNewEntryForms();
+        this.selectedDayForNewEntry(null);
+        this.openNewEntryModal(day, project);
+        const form = this.newEntryForms()[0];
+        if (!form) return;
+
+        form.onlyAssignedToMe(false);
+        form.taskStatusFilter('all');
+        form.project(project);
+        form.scope(suggestion.scope);
+        await form.loadScopeOptions();
+        const options = suggestion.scope === 'task' ? form.tasks : form.tickets;
+        if (!options().some(option => option.id === suggestion.targetId)) {
+            options.push({ id: suggestion.targetId, name: suggestion.targetName });
+        }
+        if (suggestion.scope === 'task') form.taskId(suggestion.targetId);
+        else form.ticketId(suggestion.targetId);
+        form.timeSpent(60 * 60 * 1000);
+        form.notes(suggestion.note);
+        form.suggestionKey = this.getSuggestionDismissalKey(suggestion);
+    }
+
     submitNewEntryBatch = async (day) => {
         if (this.loading()) return;
         const forms = this.newEntryForms().slice();
@@ -1712,6 +1773,14 @@ class ViewModel {
             day.scope(this.defaultScope());
             day.taskId(null);
             day.ticketId(null);
+            const suggestionKeys = forms.map(form => form.suggestionKey).filter(Boolean);
+            suggestionKeys.forEach(key => {
+                try {
+                    sessionStorage.setItem(key, 'true');
+                } catch (error) {
+                    console.warn('Could not save logged suggestion for this session:', error);
+                }
+            });
             this.clearNewEntryForms();
             this.newEntryModal?.hide();
 
@@ -1724,6 +1793,7 @@ class ViewModel {
                     .map(date => visibleDays.find(visibleDay => visibleDay.dateStr() === date))
                     .filter(Boolean))];
                 await Promise.all(refreshDays.map(refreshDay => refreshDay.updateDay()));
+                if (suggestionKeys.length) await this.refreshSuggestions();
                 await this.updateStats();
 
                 if (this.keybindingsEnabled() && this.navigationMode() === 'entry') {
@@ -2262,6 +2332,7 @@ class ViewModel {
             .map(week => new Week(week, entries));
         this.weeks(weeks);
         this.dashboardHasLoaded(true);
+        await this.refreshSuggestions();
 
         const refreshId = this.dashboardRefreshSequence;
         this.updateStats().catch(error => {
@@ -2274,6 +2345,102 @@ class ViewModel {
             console.warn('Time entries loaded, but dashboard statistics could not be refreshed:', error);
             this.statsWarning('Time entries loaded, but one or more summary charts could not be refreshed.');
         });
+    }
+
+    refreshSuggestions = async () => {
+        this.suggestions([]);
+        if (!this.suggestionsEnabled() || !this.slingr.user) return;
+
+        try {
+            const date = getDateString(new Date());
+            const userId = String(this.slingr.user.id);
+            const targetMs = this.dailyWorkHours() * 60 * 60 * 1000;
+            const { items: entries } = await this.slingr.get(`/data/${TIME_TRACKING_ENTITY}`, {
+                _size: 1000,
+                date,
+                person: this.slingr.user.id,
+            });
+            const loggedMs = entries.reduce((sum, entry) => sum + (Number(entry.timeSpent) || 0), 0);
+            if (loggedMs >= targetMs) return;
+
+            const loggedTaskIds = new Set(entries.map(entry => entry.task?.id).filter(Boolean).map(String));
+            const loggedTicketIds = new Set(entries.map(entry => entry.ticket?.id).filter(Boolean).map(String));
+            const fetchCandidates = async (entity, filters) => {
+                try {
+                    const { items = [] } = await this.slingr.get(`/data/${entity}`, {
+                        _size: 1000,
+                        ...filters,
+                    });
+                    return items;
+                } catch (error) {
+                    if (error instanceof AuthError) throw error;
+                    console.warn(`Could not load ${entity} suggestions for filters`, filters, error);
+                    return [];
+                }
+            };
+
+            const [tasks, tickets] = await Promise.all([
+                Promise.all([
+                    fetchCandidates('dev.tasks', { status: 'inProgress', assignees: userId, type: 'notEquals(release)' }),
+                    fetchCandidates('dev.tasks', { status: 'inReview', reviewers: userId, type: 'notEquals(release)' }),
+                ]).then(results => results.flat()),
+                Promise.all(['inProgress', 'inReview', 'inRevision'].map(status =>
+                    fetchCandidates('support.tickets', { status, assignee: userId })
+                )).then(results => results.flat()),
+            ]);
+            const dismissed = suggestion => {
+                try {
+                    return sessionStorage.getItem(this.getSuggestionDismissalKey(suggestion)) === 'true';
+                } catch (error) {
+                    return false;
+                }
+            };
+            const suggestions = [];
+            const seenSuggestions = new Set();
+
+            for (const task of tasks) {
+                if (!task?.id || loggedTaskIds.has(String(task.id)) || seenSuggestions.has(`task:${task.id}`)) continue;
+                const isAssignee = (task.assignees || []).some(person => String(person?.id) === userId);
+                const isReviewer = (task.reviewers || []).some(person => String(person?.id) === userId);
+                const note = task.status === 'inProgress' && isAssignee
+                    ? 'Development'
+                    : task.status === 'inReview' && isReviewer
+                        ? 'Review'
+                        : null;
+                if (!note || !task.project?.id) continue;
+                seenSuggestions.add(`task:${task.id}`);
+                suggestions.push({
+                    date,
+                    scope: 'task',
+                    targetId: String(task.id),
+                    targetName: task.label || task.title || `Task ${task.number || ''}`.trim(),
+                    projectId: String(task.project.id),
+                    projectName: task.project.label || '',
+                    note,
+                });
+            }
+
+            for (const ticket of tickets) {
+                if (!ticket?.id || loggedTicketIds.has(String(ticket.id)) || seenSuggestions.has(`supportTicket:${ticket.id}`)) continue;
+                if (!['inProgress', 'inReview', 'inRevision'].includes(ticket.status) || !ticket.project?.id) continue;
+                if (String(ticket.assignee?.id) !== userId) continue;
+                seenSuggestions.add(`supportTicket:${ticket.id}`);
+                suggestions.push({
+                    date,
+                    scope: 'supportTicket',
+                    targetId: String(ticket.id),
+                    targetName: ticket.label || ticket.title || `Ticket ${ticket.number || ''}`.trim(),
+                    projectId: String(ticket.project.id),
+                    projectName: ticket.project.label || '',
+                    note: ticket.title || ticket.label || 'Support ticket',
+                });
+            }
+
+            this.suggestions(suggestions.filter(suggestion => !dismissed(suggestion)));
+        } catch (error) {
+            if (error instanceof AuthError) throw error;
+            console.warn('Could not refresh time-entry suggestions:', error);
+        }
     }
 
     updateStats = async () => {
@@ -3155,6 +3322,11 @@ function Day (date, entries, week) {
             });
         }
         return entries;
+    });
+
+    day.suggestions = ko.computed(function() {
+        if (!day.isToday() || !model.suggestionsEnabled()) return [];
+        return model.suggestions().filter(suggestion => suggestion.date === day.dateStr());
     });
 
     // Set default project if available
