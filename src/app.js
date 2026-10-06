@@ -186,6 +186,7 @@ class ViewModel {
         // Time Tracking
         this.weeks = ko.observableArray([]);
         this.projects = ko.observableArray([]);
+        this.projectsLoaded = false;
         this.getSelectedMonthKey = () => `${this.year()}-${String(this.month() + 1).padStart(2, '0')}`;
         this.projectTargetHoursByMonth = ko.observable((() => {
             try {
@@ -332,10 +333,12 @@ class ViewModel {
 
         // Default project
         this.defaultProject = ko.observable(localStorage.getItem('solutions:timetracking:defaultProject') || null);
+        this.suppressDefaultProjectToast = false;
         this.defaultProject.subscribe(val => {
-            if (val) {
+            if (!this.projectsLoaded) return;
+            if (val !== null && val !== undefined && val !== '') {
                 localStorage.setItem('solutions:timetracking:defaultProject', val);
-                this.addToast('Default project saved.', 'success');
+                if (!this.suppressDefaultProjectToast) this.addToast('Default project saved.', 'success');
             } else {
                 localStorage.removeItem('solutions:timetracking:defaultProject');
             }
@@ -343,6 +346,14 @@ class ViewModel {
         const storedDefaultScope = localStorage.getItem('solutions:timetracking:defaultScope');
         this.defaultScope = ko.observable(['global', 'task', 'supportTicket'].includes(storedDefaultScope) ? storedDefaultScope : 'global');
         this.defaultScope.subscribe(scope => localStorage.setItem('solutions:timetracking:defaultScope', scope));
+
+        this.getProjectById = projectId => {
+            if (projectId === null || projectId === undefined || projectId === '') return null;
+            return this.projects().find(project => String(project.id) === String(projectId)) || null;
+        };
+        this.getDefaultProject = () => this.getProjectById(
+            this.defaultProject() || localStorage.getItem('solutions:timetracking:defaultProject')
+        );
 
         this.visibleProjects = ko.computed(() => {
             return this.projects().filter(project => project.isVisible());
@@ -1008,6 +1019,7 @@ class ViewModel {
         this.logged(false);
         this.dashboardHasLoaded(false);
         this.weeks([]);
+        this.projectsLoaded = false;
         this.projects([]);
         if (notify) this.addToast('Logged out successfully.', 'success');
     }
@@ -1694,25 +1706,20 @@ class ViewModel {
     }
 
     openNewEntryModal = (day, project = null) => {
-        const isNewDay = this.selectedDayForNewEntry() !== day;
-        const createDraft = isNewDay || this.newEntryForms().length === 0;
-        const projectId = project?.id || this.filterByProject() || this.defaultProject();
-        const selectedProject = this.projects().find(project => project.id === projectId) || null;
-        if (createDraft) {
-            this.clearNewEntryForms();
-            const form = new NewEntryDraft(day, false, day.date);
-            form.project(selectedProject);
-            form.scope(this.defaultScope());
-            form.taskId(null);
-            form.ticketId(null);
-            this.newEntryForms([form]);
-            this.newEntrySubmissionStatus('');
-        }
+        const selectedProject = (project && this.getProjectById(project.id))
+            || this.getDefaultProject()
+            || this.getProjectById(this.filterByProject());
+        this.clearNewEntryForms();
+        const form = new NewEntryDraft(day, false, day.date);
+        form.project(selectedProject);
+        form.scope(this.defaultScope());
+        form.taskId(null);
+        form.ticketId(null);
+        this.newEntryForms([form]);
+        this.newEntrySubmissionStatus('');
         this.selectedDayForNewEntry(day);
 
-        if (day && (createDraft || project)) {
-            day.project(selectedProject);
-        }
+        if (day) day.project(selectedProject);
 
         const modal = this.initializeModal('newEntryModal', 'newEntryModal', {
             onShown: () => {
@@ -1901,9 +1908,12 @@ class ViewModel {
 
     openNewTodoModal = (day) => {
         this.selectedDayForNewEntry(day);
-        const projectId = this.filterByProject() || this.defaultProject();
-        const selectedProject = this.projects().find(project => project.id === projectId) || null;
-        if (day) day.project(selectedProject);
+        const selectedProject = this.getDefaultProject()
+            || this.getProjectById(this.filterByProject());
+        if (day) {
+            day.project(selectedProject);
+            day.notes('');
+        }
         const modal = this.initializeModal('newTodoModal', 'newTodoModal', {
             onShown: () => {
                 const currentDay = this.selectedDayForNewEntry();
@@ -2707,11 +2717,16 @@ class ViewModel {
         });
 
         this.projects(mappedProjects);
+        this.projectsLoaded = true;
 
-        // Set default project if it's not set and there is one in localStorage
-        if (!this.defaultProject()) {
-            const storedDefaultProject = localStorage.getItem('solutions:timetracking:defaultProject');
-            if (storedDefaultProject) this.defaultProject(storedDefaultProject);
+        // Restore the persisted id after options binding has received the project list.
+        const storedDefaultProject = localStorage.getItem('solutions:timetracking:defaultProject');
+        const savedDefaultProject = this.getProjectById(storedDefaultProject || this.defaultProject());
+        const defaultProjectId = savedDefaultProject?.id ?? storedDefaultProject ?? null;
+        if (defaultProjectId !== this.defaultProject()) {
+            this.suppressDefaultProjectToast = true;
+            this.defaultProject(defaultProjectId);
+            this.suppressDefaultProjectToast = false;
         }
  
         const projectChartData = {
@@ -3445,14 +3460,9 @@ function Day (date, entries, week) {
 
     // Set default project if available
     ko.computed(() => {
-        if (day.project() === null && model.projects().length > 0 && model.defaultProject()) {
-            const defaultProjectId = model.defaultProject();
-            if (defaultProjectId) {
-                const defaultProject = model.projects().find(p => p.id === defaultProjectId);
-                if (defaultProject) {
-                    day.project(defaultProject);
-                }
-            }
+        if (day.project() === null && model.projects().length > 0) {
+            const defaultProject = model.getDefaultProject();
+            if (defaultProject) day.project(defaultProject);
         }
     });
 
