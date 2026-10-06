@@ -386,6 +386,15 @@
                     <div id="calendar" class="me-lg-4 mb-4 mb-lg-0"></div>
                     <!-- STATS -->
                     <div id="stats" class="flex-grow-1">
+                        <ul class="nav nav-tabs mb-3" role="tablist" aria-label="Monthly overview statistics">
+                            <li class="nav-item" role="presentation">
+                                <button id="monthlyOverviewTab" class="nav-link" type="button" role="tab" aria-controls="monthlyOverviewPanel" data-bind="click: setMonthlyStatsTab.bind($data, 'overview'), event: { keydown: handleMonthlyStatsTabKeydown.bind($data, 'overview') }, css: { active: monthlyStatsTab() === 'overview' }, attr: { 'aria-selected': monthlyStatsTab() === 'overview', tabindex: monthlyStatsTab() === 'overview' ? 0 : -1 }">Overview</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button id="monthlyProjectTargetsTab" class="nav-link" type="button" role="tab" aria-controls="monthlyProjectTargetsPanel" data-bind="click: setMonthlyStatsTab.bind($data, 'projectTargets'), event: { keydown: handleMonthlyStatsTabKeydown.bind($data, 'projectTargets') }, css: { active: monthlyStatsTab() === 'projectTargets' }, attr: { 'aria-selected': monthlyStatsTab() === 'projectTargets', tabindex: monthlyStatsTab() === 'projectTargets' ? 0 : -1 }">Project targets</button>
+                            </li>
+                        </ul>
+                        <div id="monthlyOverviewPanel" role="tabpanel" aria-labelledby="monthlyOverviewTab" tabindex="0" data-bind="visible: monthlyStatsTab() === 'overview'">
                         <div class="mb-4 row">
                             <div class="col-md-5">
                                 <div id="month-progress">
@@ -418,12 +427,33 @@
                                          <canvas id="projectHoursChart" role="img" aria-label="Logged hours by project"></canvas>
                                      </div>
                                      <span class="visually-hidden" data-bind="text: projectHoursSummary"></span>
-                                </div>
+                                 </div>
                                 <div data-bind="visible: visibleProjects().length === 0" class="text-center text-muted py-5">
                                     <div><i class="bi bi-eye-slash fs-2 mb-2"></i></div>
-                                    <p class="mb-0">No visible projects selected. Show projects in Settings.</p>
+                                    <p class="mb-0">No visible projects selected. Show projects in project settings.</p>
                                 </div>
                             </div>
+                        </div>
+                        </div>
+                        <div id="monthlyProjectTargetsPanel" role="tabpanel" aria-labelledby="monthlyProjectTargetsTab" tabindex="0" data-bind="visible: monthlyStatsTab() === 'projectTargets'">
+                            <h2 class="h6">Monthly project targets</h2>
+                            <p class="small text-body-secondary">Hours logged against each visible project’s target for <span data-bind="text: selectedMonthLabel"></span>.</p>
+                            <!-- ko if: projectTargetProgress().length > 0 -->
+                            <ul class="list-unstyled row row-cols-1 row-cols-sm-2 g-3 mb-0" data-bind="foreach: projectTargetProgress">
+                                <li class="col">
+                                    <div class="d-flex justify-content-between gap-2 small mb-1">
+                                        <span class="text-truncate" data-bind="text: name, attr: { title: name }"></span>
+                                        <span class="text-nowrap"><strong data-bind="text: logged"></strong> / <span data-bind="text: target"></span></span>
+                                    </div>
+                                    <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" data-bind="attr: { 'aria-valuenow': Math.round(percentage), 'aria-valuetext': ariaValueText, 'aria-label': 'Monthly target progress for ' + name }">
+                                        <div class="progress-bar" data-bind="style: { width: percentage + '%' }, css: progressClass"></div>
+                                    </div>
+                                </li>
+                            </ul>
+                            <!-- /ko -->
+                            <!-- ko if: projectTargetProgress().length === 0 -->
+                            <div class="alert alert-light border mb-0" role="status">No visible projects have a target yet. Set target hours in project settings.</div>
+                            <!-- /ko -->
                         </div>
                     </div>
                 </div>
@@ -848,21 +878,38 @@
                             </div>
                         </section>
 
-                        <section class="settings-section" aria-labelledby="projectVisibilityHeading">
+                        <section class="settings-section" aria-labelledby="projectSettingsHeading">
                             <div class="settings-section-heading">
-                                <span class="settings-section-icon"><i class="bi bi-eye" aria-hidden="true"></i></span>
+                                <span class="settings-section-icon"><i class="bi bi-kanban" aria-hidden="true"></i></span>
                                 <div>
-                                    <h6 id="projectVisibilityHeading" class="mb-1">Visible projects</h6>
-                                    <p class="small text-body-secondary mb-0">Choose which projects appear in charts and project filters.</p>
+                                    <h6 id="projectSettingsHeading" class="mb-1">Projects</h6>
+                                    <p class="small text-body-secondary mb-0">Choose which projects appear in charts and filters, and set their targets for <strong data-bind="text: selectedMonthLabel"></strong>. Select a different month in the overview to edit its targets.</p>
                                 </div>
                             </div>
-                            <div class="settings-project-list list-group">
-                                <!-- ko foreach: projects -->
-                                <label class="list-group-item d-flex justify-content-between align-items-center gap-3">
-                                    <span class="text-truncate" data-bind="text: name"></span>
-                                    <input class="form-check-input flex-shrink-0" type="checkbox" data-bind="checked: isVisible, attr: { 'aria-label': 'Show project ' + name }">
-                                </label>
-                                <!-- /ko -->
+                            <div class="settings-project-list table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th scope="col">Project</th>
+                                            <th scope="col" class="text-center">Visible</th>
+                                            <th scope="col" style="min-width: 10rem;">Target · <span data-bind="text: selectedMonthLabel"></span></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody data-bind="foreach: projects">
+                                        <tr>
+                                            <th scope="row" class="fw-normal text-truncate" data-bind="text: name"></th>
+                                            <td class="text-center">
+                                                <input class="form-check-input" type="checkbox" data-bind="checked: isVisible, attr: { 'aria-label': 'Show project ' + name }">
+                                            </td>
+                                            <td>
+                                                <div class="input-group input-group-sm">
+                                                    <input type="number" class="form-control" min="0" step="0.5" placeholder="Optional" data-bind="value: targetHours, attr: { 'aria-label': 'Target hours for ' + name + ' in ' + $root.selectedMonthLabel() }">
+                                                    <span class="input-group-text">h</span>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </section>
                     </div>

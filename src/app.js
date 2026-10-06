@@ -186,6 +186,22 @@ class ViewModel {
         // Time Tracking
         this.weeks = ko.observableArray([]);
         this.projects = ko.observableArray([]);
+        this.getSelectedMonthKey = () => `${this.year()}-${String(this.month() + 1).padStart(2, '0')}`;
+        this.projectTargetHoursByMonth = ko.observable((() => {
+            try {
+                const monthlyTargets = JSON.parse(localStorage.getItem('solutions:timetracking:projectTargetHoursByMonth') || 'null');
+                if (monthlyTargets && typeof monthlyTargets === 'object' && !Array.isArray(monthlyTargets)) return monthlyTargets;
+
+                const legacyTargets = JSON.parse(localStorage.getItem('solutions:timetracking:projectTargetHours') || '{}');
+                const selectedMonthTargets = legacyTargets && typeof legacyTargets === 'object' && !Array.isArray(legacyTargets) ? legacyTargets : {};
+                return Object.keys(selectedMonthTargets).length ? { [this.getSelectedMonthKey()]: selectedMonthTargets } : {};
+            } catch (e) {
+                return {};
+            }
+        })());
+        this.projectTargetHoursByMonth.subscribe(targets => {
+            localStorage.setItem('solutions:timetracking:projectTargetHoursByMonth', JSON.stringify(targets));
+        });
         this.suggestions = ko.observableArray([]);
         this.suggestionsEnabled = ko.observable(localStorage.getItem('solutions:timetracking:suggestionsEnabled') !== 'false');
         this.suggestionsEnabled.subscribe(enabled => {
@@ -193,6 +209,7 @@ class ViewModel {
             if (this.logged()) this.updateDashboard();
         });
         this.activeView = ko.observable('daily');
+        this.monthlyStatsTab = ko.observable('overview');
         this.matrixModalTitle = ko.observable('Entries');
         this.matrixModalEntries = ko.observableArray([]);
         this.matrixModalDay = ko.observable(null);
@@ -330,6 +347,29 @@ class ViewModel {
         this.visibleProjects = ko.computed(() => {
             return this.projects().filter(project => project.isVisible());
         });
+        this.projectTargetProgress = ko.computed(() => this.visibleProjects()
+            .map(project => {
+                const targetHours = Number(project.targetHours());
+                if (!Number.isFinite(targetHours) || targetHours <= 0) return null;
+
+                const loggedMs = this.weeks().flatMap(week => week.days())
+                    .flatMap(day => day.entries())
+                    .filter(entry => !entry.isTodo() && entry.raw?.project?.id === project.id)
+                    .reduce((sum, entry) => sum + entry.timeSpent(), 0);
+                const loggedHours = loggedMs / (60 * 60 * 1000);
+                const percentage = Math.min((loggedHours / targetHours) * 100, 100);
+
+                return {
+                    id: project.id,
+                    name: project.name,
+                    logged: formatMsToHours(loggedMs),
+                    target: `${targetHours}h`,
+                    percentage,
+                    progressClass: loggedHours >= targetHours ? 'bg-success' : 'bg-primary',
+                    ariaValueText: `${formatMsToHours(loggedMs)} of ${targetHours}h`,
+                };
+            })
+            .filter(project => project !== null));
         this.projectHoursSummary = ko.computed(() => {
             const totals = this.visibleProjects().map(project => {
                 const ms = this.weeks().flatMap(week => week.days())
@@ -1492,6 +1532,26 @@ class ViewModel {
         this.activeView(view);
     }
 
+    setMonthlyStatsTab = (tab) => {
+        if (['overview', 'projectTargets'].includes(tab)) this.monthlyStatsTab(tab);
+    }
+
+    handleMonthlyStatsTabKeydown = (tab, event) => {
+        const tabs = ['overview', 'projectTargets'];
+        const currentIndex = tabs.indexOf(tab);
+        let nextIndex = currentIndex;
+        if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabs.length;
+        else if (event.key === 'ArrowLeft') nextIndex = (currentIndex + tabs.length - 1) % tabs.length;
+        else if (event.key === 'Home') nextIndex = 0;
+        else if (event.key === 'End') nextIndex = tabs.length - 1;
+        else return;
+
+        event.preventDefault();
+        this.monthlyStatsTab(tabs[nextIndex]);
+        const tabIds = { overview: 'monthlyOverviewTab', projectTargets: 'monthlyProjectTargetsTab' };
+        document.getElementById(tabIds[tabs[nextIndex]])?.focus();
+    }
+
     handleViewTabKeydown = (view, event) => {
         const views = ['daily', 'matrix', 'todo'];
         const currentIndex = views.indexOf(view);
@@ -2558,20 +2618,71 @@ class ViewModel {
     }
  
     updateProjectStats = async (totalMonthMs) => {
-        let { items: projects } = await model.slingr.get('/data/projects', {
-            'members.user': model.slingr.user.id,
-            _sortField: 'name',
-            _sortType: 'asc',
-            _size: 1000,
-        });
+        let projects = [];
+        try {
+            const response = await model.slingr.get('/data/projects', {
+                'members.user': model.slingr.user.id,
+                _sortField: 'name',
+                _sortType: 'asc',
+                _size: 1000,
+            });
+            projects = Array.isArray(response?.items) ? response.items : [];
+        } catch (error) {
+            console.warn('Could not load project metadata; using project details from loaded entries instead:', error);
+        }
+
+        projects = projects.filter(project => project?.id !== null && project?.id !== undefined);
+        if (!projects.length) {
+            projects = this.projects().map(project => ({ id: project.id, label: project.name }));
+        }
+        if (!projects.length) {
+            const projectsById = new Map();
+            for (const entry of this.weeks().flatMap(week => week.days()).flatMap(day => day.entries())) {
+                const rawProject = entry.raw?.project;
+                if (rawProject?.id === null || rawProject?.id === undefined || projectsById.has(rawProject.id)) continue;
+                projectsById.set(rawProject.id, {
+                    id: rawProject.id,
+                    label: String(rawProject.label || rawProject.name || (typeof entry.project === 'function' ? entry.project() : entry.project) || 'Unnamed project'),
+                });
+            }
+            projects = [...projectsById.values()].sort((a, b) => String(a.label).localeCompare(String(b.label)));
+        }
 
         const hiddenIds = this.hiddenProjectIds();
         const mappedProjects = projects.map(p => {
+            const projectName = String(p.label || p.name || 'Unnamed project');
             const project = {
                 id: p.id,
-                name: p.label,
-                shortName: p.label.length > 15 ? `${p.label.slice(0, 15)}…` : p.label,
+                name: projectName,
+                shortName: projectName.length > 15 ? `${projectName.slice(0, 15)}…` : projectName,
                 isVisible: ko.observable(!hiddenIds.includes(p.id)),
+                targetHours: ko.computed({
+                    read: () => {
+                        const monthTargets = this.projectTargetHoursByMonth()[this.getSelectedMonthKey()] || {};
+                        const savedTargetHours = monthTargets[p.id];
+                        return savedTargetHours !== null && savedTargetHours !== undefined && savedTargetHours !== '' && Number.isFinite(Number(savedTargetHours)) && Number(savedTargetHours) >= 0
+                            ? Number(savedTargetHours)
+                            : '';
+                    },
+                    write: value => {
+                        const targetHours = value === '' || value === null ? null : Number(value);
+                        const targetsByMonth = { ...this.projectTargetHoursByMonth() };
+                        const monthKey = this.getSelectedMonthKey();
+                        const monthTargets = { ...(targetsByMonth[monthKey] || {}) };
+                        if (Number.isFinite(targetHours) && targetHours >= 0) {
+                            monthTargets[p.id] = targetHours;
+                        } else {
+                            delete monthTargets[p.id];
+                        }
+
+                        if (Object.keys(monthTargets).length) {
+                            targetsByMonth[monthKey] = monthTargets;
+                        } else {
+                            delete targetsByMonth[monthKey];
+                        }
+                        this.projectTargetHoursByMonth(targetsByMonth);
+                    },
+                }),
             };
 
             project.isVisible.subscribe(isVisible => {
@@ -2631,7 +2742,7 @@ class ViewModel {
             let projectEntries = this.weeks()
                 .map(w => w.days()).flat()
                 .map(d => d.entries()).flat()
-                .filter(e => e.raw.project.id === project.id)
+                .filter(e => e.raw?.project?.id === project.id)
                 .filter(e => !e.isTodo());
  
             const projectScopeStats = {
