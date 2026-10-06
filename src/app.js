@@ -3903,12 +3903,18 @@ function Entry (entry, day) {
 
     self.formattedNotes = ko.computed(function() {
         const notesText = self.notes() || '';
-        const escapedNotes = notesText.replace(/[&<>"']/g, character => ({
+        const escapeHtml = text => text.replace(/[&<>"']/g, character => ({
             '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
         }[character]));
-        return escapedNotes.replace(/#(\w+)/g, (match, word) => {
-            return `<span class="badge bg-secondary text-dark me-1">#${word}</span>`;
-        });
+
+        let cursor = 0;
+        let formattedNotes = '';
+        for (const match of notesText.matchAll(/#(\w+)/g)) {
+            formattedNotes += escapeHtml(notesText.slice(cursor, match.index));
+            formattedNotes += `<span class="badge bg-secondary text-dark me-1">#${escapeHtml(match[1])}</span>`;
+            cursor = match.index + match[0].length;
+        }
+        return formattedNotes + escapeHtml(notesText.slice(cursor));
     });
 
     self.isTodo = ko.computed(function() {
