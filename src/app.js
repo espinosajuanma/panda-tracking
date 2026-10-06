@@ -186,6 +186,23 @@ class ViewModel {
         // Time Tracking
         this.weeks = ko.observableArray([]);
         this.projects = ko.observableArray([]);
+        this.projectsLoaded = false;
+        this.getSelectedMonthKey = () => `${this.year()}-${String(this.month() + 1).padStart(2, '0')}`;
+        this.projectTargetHoursByMonth = ko.observable((() => {
+            try {
+                const monthlyTargets = JSON.parse(localStorage.getItem('solutions:timetracking:projectTargetHoursByMonth') || 'null');
+                if (monthlyTargets && typeof monthlyTargets === 'object' && !Array.isArray(monthlyTargets)) return monthlyTargets;
+
+                const legacyTargets = JSON.parse(localStorage.getItem('solutions:timetracking:projectTargetHours') || '{}');
+                const selectedMonthTargets = legacyTargets && typeof legacyTargets === 'object' && !Array.isArray(legacyTargets) ? legacyTargets : {};
+                return Object.keys(selectedMonthTargets).length ? { [this.getSelectedMonthKey()]: selectedMonthTargets } : {};
+            } catch (e) {
+                return {};
+            }
+        })());
+        this.projectTargetHoursByMonth.subscribe(targets => {
+            localStorage.setItem('solutions:timetracking:projectTargetHoursByMonth', JSON.stringify(targets));
+        });
         this.suggestions = ko.observableArray([]);
         this.suggestionsEnabled = ko.observable(localStorage.getItem('solutions:timetracking:suggestionsEnabled') !== 'false');
         this.suggestionsEnabled.subscribe(enabled => {
@@ -193,6 +210,7 @@ class ViewModel {
             if (this.logged()) this.updateDashboard();
         });
         this.activeView = ko.observable('daily');
+        this.monthlyStatsTab = ko.observable('overview');
         this.matrixModalTitle = ko.observable('Entries');
         this.matrixModalEntries = ko.observableArray([]);
         this.matrixModalDay = ko.observable(null);
@@ -315,10 +333,12 @@ class ViewModel {
 
         // Default project
         this.defaultProject = ko.observable(localStorage.getItem('solutions:timetracking:defaultProject') || null);
+        this.suppressDefaultProjectToast = false;
         this.defaultProject.subscribe(val => {
-            if (val) {
+            if (!this.projectsLoaded) return;
+            if (val !== null && val !== undefined && val !== '') {
                 localStorage.setItem('solutions:timetracking:defaultProject', val);
-                this.addToast('Default project saved.', 'success');
+                if (!this.suppressDefaultProjectToast) this.addToast('Default project saved.', 'success');
             } else {
                 localStorage.removeItem('solutions:timetracking:defaultProject');
             }
@@ -327,9 +347,40 @@ class ViewModel {
         this.defaultScope = ko.observable(['global', 'task', 'supportTicket'].includes(storedDefaultScope) ? storedDefaultScope : 'global');
         this.defaultScope.subscribe(scope => localStorage.setItem('solutions:timetracking:defaultScope', scope));
 
+        this.getProjectById = projectId => {
+            if (projectId === null || projectId === undefined || projectId === '') return null;
+            return this.projects().find(project => String(project.id) === String(projectId)) || null;
+        };
+        this.getDefaultProject = () => this.getProjectById(
+            this.defaultProject() || localStorage.getItem('solutions:timetracking:defaultProject')
+        );
+
         this.visibleProjects = ko.computed(() => {
             return this.projects().filter(project => project.isVisible());
         });
+        this.projectTargetProgress = ko.computed(() => this.visibleProjects()
+            .map(project => {
+                const targetHours = Number(project.targetHours());
+                if (!Number.isFinite(targetHours) || targetHours <= 0) return null;
+
+                const loggedMs = this.weeks().flatMap(week => week.days())
+                    .flatMap(day => day.entries())
+                    .filter(entry => !entry.isTodo() && entry.raw?.project?.id === project.id)
+                    .reduce((sum, entry) => sum + entry.timeSpent(), 0);
+                const loggedHours = loggedMs / (60 * 60 * 1000);
+                const percentage = Math.min((loggedHours / targetHours) * 100, 100);
+
+                return {
+                    id: project.id,
+                    name: project.name,
+                    logged: formatMsToHours(loggedMs),
+                    target: `${targetHours}h`,
+                    percentage,
+                    progressClass: loggedHours >= targetHours ? 'bg-success' : 'bg-primary',
+                    ariaValueText: `${formatMsToHours(loggedMs)} of ${targetHours}h`,
+                };
+            })
+            .filter(project => project !== null));
         this.projectHoursSummary = ko.computed(() => {
             const totals = this.visibleProjects().map(project => {
                 const ms = this.weeks().flatMap(week => week.days())
@@ -968,6 +1019,7 @@ class ViewModel {
         this.logged(false);
         this.dashboardHasLoaded(false);
         this.weeks([]);
+        this.projectsLoaded = false;
         this.projects([]);
         if (notify) this.addToast('Logged out successfully.', 'success');
     }
@@ -1492,6 +1544,26 @@ class ViewModel {
         this.activeView(view);
     }
 
+    setMonthlyStatsTab = (tab) => {
+        if (['overview', 'projectTargets'].includes(tab)) this.monthlyStatsTab(tab);
+    }
+
+    handleMonthlyStatsTabKeydown = (tab, event) => {
+        const tabs = ['overview', 'projectTargets'];
+        const currentIndex = tabs.indexOf(tab);
+        let nextIndex = currentIndex;
+        if (event.key === 'ArrowRight') nextIndex = (currentIndex + 1) % tabs.length;
+        else if (event.key === 'ArrowLeft') nextIndex = (currentIndex + tabs.length - 1) % tabs.length;
+        else if (event.key === 'Home') nextIndex = 0;
+        else if (event.key === 'End') nextIndex = tabs.length - 1;
+        else return;
+
+        event.preventDefault();
+        this.monthlyStatsTab(tabs[nextIndex]);
+        const tabIds = { overview: 'monthlyOverviewTab', projectTargets: 'monthlyProjectTargetsTab' };
+        document.getElementById(tabIds[tabs[nextIndex]])?.focus();
+    }
+
     handleViewTabKeydown = (view, event) => {
         const views = ['daily', 'matrix', 'todo'];
         const currentIndex = views.indexOf(view);
@@ -1634,25 +1706,20 @@ class ViewModel {
     }
 
     openNewEntryModal = (day, project = null) => {
-        const isNewDay = this.selectedDayForNewEntry() !== day;
-        const createDraft = isNewDay || this.newEntryForms().length === 0;
-        const projectId = project?.id || this.filterByProject() || this.defaultProject();
-        const selectedProject = this.projects().find(project => project.id === projectId) || null;
-        if (createDraft) {
-            this.clearNewEntryForms();
-            const form = new NewEntryDraft(day, false, day.date);
-            form.project(selectedProject);
-            form.scope(this.defaultScope());
-            form.taskId(null);
-            form.ticketId(null);
-            this.newEntryForms([form]);
-            this.newEntrySubmissionStatus('');
-        }
+        const selectedProject = (project && this.getProjectById(project.id))
+            || this.getDefaultProject()
+            || this.getProjectById(this.filterByProject());
+        this.clearNewEntryForms();
+        const form = new NewEntryDraft(day, false, day.date);
+        form.project(selectedProject);
+        form.scope(this.defaultScope());
+        form.taskId(null);
+        form.ticketId(null);
+        this.newEntryForms([form]);
+        this.newEntrySubmissionStatus('');
         this.selectedDayForNewEntry(day);
 
-        if (day && (createDraft || project)) {
-            day.project(selectedProject);
-        }
+        if (day) day.project(selectedProject);
 
         const modal = this.initializeModal('newEntryModal', 'newEntryModal', {
             onShown: () => {
@@ -1841,9 +1908,12 @@ class ViewModel {
 
     openNewTodoModal = (day) => {
         this.selectedDayForNewEntry(day);
-        const projectId = this.filterByProject() || this.defaultProject();
-        const selectedProject = this.projects().find(project => project.id === projectId) || null;
-        if (day) day.project(selectedProject);
+        const selectedProject = this.getDefaultProject()
+            || this.getProjectById(this.filterByProject());
+        if (day) {
+            day.project(selectedProject);
+            day.notes('');
+        }
         const modal = this.initializeModal('newTodoModal', 'newTodoModal', {
             onShown: () => {
                 const currentDay = this.selectedDayForNewEntry();
@@ -2558,20 +2628,71 @@ class ViewModel {
     }
  
     updateProjectStats = async (totalMonthMs) => {
-        let { items: projects } = await model.slingr.get('/data/projects', {
-            'members.user': model.slingr.user.id,
-            _sortField: 'name',
-            _sortType: 'asc',
-            _size: 1000,
-        });
+        let projects = [];
+        try {
+            const response = await model.slingr.get('/data/projects', {
+                'members.user': model.slingr.user.id,
+                _sortField: 'name',
+                _sortType: 'asc',
+                _size: 1000,
+            });
+            projects = Array.isArray(response?.items) ? response.items : [];
+        } catch (error) {
+            console.warn('Could not load project metadata; using project details from loaded entries instead:', error);
+        }
+
+        projects = projects.filter(project => project?.id !== null && project?.id !== undefined);
+        if (!projects.length) {
+            projects = this.projects().map(project => ({ id: project.id, label: project.name }));
+        }
+        if (!projects.length) {
+            const projectsById = new Map();
+            for (const entry of this.weeks().flatMap(week => week.days()).flatMap(day => day.entries())) {
+                const rawProject = entry.raw?.project;
+                if (rawProject?.id === null || rawProject?.id === undefined || projectsById.has(rawProject.id)) continue;
+                projectsById.set(rawProject.id, {
+                    id: rawProject.id,
+                    label: String(rawProject.label || rawProject.name || (typeof entry.project === 'function' ? entry.project() : entry.project) || 'Unnamed project'),
+                });
+            }
+            projects = [...projectsById.values()].sort((a, b) => String(a.label).localeCompare(String(b.label)));
+        }
 
         const hiddenIds = this.hiddenProjectIds();
         const mappedProjects = projects.map(p => {
+            const projectName = String(p.label || p.name || 'Unnamed project');
             const project = {
                 id: p.id,
-                name: p.label,
-                shortName: p.label.length > 15 ? `${p.label.slice(0, 15)}…` : p.label,
+                name: projectName,
+                shortName: projectName.length > 15 ? `${projectName.slice(0, 15)}…` : projectName,
                 isVisible: ko.observable(!hiddenIds.includes(p.id)),
+                targetHours: ko.computed({
+                    read: () => {
+                        const monthTargets = this.projectTargetHoursByMonth()[this.getSelectedMonthKey()] || {};
+                        const savedTargetHours = monthTargets[p.id];
+                        return savedTargetHours !== null && savedTargetHours !== undefined && savedTargetHours !== '' && Number.isFinite(Number(savedTargetHours)) && Number(savedTargetHours) >= 0
+                            ? Number(savedTargetHours)
+                            : '';
+                    },
+                    write: value => {
+                        const targetHours = value === '' || value === null ? null : Number(value);
+                        const targetsByMonth = { ...this.projectTargetHoursByMonth() };
+                        const monthKey = this.getSelectedMonthKey();
+                        const monthTargets = { ...(targetsByMonth[monthKey] || {}) };
+                        if (Number.isFinite(targetHours) && targetHours >= 0) {
+                            monthTargets[p.id] = targetHours;
+                        } else {
+                            delete monthTargets[p.id];
+                        }
+
+                        if (Object.keys(monthTargets).length) {
+                            targetsByMonth[monthKey] = monthTargets;
+                        } else {
+                            delete targetsByMonth[monthKey];
+                        }
+                        this.projectTargetHoursByMonth(targetsByMonth);
+                    },
+                }),
             };
 
             project.isVisible.subscribe(isVisible => {
@@ -2596,11 +2717,16 @@ class ViewModel {
         });
 
         this.projects(mappedProjects);
+        this.projectsLoaded = true;
 
-        // Set default project if it's not set and there is one in localStorage
-        if (!this.defaultProject()) {
-            const storedDefaultProject = localStorage.getItem('solutions:timetracking:defaultProject');
-            if (storedDefaultProject) this.defaultProject(storedDefaultProject);
+        // Restore the persisted id after options binding has received the project list.
+        const storedDefaultProject = localStorage.getItem('solutions:timetracking:defaultProject');
+        const savedDefaultProject = this.getProjectById(storedDefaultProject || this.defaultProject());
+        const defaultProjectId = savedDefaultProject?.id ?? storedDefaultProject ?? null;
+        if (defaultProjectId !== this.defaultProject()) {
+            this.suppressDefaultProjectToast = true;
+            this.defaultProject(defaultProjectId);
+            this.suppressDefaultProjectToast = false;
         }
  
         const projectChartData = {
@@ -2631,7 +2757,7 @@ class ViewModel {
             let projectEntries = this.weeks()
                 .map(w => w.days()).flat()
                 .map(d => d.entries()).flat()
-                .filter(e => e.raw.project.id === project.id)
+                .filter(e => e.raw?.project?.id === project.id)
                 .filter(e => !e.isTodo());
  
             const projectScopeStats = {
@@ -3334,14 +3460,9 @@ function Day (date, entries, week) {
 
     // Set default project if available
     ko.computed(() => {
-        if (day.project() === null && model.projects().length > 0 && model.defaultProject()) {
-            const defaultProjectId = model.defaultProject();
-            if (defaultProjectId) {
-                const defaultProject = model.projects().find(p => p.id === defaultProjectId);
-                if (defaultProject) {
-                    day.project(defaultProject);
-                }
-            }
+        if (day.project() === null && model.projects().length > 0) {
+            const defaultProject = model.getDefaultProject();
+            if (defaultProject) day.project(defaultProject);
         }
     });
 
@@ -3782,12 +3903,18 @@ function Entry (entry, day) {
 
     self.formattedNotes = ko.computed(function() {
         const notesText = self.notes() || '';
-        const escapedNotes = notesText.replace(/[&<>"']/g, character => ({
+        const escapeHtml = text => text.replace(/[&<>"']/g, character => ({
             '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
         }[character]));
-        return escapedNotes.replace(/#(\w+)/g, (match, word) => {
-            return `<span class="badge bg-secondary text-dark me-1">#${word}</span>`;
-        });
+
+        let cursor = 0;
+        let formattedNotes = '';
+        for (const match of notesText.matchAll(/#(\w+)/g)) {
+            formattedNotes += escapeHtml(notesText.slice(cursor, match.index));
+            formattedNotes += `<span class="badge bg-secondary text-dark me-1">#${escapeHtml(match[1])}</span>`;
+            cursor = match.index + match[0].length;
+        }
+        return formattedNotes + escapeHtml(notesText.slice(cursor));
     });
 
     self.isTodo = ko.computed(function() {
