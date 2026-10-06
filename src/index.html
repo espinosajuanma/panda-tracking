@@ -437,7 +437,7 @@
                         </div>
                         <div id="monthlyProjectTargetsPanel" role="tabpanel" aria-labelledby="monthlyProjectTargetsTab" tabindex="0" data-bind="visible: monthlyStatsTab() === 'projectTargets'">
                             <h2 class="h6">Monthly project targets</h2>
-                            <p class="small text-body-secondary">Hours logged against each visible project’s target for <span data-bind="text: selectedMonthLabel"></span>.</p>
+                            <p class="small text-body-secondary">Hours logged against each visible project’s target for <span data-bind="text: selectedMonthLabel"></span>. Remaining monthly work hours are allocated to other projects.</p>
                             <!-- ko if: projectTargetProgress().length > 0 -->
                             <ul class="list-unstyled row row-cols-1 row-cols-sm-2 g-3 mb-0" data-bind="foreach: projectTargetProgress">
                                 <li class="col">

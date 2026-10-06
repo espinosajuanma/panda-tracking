@@ -358,18 +358,27 @@ class ViewModel {
         this.visibleProjects = ko.computed(() => {
             return this.projects().filter(project => project.isVisible());
         });
-        this.projectTargetProgress = ko.computed(() => this.visibleProjects()
-            .map(project => {
-                const targetHours = Number(project.targetHours());
-                if (!Number.isFinite(targetHours) || targetHours <= 0) return null;
+        this.projectTargetProgress = ko.computed(() => {
+            const visibleProjects = this.visibleProjects();
+            const projectTargets = visibleProjects.map(project => ({
+                project,
+                targetHours: Number(project.targetHours()),
+            }));
+            const targetedProjects = projectTargets.filter(({ targetHours }) => Number.isFinite(targetHours) && targetHours > 0);
+            const targetedProjectIds = new Set(targetedProjects.map(({ project }) => String(project.id)));
+            const loggedMsByProject = new Map();
+            for (const entry of this.weeks().flatMap(week => week.days()).flatMap(day => day.entries())) {
+                if (entry.isTodo()) continue;
+                const projectId = entry.raw?.project?.id;
+                if (projectId === null || projectId === undefined) continue;
+                const key = String(projectId);
+                loggedMsByProject.set(key, (loggedMsByProject.get(key) || 0) + entry.timeSpent());
+            }
 
-                const loggedMs = this.weeks().flatMap(week => week.days())
-                    .flatMap(day => day.entries())
-                    .filter(entry => !entry.isTodo() && entry.raw?.project?.id === project.id)
-                    .reduce((sum, entry) => sum + entry.timeSpent(), 0);
+            const progress = targetedProjects.map(({ project, targetHours }) => {
+                const loggedMs = loggedMsByProject.get(String(project.id)) || 0;
                 const loggedHours = loggedMs / (60 * 60 * 1000);
                 const percentage = Math.min((loggedHours / targetHours) * 100, 100);
-
                 return {
                     id: project.id,
                     name: project.name,
@@ -379,8 +388,32 @@ class ViewModel {
                     progressClass: loggedHours >= targetHours ? 'bg-success' : 'bg-primary',
                     ariaValueText: `${formatMsToHours(loggedMs)} of ${targetHours}h`,
                 };
-            })
-            .filter(project => project !== null));
+            });
+
+            const monthlyCapacityHours = this.weeks().flatMap(week => week.days())
+                .filter(day => day.isBussinessDay()).length * this.dailyWorkHours();
+            if (monthlyCapacityHours > 0) {
+                const assignedTargetHours = targetedProjects.reduce((sum, { targetHours }) => sum + targetHours, 0);
+                const otherTargetHours = Math.max(0, monthlyCapacityHours - assignedTargetHours);
+                const otherLoggedMs = visibleProjects
+                    .filter(project => !targetedProjectIds.has(String(project.id)))
+                    .reduce((sum, project) => sum + (loggedMsByProject.get(String(project.id)) || 0), 0);
+                const otherLoggedHours = otherLoggedMs / (60 * 60 * 1000);
+                progress.push({
+                    id: 'other-projects',
+                    name: 'Other projects',
+                    logged: formatMsToHours(otherLoggedMs),
+                    target: `${otherTargetHours}h`,
+                    percentage: otherTargetHours > 0 ? Math.min((otherLoggedHours / otherTargetHours) * 100, 100) : 0,
+                    progressClass: otherTargetHours > 0 && otherLoggedHours >= otherTargetHours ? 'bg-success' : 'bg-primary',
+                    ariaValueText: otherTargetHours > 0
+                        ? `${formatMsToHours(otherLoggedMs)} of ${otherTargetHours}h`
+                        : `${formatMsToHours(otherLoggedMs)} logged; no target hours remaining for other projects`,
+                });
+            }
+
+            return progress;
+        });
         this.projectHoursSummary = ko.computed(() => {
             const totals = this.visibleProjects().map(project => {
                 const ms = this.weeks().flatMap(week => week.days())
