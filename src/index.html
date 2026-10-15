@@ -88,6 +88,7 @@
                         <span class="me-2" data-bind="css: scopeClasses"></span>
                         <span data-bind="text: project"></span>
                     </div>
+                    <div class="small text-body-secondary" data-bind="text: scope() === 'task' ? 'Task: ' + task() : 'Support ticket: ' + task(), visible: scope() !== 'global'"></div>
                     <p style="white-space: pre-wrap;" data-bind="text: notes" class="text-muted small mb-0 mt-1"></p>
                 </div>
                 <div class="flex-shrink-0 text-end">
@@ -813,7 +814,7 @@
                                             <option value="task">Task</option>
                                             <option value="supportTicket">Support ticket</option>
                                         </select>
-                                        <div class="form-text">Used when opening a new time entry. To-Dos remain project-wide.</div>
+                                        <div class="form-text">Used when opening a new time entry or To-Do.</div>
                                     </div>
                                 </div>
                             </div>
@@ -1106,8 +1107,49 @@
                     <div class="modal-body">
                         <div class="mb-3">
                             <label class="form-label">Project <span class="text-danger">*</span></label>
-                                <select data-bind="options: $root.projects, optionsText: 'name', value: project" class="form-select" aria-label="Project"></select>
+                            <select data-bind="options: $root.projects, optionsText: 'name', value: project, optionsCaption: 'Select project...', attr: { disabled: todoScopeOptionsLoading() }" class="form-select" aria-label="Project"></select>
                         </div>
+                        <div class="mb-3">
+                            <label class="form-label d-block">Scope</label>
+                            <div class="btn-group" role="group" aria-label="To-Do scope">
+                                <input type="radio" class="btn-check" value="global" autocomplete="off" id="todo-scope-global" data-bind="checked: scope, attr: { disabled: todoScopeOptionsLoading() }">
+                                <label class="btn btn-outline-primary" for="todo-scope-global"><i class="bi bi-globe-americas me-1" aria-hidden="true"></i>Global to project</label>
+                                <input type="radio" class="btn-check" value="task" autocomplete="off" id="todo-scope-task" data-bind="checked: scope, attr: { disabled: todoScopeOptionsLoading() }">
+                                <label class="btn btn-outline-primary" for="todo-scope-task"><i class="bi bi-journal-check me-1" aria-hidden="true"></i>Task</label>
+                                <input type="radio" class="btn-check" value="supportTicket" autocomplete="off" id="todo-scope-ticket" data-bind="checked: scope, attr: { disabled: todoScopeOptionsLoading() }">
+                                <label class="btn btn-outline-primary" for="todo-scope-ticket"><i class="bi bi-receipt me-1" aria-hidden="true"></i>Support ticket</label>
+                            </div>
+                        </div>
+                        <!-- ko if: scope() === 'task' -->
+                        <div class="mb-3">
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" role="switch" id="todo-only-assigned" data-bind="checked: onlyAssignedToMe, attr: { disabled: todoScopeOptionsLoading() }">
+                                <label class="form-check-label small text-muted" for="todo-only-assigned">Only show assigned to me</label>
+                            </div>
+                            <label class="form-label">Task <span class="text-danger">*</span></label>
+                            <div class="btn-group btn-group-sm flex-wrap mb-2" role="group" aria-label="Task status filter for To-Do">
+                                <!-- ko foreach: taskStatusOptions -->
+                                <input type="radio" class="btn-check" data-bind="value: value, checked: $parent.taskStatusFilter, attr: { name: 'todo-task-status', id: 'todo-task-status-' + value, disabled: $parent.todoScopeOptionsLoading() }">
+                                <label class="btn btn-outline-secondary" data-bind="text: text, attr: { for: 'todo-task-status-' + value }"></label>
+                                <!-- /ko -->
+                            </div>
+                            <select id="todo-task" class="form-select" data-bind="options: todoTasks, optionsText: 'name', optionsValue: 'id', value: todoTaskId, optionsCaption: 'Select task...', attr: { disabled: todoScopeOptionsLoading() || !project() }, select2: { theme: 'bootstrap-5', dropdownParent: $('#newTodoModal'), width: '100%' }"></select>
+                            <div class="form-text" data-bind="visible: todoScopeOptionsLoading()"><span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Loading tasks...</div>
+                            <div class="form-text" data-bind="visible: !todoScopeOptionsLoading() && project() && todoTasks().length === 0">No tasks for this project.</div>
+                        </div>
+                        <!-- /ko -->
+                        <!-- ko if: scope() === 'supportTicket' -->
+                        <div class="mb-3">
+                            <label class="form-label" for="todo-ticket">Support ticket <span class="text-danger">*</span></label>
+                            <div class="form-check form-switch mb-2">
+                                <input class="form-check-input" type="checkbox" role="switch" id="todo-only-assigned-ticket" data-bind="checked: onlyAssignedToMe, attr: { disabled: todoScopeOptionsLoading() }">
+                                <label class="form-check-label small text-muted" for="todo-only-assigned-ticket">Only show assigned to me</label>
+                            </div>
+                            <select id="todo-ticket" class="form-select" data-bind="options: todoTickets, optionsText: 'name', optionsValue: 'id', value: todoTicketId, optionsCaption: 'Select support ticket...', attr: { disabled: todoScopeOptionsLoading() || !project() }, select2: { theme: 'bootstrap-5', dropdownParent: $('#newTodoModal'), width: '100%' }"></select>
+                            <div class="form-text" data-bind="visible: todoScopeOptionsLoading()"><span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Loading support tickets...</div>
+                            <div class="form-text" data-bind="visible: !todoScopeOptionsLoading() && project() && todoTickets().length === 0">No support tickets for this project.</div>
+                        </div>
+                        <!-- /ko -->
                         <div class="mb-3">
                             <label class="form-label">Notes <span class="text-danger">*</span></label>
                             <textarea placeholder="What needs to be done?" aria-label="To-Do notes" data-bind="value: notes" name="notes" class="form-control" rows="5"></textarea>
