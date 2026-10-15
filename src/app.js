@@ -209,6 +209,11 @@ class ViewModel {
             localStorage.setItem('solutions:timetracking:suggestionsEnabled', JSON.stringify(enabled));
             if (this.logged()) this.updateDashboard();
         });
+        const storedEntryGroupingMode = localStorage.getItem('solutions:timetracking:entryGroupingMode');
+        this.entryGroupingMode = ko.observable(['none', 'type', 'project'].includes(storedEntryGroupingMode) ? storedEntryGroupingMode : 'type');
+        this.entryGroupingMode.subscribe(mode => {
+            localStorage.setItem('solutions:timetracking:entryGroupingMode', mode);
+        });
         this.activeView = ko.observable('daily');
         this.monthlyStatsTab = ko.observable('overview');
         this.matrixModalTitle = ko.observable('Entries');
@@ -3489,6 +3494,37 @@ function Day (date, entries, week) {
     day.suggestions = ko.computed(function() {
         if (!day.isToday() || !model.suggestionsEnabled()) return [];
         return model.suggestions().filter(suggestion => suggestion.date === day.dateStr());
+    });
+
+    day.entryGroups = ko.computed(function() {
+        const entries = day.filteredEntries();
+        const suggestions = day.suggestions();
+        if (model.entryGroupingMode() === 'none') {
+            return [{ label: '', entries, suggestions }];
+        }
+        if (model.entryGroupingMode() === 'project') {
+            const groupsByProject = new Map();
+            const getGroup = (projectId, projectName) => {
+                const name = projectName || 'Unassigned project';
+                const key = projectId !== null && projectId !== undefined && projectId !== ''
+                    ? `id:${projectId}`
+                    : `name:${name.toLowerCase()}`;
+                if (!groupsByProject.has(key)) groupsByProject.set(key, { label: name, entries: [], suggestions: [] });
+                return groupsByProject.get(key);
+            };
+
+            entries.forEach(entry => getGroup(entry.raw?.project?.id, entry.project()).entries.push(entry));
+            suggestions.forEach(suggestion => getGroup(suggestion.projectId, suggestion.projectName).suggestions.push(suggestion));
+            return [...groupsByProject.values()].sort((a, b) => a.label.localeCompare(b.label));
+        }
+
+        const loggedEntries = entries.filter(entry => !entry.isTodo());
+        const todos = entries.filter(entry => entry.isTodo());
+        return [
+            { label: 'Logged entries', entries: loggedEntries, suggestions: [] },
+            { label: 'To-Dos', entries: todos, suggestions: [] },
+            { label: 'Suggestions', entries: [], suggestions },
+        ].filter(group => group.entries.length || group.suggestions.length);
     });
 
     // Set default project if available

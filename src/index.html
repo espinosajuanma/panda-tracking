@@ -626,11 +626,16 @@
                             <div class="card-body">
                                 <!-- ENTRIES -->
                                 <ul data-bind="visible: filteredEntries().length > 0 || suggestions().length > 0" class="list-group list-group-flush">
-                                    <!-- ko foreach: filteredEntries -->
+                                    <!-- ko foreach: entryGroups -->
+                                    <!-- ko if: label -->
+                                    <li class="list-group-item bg-body-tertiary fw-semibold small px-0 py-2" data-bind="text: label"></li>
+                                    <!-- /ko -->
+                                    <!-- ko foreach: entries -->
                                     <!-- ko template: { name: 'entry-template', data: $data } --><!-- /ko -->
                                     <!-- /ko -->
                                     <!-- ko foreach: suggestions -->
                                     <!-- ko template: { name: 'suggestion-entry-template', data: $data } --><!-- /ko -->
+                                    <!-- /ko -->
                                     <!-- /ko -->
                                 </ul>
                                 <div data-bind="visible: filteredEntries().length === 0 && suggestions().length === 0" class="text-center text-body-secondary p-3">
@@ -873,6 +878,19 @@
                                             <label class="form-check-label fw-semibold" for="suggestionsEnabled">Suggest entries</label>
                                         </div>
                                         <div id="suggestionsHelp" class="form-text">Show eligible tasks and tickets you haven’t logged today while you have time remaining.</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row g-3 mt-0">
+                                <div class="col-md-6">
+                                    <div class="settings-option-card">
+                                        <label for="entryGroupingMode" class="form-label">Group daily entries by</label>
+                                        <select id="entryGroupingMode" class="form-select" data-bind="value: entryGroupingMode">
+                                            <option value="none">No group</option>
+                                            <option value="type">Type</option>
+                                            <option value="project">Project</option>
+                                        </select>
+                                        <div class="form-text">Choose how entries, To-Dos, and suggestions are organized in each day.</div>
                                     </div>
                                 </div>
                             </div>
