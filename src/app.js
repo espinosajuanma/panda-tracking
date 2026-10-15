@@ -209,6 +209,11 @@ class ViewModel {
             localStorage.setItem('solutions:timetracking:suggestionsEnabled', JSON.stringify(enabled));
             if (this.logged()) this.updateDashboard();
         });
+        const storedEntryGroupingMode = localStorage.getItem('solutions:timetracking:entryGroupingMode');
+        this.entryGroupingMode = ko.observable(['none', 'type', 'project'].includes(storedEntryGroupingMode) ? storedEntryGroupingMode : 'type');
+        this.entryGroupingMode.subscribe(mode => {
+            localStorage.setItem('solutions:timetracking:entryGroupingMode', mode);
+        });
         this.activeView = ko.observable('daily');
         this.monthlyStatsTab = ko.observable('overview');
         this.matrixModalTitle = ko.observable('Entries');
@@ -1944,10 +1949,22 @@ class ViewModel {
         const selectedProject = this.getDefaultProject()
             || this.getProjectById(this.filterByProject());
         if (day) {
+            day.todoModalActive(true);
             day.project(selectedProject);
+            day.scope(this.defaultScope());
+            day.todoTaskId(null);
+            day.todoTicketId(null);
             day.notes('');
+            day.loadTodoScopeOptions();
         }
         const modal = this.initializeModal('newTodoModal', 'newTodoModal', {
+            onHide: () => {
+                const currentDay = this.selectedDayForNewEntry();
+                if (!currentDay) return;
+                currentDay.todoModalActive(false);
+                currentDay.todoScopeOptionsRequest++;
+                currentDay.todoScopeOptionsLoading(false);
+            },
             onShown: () => {
                 const currentDay = this.selectedDayForNewEntry();
                 const firstRequiredField = currentDay?.project()
@@ -3356,10 +3373,27 @@ function Day (date, entries, week) {
                     model.loading(false);
                     return;
                 }
+                if (day.scope() === 'task' && !day.todoTaskId()) {
+                    model.addToast('Please select a task for this To-Do.', 'error');
+                    model.loading(false);
+                    return;
+                }
+                if (day.scope() === 'supportTicket' && !day.todoTicketId()) {
+                    model.addToast('Please select a support ticket for this To-Do.', 'error');
+                    model.loading(false);
+                    return;
+                }
+                if (!day.notes().trim()) {
+                    model.addToast('Please add notes for this To-Do.', 'error');
+                    model.loading(false);
+                    return;
+                }
 
                 await model.slingr.put(`/data/${TIME_TRACKING_ENTITY}/logTime`, {
                     project: day.project().id,
-                    scope: 'global',
+                    scope: day.scope(),
+                    task: day.scope() === 'task' ? day.todoTaskId() : null,
+                    ticket: day.scope() === 'supportTicket' ? day.todoTicketId() : null,
                     forMe: true,
                     date: day.dateStr(),
                     timeSpent: 0,
@@ -3369,6 +3403,8 @@ function Day (date, entries, week) {
                 await day.updateDay();
 
                 day.notes('');
+                day.todoTaskId(null);
+                day.todoTicketId(null);
 
                 model.newTodoModal.hide();
                 await model.updateStats();
@@ -3381,6 +3417,13 @@ function Day (date, entries, week) {
         },
         taskId: ko.observable(null),
         ticketId: ko.observable(null),
+        todoTaskId: ko.observable(null),
+        todoTicketId: ko.observable(null),
+        todoTasks: ko.observableArray([]),
+        todoTickets: ko.observableArray([]),
+        todoScopeOptionsLoading: ko.observable(false),
+        todoScopeOptionsRequest: 0,
+        todoModalActive: ko.observable(false),
         tasks: ko.observableArray([]),
         taskStatusFilter: ko.observable('all'),
         taskStatusOptions: [
@@ -3432,6 +3475,15 @@ function Day (date, entries, week) {
 
     day.isTodoLoggable = ko.computed(function() {
         if (!day.project()) {
+            return false;
+        }
+        if (day.todoScopeOptionsLoading()) {
+            return false;
+        }
+        if (day.scope() === 'task' && !day.todoTaskId()) {
+            return false;
+        }
+        if (day.scope() === 'supportTicket' && !day.todoTicketId()) {
             return false;
         }
         if (day.notes().trim() === '') {
@@ -3489,6 +3541,37 @@ function Day (date, entries, week) {
     day.suggestions = ko.computed(function() {
         if (!day.isToday() || !model.suggestionsEnabled()) return [];
         return model.suggestions().filter(suggestion => suggestion.date === day.dateStr());
+    });
+
+    day.entryGroups = ko.computed(function() {
+        const entries = day.filteredEntries();
+        const suggestions = day.suggestions();
+        if (model.entryGroupingMode() === 'none') {
+            return [{ label: '', entries, suggestions }];
+        }
+        if (model.entryGroupingMode() === 'project') {
+            const groupsByProject = new Map();
+            const getGroup = (projectId, projectName) => {
+                const name = projectName || 'Unassigned project';
+                const key = projectId !== null && projectId !== undefined && projectId !== ''
+                    ? `id:${projectId}`
+                    : `name:${name.toLowerCase()}`;
+                if (!groupsByProject.has(key)) groupsByProject.set(key, { label: name, entries: [], suggestions: [] });
+                return groupsByProject.get(key);
+            };
+
+            entries.forEach(entry => getGroup(entry.raw?.project?.id, entry.project()).entries.push(entry));
+            suggestions.forEach(suggestion => getGroup(suggestion.projectId, suggestion.projectName).suggestions.push(suggestion));
+            return [...groupsByProject.values()].sort((a, b) => a.label.localeCompare(b.label));
+        }
+
+        const loggedEntries = entries.filter(entry => !entry.isTodo());
+        const todos = entries.filter(entry => entry.isTodo());
+        return [
+            { label: 'Logged entries', entries: loggedEntries, suggestions: [] },
+            { label: 'To-Dos', entries: todos, suggestions: [] },
+            { label: 'Suggestions', entries: [], suggestions },
+        ].filter(group => group.entries.length || group.suggestions.length);
     });
 
     // Set default project if available
@@ -3557,20 +3640,76 @@ function Day (date, entries, week) {
         }
     };
 
+    day.loadTodoScopeOptions = async () => {
+        const requestId = ++day.todoScopeOptionsRequest;
+        const project = day.project();
+        const scope = day.scope();
+        day.todoTasks([]);
+        day.todoTickets([]);
+
+        if (!project || !scope || scope === 'global') {
+            day.todoScopeOptionsLoading(false);
+            return;
+        }
+
+        day.todoScopeOptionsLoading(true);
+        try {
+            const taskScope = scope === 'task';
+            const entity = taskScope ? 'dev.tasks' : 'support.tickets';
+            const params = {
+                project: project.id,
+                _size: 1000,
+                _fields: 'id,label,number',
+                ...(taskScope
+                    ? { _sortField: 'createdAt', _sortType: 'desc' }
+                    : { _sortField: 'draftTimestamp', _sortType: 'desc' }),
+            };
+            if (day.onlyAssignedToMe()) {
+                if (taskScope) params.assignees = model.slingr.user.id;
+                else params.assignee = model.slingr.user.id;
+            }
+            if (taskScope && day.taskStatusFilter() !== 'all') params.status = day.taskStatusFilter();
+
+            const { items } = await model.slingr.get(`/data/${entity}`, params);
+            if (requestId === day.todoScopeOptionsRequest) {
+                const options = items.map(item => ({ id: item.id, name: item.label }));
+                if (taskScope) day.todoTasks(options);
+                else day.todoTickets(options);
+            }
+        } catch (error) {
+            if (requestId === day.todoScopeOptionsRequest) {
+                console.error('Error loading scope options for a To-Do', error);
+                model.addToast('Error loading tasks/tickets for a To-Do.', 'error');
+            }
+        } finally {
+            if (requestId === day.todoScopeOptionsRequest) day.todoScopeOptionsLoading(false);
+        }
+    };
+
     day.project.subscribe(async () => await loadScopeOptions());
+    day.project.subscribe(async () => {
+        if (day.todoModalActive()) await day.loadTodoScopeOptions();
+    });
     day.scope.subscribe(async () => {
         model.defaultScope(day.scope());
         day.taskId(null);
         day.ticketId(null);
         await loadScopeOptions();
+        day.todoTaskId(null);
+        day.todoTicketId(null);
+        if (day.todoModalActive()) await day.loadTodoScopeOptions();
     });
     day.taskStatusFilter.subscribe(async () => {
         await loadScopeOptions();
+        if (day.todoModalActive()) await day.loadTodoScopeOptions();
     });
     day.onlyAssignedToMe.subscribe(async () => {
         day.taskId(null);
         day.ticketId(null);
         await loadScopeOptions();
+        day.todoTaskId(null);
+        day.todoTicketId(null);
+        if (day.todoModalActive()) await day.loadTodoScopeOptions();
     });
 
     for (let entry of entries) {
