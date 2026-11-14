@@ -229,6 +229,7 @@
                             <!-- /ko -->
                         </div>
                     </div>
+                    <div class="col-12" data-bind="template: { name: 'related-entries-panel-template', data: relatedEntries }"></div>
                     <div class="col-12">
                         <label class="form-label" data-bind="attr: { for: 'entry-notes-' + id }">Notes <span class="text-danger">*</span></label>
                         <textarea class="form-control" rows="3" placeholder="What did you work on?" data-bind="value: notes, attr: { id: 'entry-notes-' + id, 'aria-label': 'Notes for entry ' + entryNumber(), disabled: $root.loading() || optionsLoading() }"></textarea>
@@ -258,6 +259,38 @@
                         <button type="button" class="btn btn-sm btn-outline-warning" data-bind="click: loadScheduleHolidayData, visible: scheduleHolidayError, attr: { disabled: $root.loading() }">Retry holiday data</button>
                     </div>
                     <div class="form-text mt-1">Occurrences are created immediately as a one-time batch, not an ongoing schedule. Weekends and saved leave dates are skipped; public holidays are skipped when holiday support is enabled.</div>
+                </div>
+            </div>
+        </div>
+    </script>
+
+    <script type="text/html" id="related-entries-panel-template">
+        <div class="related-entries-panel border rounded bg-body-tertiary p-2 mt-3" data-bind="visible: isActive">
+            <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                <button type="button" class="btn btn-link related-entries-toggle p-0 text-body text-decoration-none small fw-semibold" data-bind="click: toggleExpanded, attr: { 'aria-expanded': expanded() ? 'true' : 'false' }">
+                    <i class="bi me-1" data-bind="css: { 'bi-chevron-right': !expanded(), 'bi-chevron-down': expanded() }" aria-hidden="true"></i>Other entries
+                </button>
+                <span class="badge text-bg-secondary" data-bind="visible: !loading() && !error() && entries().length > 0, text: totalLabel"></span>
+            </div>
+            <div data-bind="visible: expanded">
+                <div class="small text-body-secondary mt-2" data-bind="visible: loading">
+                    <span class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>Loading related entries…
+                </div>
+                <div class="alert alert-warning py-2 mb-0 mt-2 small" role="alert" data-bind="visible: !loading() && error()">
+                    <span data-bind="text: error"></span>
+                    <button type="button" class="btn btn-sm btn-outline-secondary ms-2" data-bind="click: retry">Retry</button>
+                </div>
+                <div class="small text-body-secondary mt-2" data-bind="visible: !loading() && !error() && entries().length === 0">
+                    No other entries for this task or ticket yet.
+                </div>
+                <div class="related-entries-list mt-2" data-bind="visible: !loading() && !error() && entries().length > 0, foreach: entries">
+                    <div class="related-entry d-flex align-items-start justify-content-between gap-2 py-1 border-top">
+                        <div class="min-w-0">
+                            <div class="small fw-semibold" data-bind="text: dateLabel"></div>
+                            <div class="small text-body-secondary text-truncate" data-bind="text: notes || 'No notes', attr: { title: notes || 'No notes' }"></div>
+                        </div>
+                        <span class="badge text-bg-light border flex-shrink-0" data-bind="text: isTodo ? 'To-Do' : durationLabel"></span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1080,6 +1113,7 @@
                                 <!-- /ko -->
                             </div>
                         </div>
+                        <div class="mb-3" data-bind="template: { name: 'related-entries-panel-template', data: relatedEntries }"></div>
                         <div class="mb-3">
                             <label class="form-label">Notes <span class="text-danger">*</span></label>
                             <textarea placeholder="What did you work on?" aria-label="Notes" data-bind="value: edit_notes" name="notes" class="form-control" rows="5"></textarea>
@@ -1150,6 +1184,7 @@
                             <div class="form-text" data-bind="visible: !todoScopeOptionsLoading() && project() && todoTickets().length === 0">No support tickets for this project.</div>
                         </div>
                         <!-- /ko -->
+                        <div class="mb-3" data-bind="template: { name: 'related-entries-panel-template', data: todoRelatedEntries }"></div>
                         <div class="mb-3">
                             <label class="form-label">Notes <span class="text-danger">*</span></label>
                             <textarea placeholder="What needs to be done?" aria-label="To-Do notes" data-bind="value: notes" name="notes" class="form-control" rows="5"></textarea>

@@ -1954,6 +1954,7 @@ class ViewModel {
             day.scope(this.defaultScope());
             day.todoTaskId(null);
             day.todoTicketId(null);
+            day.todoRelatedEntries.reset();
             day.notes('');
             day.loadTodoScopeOptions();
         }
@@ -1964,6 +1965,7 @@ class ViewModel {
                 currentDay.todoModalActive(false);
                 currentDay.todoScopeOptionsRequest++;
                 currentDay.todoScopeOptionsLoading(false);
+                currentDay.todoRelatedEntries.reset();
             },
             onShown: () => {
                 const currentDay = this.selectedDayForNewEntry();
@@ -3049,6 +3051,120 @@ function Week(week, entries) {
 
 let newEntryFormSequence = 0;
 
+function createRelatedEntriesState(resolveSelection) {
+    const entries = ko.observableArray([]);
+    const totalMs = ko.observable(0);
+    const loading = ko.observable(false);
+    const error = ko.observable('');
+    const expanded = ko.observable(false);
+    let requestId = 0;
+
+    const isActive = ko.computed(() => Boolean((resolveSelection() || {}).targetId));
+    const toggleExpanded = () => expanded(!expanded());
+
+    const totalLabel = ko.computed(() => {
+        const count = entries().length;
+        if (!count) return '';
+        return `${formatMsToDuration(totalMs())} total · ${count} ${count === 1 ? 'entry' : 'entries'}`;
+    });
+
+    const reset = () => {
+        requestId++;
+        entries([]);
+        totalMs(0);
+        loading(false);
+        error('');
+        expanded(false);
+    };
+
+    const refresh = async () => {
+        const selection = resolveSelection() || {};
+        const filterField = selection.scope === 'task'
+            ? 'task'
+            : selection.scope === 'supportTicket'
+                ? 'ticket'
+                : null;
+        const targetId = selection.targetId;
+        const currentRequestId = ++requestId;
+
+        if (!filterField || !targetId) {
+            entries([]);
+            totalMs(0);
+            loading(false);
+            error('');
+            expanded(false);
+            return;
+        }
+
+        loading(true);
+        error('');
+
+        try {
+            const { items } = await model.slingr.get(`/data/${TIME_TRACKING_ENTITY}`, {
+                _size: 1000,
+                _sortField: 'date',
+                _sortType: 'desc',
+                _fields: 'id,date,timeSpent,notes,project,task,ticket',
+                person: model.slingr.user.id,
+                [filterField]: targetId,
+            });
+
+            if (currentRequestId !== requestId) return;
+
+            const excludeId = selection.excludeId == null ? null : String(selection.excludeId);
+            const rows = items
+                .filter(entry => {
+                    const linkedId = filterField === 'task' ? entry.task?.id : entry.ticket?.id;
+                    return linkedId != null && String(linkedId) === String(targetId);
+                })
+                .filter(entry => !excludeId || String(entry.id) !== excludeId)
+                .map(entry => {
+                    const timeSpent = Number(entry.timeSpent) || 0;
+                    return {
+                        id: entry.id,
+                        notes: entry.notes || '',
+                        timeSpent,
+                        dateLabel: entry.date ? formatEntryDateLabel(entry.date) : 'Unknown date',
+                        durationLabel: formatMsToDuration(timeSpent),
+                        isTodo: timeSpent === 0,
+                    };
+                });
+
+            entries(rows);
+            totalMs(rows.reduce((sum, entry) => sum + entry.timeSpent, 0));
+        } catch (fetchError) {
+            if (currentRequestId !== requestId) return;
+            console.error('Error loading related entries', fetchError);
+            entries([]);
+            totalMs(0);
+            error('Could not load entries related to this task or ticket.');
+        } finally {
+            if (currentRequestId === requestId) loading(false);
+        }
+    };
+
+    const dispose = () => {
+        requestId++;
+        isActive.dispose();
+        totalLabel.dispose();
+    };
+
+    return {
+        entries,
+        totalMs,
+        loading,
+        error,
+        isActive,
+        totalLabel,
+        expanded,
+        toggleExpanded,
+        refresh,
+        retry: refresh,
+        reset,
+        dispose,
+    };
+}
+
 function NewEntryDraft(source, copyDetails = false, baseDate = null) {
     const initialProject = source.project ? source.project() : null;
     const initialScope = source.scope ? source.scope() : model.defaultScope();
@@ -3079,6 +3195,10 @@ function NewEntryDraft(source, copyDetails = false, baseDate = null) {
         { value: 'released', text: 'Released' },
     ];
     this.onlyAssignedToMe = ko.observable(source.onlyAssignedToMe ? source.onlyAssignedToMe() : true);
+    this.relatedEntries = createRelatedEntriesState(() => ({
+        scope: this.scope(),
+        targetId: this.scope() === 'task' ? this.taskId() : this.scope() === 'supportTicket' ? this.ticketId() : null,
+    }));
     this.scheduled = ko.observable(false);
     this.scheduleFrequency = ko.observable('businessDaily');
     this.scheduleStart = ko.observable(selectedDateString);
@@ -3258,6 +3378,8 @@ function NewEntryDraft(source, copyDetails = false, baseDate = null) {
             this.ticketId(null);
             this.loadScopeOptions();
         }),
+        this.taskId.subscribe(() => this.relatedEntries.refresh()),
+        this.ticketId.subscribe(() => this.relatedEntries.refresh()),
         this.scheduled.subscribe(scheduled => {
             if (scheduled) {
                 this.loadScheduleHolidayData();
@@ -3283,9 +3405,11 @@ function NewEntryDraft(source, copyDetails = false, baseDate = null) {
         this.scheduleDates.dispose();
         this.scheduleValid.dispose();
         this.scheduleSummary.dispose();
+        this.relatedEntries.dispose();
     };
 
     if (this.scope() !== 'global') this.loadScopeOptions();
+    this.relatedEntries.refresh();
 }
 
 function Day (date, entries, week) {
@@ -3456,6 +3580,11 @@ function Day (date, entries, week) {
             day.visibleNotes(! day.visibleNotes());
         }
     }
+
+    day.todoRelatedEntries = createRelatedEntriesState(() => ({
+        scope: day.scope(),
+        targetId: day.scope() === 'task' ? day.todoTaskId() : day.scope() === 'supportTicket' ? day.todoTicketId() : null,
+    }));
 
     day.fillMissingHours = function() {
         day.timeSpent(getMaxTimeSpent() - day.durationMs());
@@ -3688,7 +3817,11 @@ function Day (date, entries, week) {
 
     day.project.subscribe(async () => await loadScopeOptions());
     day.project.subscribe(async () => {
-        if (day.todoModalActive()) await day.loadTodoScopeOptions();
+        if (!day.todoModalActive()) return;
+        day.todoTaskId(null);
+        day.todoTicketId(null);
+        day.todoRelatedEntries.reset();
+        await day.loadTodoScopeOptions();
     });
     day.scope.subscribe(async () => {
         model.defaultScope(day.scope());
@@ -3711,6 +3844,9 @@ function Day (date, entries, week) {
         day.todoTicketId(null);
         if (day.todoModalActive()) await day.loadTodoScopeOptions();
     });
+
+    day.todoTaskId.subscribe(() => day.todoRelatedEntries.refresh());
+    day.todoTicketId.subscribe(() => day.todoRelatedEntries.refresh());
 
     for (let entry of entries) {
         if (entry.date !== dateStr) continue;
@@ -3952,6 +4088,8 @@ function Entry (entry, day) {
                 if (self.scope() === 'supportTicket' && self.raw.ticket) {
                     self.edit_ticketId(self.raw.ticket.id);
                 }
+
+                await self.relatedEntries.refresh();
             } finally {
                 isInitializing = false;
             }
@@ -4060,6 +4198,12 @@ function Entry (entry, day) {
         },
     };
 
+    self.relatedEntries = createRelatedEntriesState(() => ({
+        scope: self.edit_scope(),
+        targetId: self.edit_scope() === 'task' ? self.edit_taskId() : self.edit_scope() === 'supportTicket' ? self.edit_ticketId() : null,
+        excludeId: self.id(),
+    }));
+
     self.editTargetWarning = ko.computed(function() {
         const targetMs = model.dailyWorkHours() * 60 * 60 * 1000;
         const projectedMs = self.day.durationMs() - self.raw.timeSpent + self.edit_timeSpent();
@@ -4131,6 +4275,9 @@ function Entry (entry, day) {
         self.edit_ticketId(null);
         await self.loadEditScopeOptions();
     });
+
+    self.edit_taskId.subscribe(() => self.relatedEntries.refresh());
+    self.edit_ticketId.subscribe(() => self.relatedEntries.refresh());
 
     self.isEditLoggable = ko.computed(function() {
         if (!self.edit_project()) return false;
