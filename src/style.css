@@ -228,6 +228,15 @@ header .navbar > .container {
     padding: 1rem;
 }
 
+.related-entries-list {
+    max-height: 14rem;
+    overflow-y: auto;
+}
+
+.related-entries-panel .min-w-0 {
+    min-width: 0;
+}
+
 .suggested-entry {
     opacity: 0.6;
 }
